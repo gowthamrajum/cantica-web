@@ -77,7 +77,13 @@
 /* The channel always shows the slide as a landscape 16:9 stage. In landscape it
    letterboxes to fit; on a portrait phone the frame rotates 90° to fill the
    screen, so the composed (960×540) slides are never squished. */
-.channel-root { position: fixed; inset: 0; overflow: hidden; background: #000; }
+/* While watching a broadcast the whole document is black so no paper page bg
+   peeks through the status-bar / home-indicator safe areas. */
+html.channel-open,
+html.channel-open body {
+  background: #000;
+}
+.channel-root { position: fixed; inset: 0; height: 100dvh; width: 100dvw; overflow: hidden; background: #000; }
 
 /* A landscape canvas that fills the screen. In landscape it's the screen itself;
    on a portrait phone it rotates 90° so the whole broadcast (slide + chrome) is
@@ -88,8 +94,8 @@
     inset: auto;
     top: 0;
     left: 100%;
-    width: 100vh;
-    height: 100vw;
+    width: 100dvh;
+    height: 100dvw;
     transform-origin: top left;
     transform: rotate(90deg);
   }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useLiveState } from '../lib/useLiveState'
 import { Stage } from '../components/Stage'
@@ -6,6 +7,14 @@ export function Channel(): JSX.Element {
   const { room = '' } = useParams()
   const { state, connected } = useLiveState(room)
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
+
+  // Paint the whole document black while watching, so no paper page background
+  // can show through in the status-bar / home-indicator safe areas.
+  useEffect(() => {
+    const html = document.documentElement
+    html.classList.add('channel-open')
+    return () => html.classList.remove('channel-open')
+  }, [])
 
   return (
     <div className="channel-root">
