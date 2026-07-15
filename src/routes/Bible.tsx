@@ -50,7 +50,7 @@ export function Bible(): JSX.Element {
           <p className="eyebrow">Holy Bible · పరిశుద్ధ గ్రంథము</p>
 
           {/* controls */}
-          <div className="sticky top-[68px] z-20 -mx-2 mb-8 mt-4 flex flex-wrap items-center gap-3 bg-paper/95 px-2 py-2 backdrop-blur">
+          <div className="sticky top-[calc(68px+env(safe-area-inset-top))] z-20 -mx-2 mb-8 mt-4 flex flex-wrap items-center gap-3 bg-paper/95 px-2 py-2 backdrop-blur">
             <button
               onClick={() => setPicker('book')}
               className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 font-serif text-lg font-semibold text-ink shadow-soft transition hover:border-gold-400"

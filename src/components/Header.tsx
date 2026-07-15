@@ -29,7 +29,7 @@ export function Header(): JSX.Element {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
+      className={`fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)] transition-colors duration-300 ${
         solid || open ? 'border-b border-line/80 bg-paper/90 backdrop-blur-md' : 'bg-transparent'
       }`}
     >

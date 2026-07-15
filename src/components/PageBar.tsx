@@ -10,7 +10,7 @@ const LINKS = [
 /** Solid top bar shared by the interior pages (Watch / Bible / Songs). */
 export function PageBar(): JSX.Element {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-line bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="container-x flex h-[68px] items-center justify-between gap-4">
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <EmblemBadge className="h-10 w-10" tone="navy" />

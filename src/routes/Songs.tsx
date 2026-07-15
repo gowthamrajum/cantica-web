@@ -39,7 +39,7 @@ export function Songs(): JSX.Element {
         <h1 className="mt-4 font-serif text-4xl font-semibold text-ink sm:text-5xl">Songs</h1>
         <p className="mt-3 text-lg text-ink-soft">{songs ? `${songs.length.toLocaleString()} songs` : 'Our worship songbook'}</p>
 
-        <div className="sticky top-[68px] z-20 -mx-1 mb-6 mt-6 flex items-center gap-3 rounded-full border border-line bg-card px-4 py-3 shadow-soft">
+        <div className="sticky top-[calc(68px+env(safe-area-inset-top))] z-20 -mx-1 mb-6 mt-6 flex items-center gap-3 rounded-full border border-line bg-card px-4 py-3 shadow-soft">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="flex-none text-ink-muted"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
           <input
             value={q}
