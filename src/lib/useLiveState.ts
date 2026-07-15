@@ -1,0 +1,70 @@
+import { useEffect, useState } from 'react'
+import { stateUrl, streamUrl, type LiveState } from './relay'
+
+/** Subscribe to a room's live state — SSE first, short-poll fallback (mirrors the
+ *  desktop obs.html audience client). */
+export function useLiveState(room: string): { state: LiveState | null; connected: boolean } {
+  const [state, setState] = useState<LiveState | null>(null)
+  const [connected, setConnected] = useState(false)
+
+  useEffect(() => {
+    if (!room) return
+    let alive = true
+    let es: EventSource | null = null
+    let poll: ReturnType<typeof setInterval> | null = null
+    let lastRev = -1
+
+    const startPolling = (): void => {
+      if (poll) return
+      poll = setInterval(() => {
+        fetch(stateUrl(room), { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (!alive || !d) return
+            setConnected(true)
+            if (d.rev !== lastRev) {
+              lastRev = d.rev
+              setState(d.state ?? null)
+            }
+          })
+          .catch(() => alive && setConnected(false))
+      }, 800)
+    }
+
+    const startSSE = (): void => {
+      try {
+        es = new EventSource(streamUrl(room))
+        es.addEventListener('open', () => alive && setConnected(true))
+        es.addEventListener('state', (e) => {
+          try {
+            const msg = JSON.parse((e as MessageEvent).data)
+            if (alive && msg && typeof msg === 'object' && 'state' in msg) {
+              setConnected(true)
+              setState(msg.state ?? null)
+            }
+          } catch {
+            /* ignore */
+          }
+        })
+        es.onerror = () => {
+          es?.close()
+          es = null
+          startPolling()
+        }
+      } catch {
+        startPolling()
+      }
+    }
+
+    if (typeof window !== 'undefined' && 'EventSource' in window) startSSE()
+    else startPolling()
+
+    return () => {
+      alive = false
+      es?.close()
+      if (poll) clearInterval(poll)
+    }
+  }, [room])
+
+  return { state, connected }
+}

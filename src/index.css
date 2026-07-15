@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-optical-sizing: auto;
+  }
+  h1, h2, h3 {
+    font-optical-sizing: auto;
+  }
+  ::selection {
+    background: #e8cd8c;
+    color: #241f18;
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-6xl px-6 sm:px-8;
+  }
+  /* small-caps eyebrow label with a gold rule */
+  .eyebrow {
+    @apply inline-flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-label text-gold-600;
+  }
+  .eyebrow::before {
+    content: '';
+    @apply h-px w-8 bg-gold-500/70;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[15px] font-semibold transition duration-200;
+  }
+  .btn-primary {
+    @apply btn bg-navy-700 text-paper shadow-soft hover:bg-navy-800 hover:shadow-lift;
+  }
+  .btn-gold {
+    @apply btn bg-gold-500 text-white shadow-gold hover:bg-gold-600;
+  }
+  .btn-ghost {
+    @apply btn border border-ink/15 text-ink hover:border-gold-500 hover:text-gold-600;
+  }
+  .btn-ghost-light {
+    @apply btn border border-white/25 text-paper hover:border-gold-300 hover:text-gold-200;
+  }
+  .card-classic {
+    @apply rounded-xl2 border border-line bg-card shadow-soft;
+  }
+}
+
+/* Fade / rise-in as sections enter the viewport */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* Subtle dotted grain for warmth on large panels */
+.grain {
+  background-image: radial-gradient(rgba(36, 31, 24, 0.045) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+/* ---- live stage (audience mirror; ported from the desktop obs.html) ---- */
+/* The channel always shows the slide as a landscape 16:9 stage. In landscape it
+   letterboxes to fit; on a portrait phone the frame rotates 90° to fill the
+   screen, so the composed (960×540) slides are never squished. */
+.channel-root { position: fixed; inset: 0; overflow: hidden; background: #000; }
+/* A 16:9 stage that COVERS the screen (fills it, cropping the outer margins) so
+   there are no black bars. On a portrait phone it rotates 90° to fill landscape. */
+.channel-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100vw, 100vh * 16 / 9);
+  height: max(100vh, 100vw * 9 / 16);
+  transform: translate(-50%, -50%);
+}
+@media (orientation: portrait) {
+  .channel-frame {
+    width: max(100vh, 100vw * 16 / 9);
+    height: max(100vw, 100vh * 9 / 16);
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+}
+.stage-frame { position: absolute; inset: 0; overflow: hidden; container-type: size; background: #000; }
+.stage-bg { position: absolute; inset: 0; }
+.stage-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stage-scrim { position: absolute; inset: 0; pointer-events: none; }
+.stage-content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4cqw; padding: 4% 6%; }
+.stage-text-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 100%; }
+.stage-lyrics { text-align: center; font-weight: 700; line-height: 1.24; max-width: 92%; color: var(--text); text-wrap: balance; }
+.stage-lyrics .line { display: block; }
+.stage-lyrics.nowrap .line { white-space: nowrap; }
+.stage-lyrics.upper { text-transform: uppercase; }
+.stage-lyrics.shadow, .stage-composed.shadow { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55); }
+.stage-caption { margin-top: 1.6cqh; text-align: center; font-weight: 500; color: var(--accent); font-size: 2.6cqh; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7); }
+.stage-composed { position: absolute; inset: 0; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5); }
+.stage-composed .cline { position: absolute; transform: translate(-50%, -50%); white-space: pre-wrap; font-weight: 700; }
+.stage-qr { width: 30cqh; height: 30cqh; object-fit: contain; background: #fff; padding: 1.6cqh; border-radius: 2cqh; box-shadow: 0 1cqh 4cqh rgba(0, 0, 0, 0.4); }
+.stage-standby { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2.4cqh; background: radial-gradient(circle at 50% 30%, #1b2947 0%, #0f1728 100%); color: #fff; text-align: center; padding: 0 6%; }
+.stage-emblem { width: 13cqh; height: auto; color: #dcb457; filter: drop-shadow(0 0 3cqh rgba(220, 180, 87, 0.4)); }
+.stage-standby-name { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 5cqh; }
+.stage-standby-tag { font-size: 2.1cqh; color: rgba(255, 255, 255, 0.65); }
