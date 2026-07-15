@@ -60,7 +60,7 @@ export default defineConfig({
       },
       manifest: {
         name: 'Telugu Community Church',
-        short_name: 'TCC',
+        short_name: 'Cantica',
         description: 'Telugu Community Church, Irving TX — worship, study, and prayer.',
         theme_color: '#0f1728',
         background_color: '#faf6ee',
