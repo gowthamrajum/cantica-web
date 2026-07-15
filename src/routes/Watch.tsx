@@ -44,7 +44,7 @@ export function Watch(): JSX.Element {
   return (
     <div className="flex min-h-svh flex-col">
       {/* interior top bar */}
-      <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="container-x flex h-[68px] items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
             <EmblemBadge className="h-10 w-10" tone="navy" />
