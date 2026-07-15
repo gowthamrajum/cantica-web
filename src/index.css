@@ -78,35 +78,51 @@
    letterboxes to fit; on a portrait phone the frame rotates 90° to fill the
    screen, so the composed (960×540) slides are never squished. */
 .channel-root { position: fixed; inset: 0; overflow: hidden; background: #000; }
-/* A 16:9 stage that COVERS the screen (fills it, cropping the outer margins) so
-   there are no black bars. On a portrait phone it rotates 90° to fill landscape. */
+
+/* A landscape canvas that fills the screen. In landscape it's the screen itself;
+   on a portrait phone it rotates 90° so the whole broadcast (slide + chrome) is
+   one coherent, full-screen landscape view. */
+.channel-rotor { position: absolute; inset: 0; overflow: hidden; container-type: size; }
+@media (orientation: portrait) {
+  .channel-rotor {
+    inset: auto;
+    top: 0;
+    left: 100%;
+    width: 100vh;
+    height: 100vw;
+    transform-origin: top left;
+    transform: rotate(90deg);
+  }
+}
+
+/* The 16:9 slide COVERS the canvas (fills it, cropping only the outer margins). */
 .channel-frame {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: max(100vw, 100vh * 16 / 9);
-  height: max(100vh, 100vw * 9 / 16);
   transform: translate(-50%, -50%);
-}
-@media (orientation: portrait) {
-  .channel-frame {
-    width: max(100vh, 100vw * 16 / 9);
-    height: max(100vw, 100vh * 9 / 16);
-    transform: translate(-50%, -50%) rotate(90deg);
-  }
+  width: max(100cqw, 100cqh * 16 / 9);
+  height: max(100cqh, 100cqw * 9 / 16);
 }
 .stage-frame { position: absolute; inset: 0; overflow: hidden; container-type: size; background: #000; }
 
-/* Channel chrome — screen-space overlay, always upright & visible below the notch. */
+/* Chrome sits at the canvas top-left (rotates with it), clear of the notch. */
 .channel-chrome {
   position: absolute;
   z-index: 30;
-  top: max(env(safe-area-inset-top), 12px);
-  left: max(env(safe-area-inset-left), 12px);
+  top: max(env(safe-area-inset-top), 14px);
+  left: max(env(safe-area-inset-left), 16px);
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - 32px);
+}
+@media (orientation: portrait) {
+  /* Inside the rotated canvas, physical screen insets map to different edges. */
+  .channel-chrome {
+    top: max(env(safe-area-inset-right), 14px);
+    left: max(env(safe-area-inset-top), 16px);
+  }
 }
 .channel-back {
   flex: none;
