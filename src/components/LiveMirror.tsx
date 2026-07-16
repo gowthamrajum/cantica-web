@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode, TouchEvent } from 'react'
 import { Stage } from './Stage'
 import type { LiveState } from '../lib/relay'
@@ -21,6 +21,8 @@ export function LiveMirror({
   onTouchStart?: (e: TouchEvent) => void
   onTouchEnd?: (e: TouchEvent) => void
 }): JSX.Element {
+  const rootRef = useRef<HTMLDivElement>(null)
+
   // Paint the whole document black while watching, so no paper page background
   // shows through in the status-bar / home-indicator safe areas.
   useEffect(() => {
@@ -29,22 +31,33 @@ export function LiveMirror({
     return () => html.classList.remove('channel-open')
   }, [])
 
-  // Publish the REAL viewport size as CSS vars. On a portrait phone the rotor is
-  // sized to the screen's height/width (it's rotated 90°), but iOS standalone
-  // PWAs compute dvh/dvw unreliably and don't refresh them on rotation — leaving
-  // a black strip. window.innerWidth/Height are always correct and update on
-  // resize/orientationchange, so the rotor fills edge-to-edge in every case.
+  // Publish the REAL screen size as CSS vars (--mvw/--mvh). The rotated portrait
+  // rotor and the 16:9 frame are sized from these instead of dvh/dvw — iOS
+  // standalone PWAs compute vw/vh/dvh unreliably and don't refresh on rotation,
+  // which left a black strip. We measure the .channel-root element itself (it's
+  // fixed + inset:0, so its painted rect IS the true screen) via ResizeObserver,
+  // which is the ground truth in every orientation on every device.
   useEffect(() => {
+    const el = rootRef.current
     const html = document.documentElement
     const sync = (): void => {
-      html.style.setProperty('--mvw', `${window.innerWidth}px`)
-      html.style.setProperty('--mvh', `${window.innerHeight}px`)
+      const r = el?.getBoundingClientRect()
+      const w = Math.round(r?.width || window.innerWidth)
+      const h = Math.round(r?.height || window.innerHeight)
+      html.style.setProperty('--mvw', `${w}px`)
+      html.style.setProperty('--mvh', `${h}px`)
     }
     sync()
+    let ro: ResizeObserver | null = null
+    if (el && 'ResizeObserver' in window) {
+      ro = new ResizeObserver(sync)
+      ro.observe(el)
+    }
     window.addEventListener('resize', sync)
     window.addEventListener('orientationchange', sync)
     window.visualViewport?.addEventListener('resize', sync)
     return () => {
+      ro?.disconnect()
       window.removeEventListener('resize', sync)
       window.removeEventListener('orientationchange', sync)
       window.visualViewport?.removeEventListener('resize', sync)
@@ -54,7 +67,7 @@ export function LiveMirror({
   }, [])
 
   return (
-    <div className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div ref={rootRef} className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="channel-rotor">
         <div className="channel-frame">
           <Stage state={state} />

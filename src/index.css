@@ -87,7 +87,19 @@ html.channel-open body {
    standalone PWA the vw/vh units don't recalc on rotation, so an explicit
    100dvw kept the portrait width in landscape and left a black strip. inset:0
    tracks the real viewport edges in every orientation. */
-.channel-root { position: fixed; inset: 0; overflow: hidden; background: #000; }
+.channel-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  /* The rotor is always landscape-oriented (naturally in landscape, or rotated
+     90° in portrait), so its long side = the screen's longer edge and short side
+     = the shorter edge — regardless of orientation. Derived from the JS-measured
+     real screen size (--mvw/--mvh) so the frame never depends on iOS viewport
+     units. */
+  --rotor-long: max(var(--mvw, 100vw), var(--mvh, 100vh));
+  --rotor-short: min(var(--mvw, 100vw), var(--mvh, 100vh));
+}
 
 /* A landscape canvas that fills the screen. In landscape it's the screen itself;
    on a portrait phone it rotates 90° so the whole broadcast (slide + chrome) is
@@ -108,14 +120,16 @@ html.channel-open body {
   }
 }
 
-/* The 16:9 slide COVERS the canvas (fills it, cropping only the outer margins). */
+/* The 16:9 slide COVERS the canvas (fills it, cropping only the outer margins).
+   Sized from the measured screen (--rotor-long/short) rather than container-query
+   units, so it can't be undersized by an iOS viewport-unit quirk. */
 .channel-frame {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: max(100cqw, 100cqh * 16 / 9);
-  height: max(100cqh, 100cqw * 9 / 16);
+  width: max(var(--rotor-long), var(--rotor-short) * 16 / 9);
+  height: max(var(--rotor-short), var(--rotor-long) * 9 / 16);
 }
 .stage-frame { position: absolute; inset: 0; overflow: hidden; container-type: size; background: #000; }
 
