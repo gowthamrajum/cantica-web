@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getControlStatus, getSessions, sendControl, type ControlCmd, type SessionSummary } from '../lib/relay'
 import { useLiveState } from '../lib/useLiveState'
 import { LiveMirror } from '../components/LiveMirror'
+import { MirrorChrome } from '../components/MirrorChrome'
 import { EmblemBadge } from '../components/Emblem'
 import { prettyServiceName } from '../lib/format'
 
@@ -210,7 +211,7 @@ function OperatorMirror({
 }): JSX.Element {
   const navigate = useNavigate()
   // Operators see the unsuppressed deck (every slide), unlike audience/OBS viewers.
-  const { state, connected } = useLiveState(conn.room, 'operator')
+  const { state, connected, viewers } = useLiveState(conn.room, 'operator')
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -274,20 +275,14 @@ function OperatorMirror({
 
   const chrome = (
     <>
-      <div className="channel-chrome">
-        <button onClick={exit} aria-label="Exit operator" className="channel-back">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div className="channel-meta">
-          <span className="channel-name">{prettyServiceName(state?.name || conn.label)}</span>
-          <span className="channel-status">
-            <span className={`channel-dot ${liveShowing ? 'is-live' : connected ? 'is-wait' : 'is-conn'}`} />
-            {liveShowing ? 'Live · Operator' : connected ? 'Operator' : 'Connecting'}
-          </span>
-        </div>
-      </div>
+      <MirrorChrome
+        name={state?.name || conn.label}
+        tone={liveShowing ? 'live' : connected ? 'wait' : 'conn'}
+        statusLabel={liveShowing ? 'Live · Operator' : connected ? 'Operator' : 'Connecting'}
+        onBack={exit}
+        backLabel="Exit operator"
+        watchers={viewers}
+      />
 
       {/* swipe direction flash */}
       {feedback && (

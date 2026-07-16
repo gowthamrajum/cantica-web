@@ -3,10 +3,15 @@ import { stateUrl, streamUrl, type LiveState, type LiveView } from './relay'
 
 /** Subscribe to a room's live state — SSE first, short-poll fallback (mirrors the
  *  desktop obs.html audience client). `view` picks the audience ('users') or the
- *  unsuppressed operator slice. */
-export function useLiveState(room: string, view: LiveView = 'users'): { state: LiveState | null; connected: boolean } {
+ *  unsuppressed operator slice. `viewers` is the live count of concurrent audience
+ *  watchers (relay pushes it on join/leave and in every state frame). */
+export function useLiveState(
+  room: string,
+  view: LiveView = 'users'
+): { state: LiveState | null; connected: boolean; viewers: number | null } {
   const [state, setState] = useState<LiveState | null>(null)
   const [connected, setConnected] = useState(false)
+  const [viewers, setViewers] = useState<number | null>(null)
 
   useEffect(() => {
     if (!room) return
@@ -23,6 +28,7 @@ export function useLiveState(room: string, view: LiveView = 'users'): { state: L
           .then((d) => {
             if (!alive || !d) return
             setConnected(true)
+            if (typeof d.viewers === 'number') setViewers(d.viewers)
             if (d.rev !== lastRev) {
               lastRev = d.rev
               setState(d.state ?? null)
@@ -42,7 +48,17 @@ export function useLiveState(room: string, view: LiveView = 'users'): { state: L
             if (alive && msg && typeof msg === 'object' && 'state' in msg) {
               setConnected(true)
               setState(msg.state ?? null)
+              if (typeof msg.viewers === 'number') setViewers(msg.viewers)
             }
+          } catch {
+            /* ignore */
+          }
+        })
+        // Live watcher count — pushed the instant someone joins or leaves.
+        es.addEventListener('viewers', (e) => {
+          try {
+            const msg = JSON.parse((e as MessageEvent).data)
+            if (alive && msg && typeof msg.count === 'number') setViewers(msg.count)
           } catch {
             /* ignore */
           }
@@ -67,5 +83,5 @@ export function useLiveState(room: string, view: LiveView = 'users'): { state: L
     }
   }, [room, view])
 
-  return { state, connected }
+  return { state, connected, viewers }
 }
