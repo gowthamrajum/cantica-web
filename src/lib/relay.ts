@@ -69,3 +69,43 @@ export async function getSessions(): Promise<{ sessions: SessionSummary[]; now: 
 
 export const stateUrl = (room: string): string => `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/state?view=users`
 export const streamUrl = (room: string): string => `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/stream?view=users`
+
+// ---- phone remote control ----
+// The remote drives the same live deck the desktop presenter owns: it POSTs a
+// command with the room's control PIN; the relay forwards it to the presenter,
+// which runs it and republishes state (which the remote sees on the normal feed).
+export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo'
+
+export interface ControlStatus {
+  /** a desktop presenter is currently listening for commands */
+  online: boolean
+  /** the room has a control PIN set */
+  hasPin: boolean
+  /** the supplied PIN matches */
+  pinOk: boolean
+}
+
+/** Check whether a room is controllable and whether the given PIN is valid. */
+export async function getControlStatus(room: string, pin: string): Promise<ControlStatus> {
+  const q = pin ? `?pin=${encodeURIComponent(pin)}` : ''
+  const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/status${q}`, { cache: 'no-store' })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return (await r.json()) as ControlStatus
+}
+
+/** Send one command. Returns ok + the HTTP status so callers can react to
+ *  401 (bad PIN) / 409 (presenter offline). */
+export async function sendControl(
+  room: string,
+  pin: string,
+  cmd: ControlCmd,
+  arg?: number
+): Promise<{ ok: boolean; status: number; error?: string }> {
+  const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin, cmd, arg })
+  })
+  const j = (await r.json().catch(() => ({}))) as { error?: string }
+  return { ok: r.ok, status: r.status, error: j.error }
+}

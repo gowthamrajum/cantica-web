@@ -9,7 +9,6 @@ const LINKS = [
   { href: '#visit', label: 'Visit' }
 ]
 const ROUTES = [
-  { to: '/watch', label: 'Watch' },
   { to: '/bible', label: 'Bible' },
   { to: '/songs', label: 'Songs' }
 ]

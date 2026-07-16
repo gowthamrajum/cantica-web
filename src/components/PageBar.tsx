@@ -2,7 +2,6 @@ import { Link, NavLink } from 'react-router-dom'
 import { EmblemBadge } from './Emblem'
 
 const LINKS = [
-  { to: '/watch', label: 'Watch' },
   { to: '/bible', label: 'Bible' },
   { to: '/songs', label: 'Songs' }
 ]
@@ -32,6 +31,9 @@ export function PageBar(): JSX.Element {
           ))}
           <Link to="/" className="ml-1 hidden text-[15px] font-semibold text-ink-muted transition hover:text-gold-600 sm:block">
             Home
+          </Link>
+          <Link to="/watch" className="btn-gold ml-1 px-4 py-2 text-sm">
+            Follow the service
           </Link>
         </nav>
       </div>
