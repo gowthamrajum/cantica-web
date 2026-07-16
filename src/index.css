@@ -79,8 +79,17 @@
    screen, so the composed (960×540) slides are never squished. */
 /* While watching a broadcast the whole document is black so no paper page bg
    peeks through the status-bar / home-indicator safe areas. */
+/* The mirror fills a full-screen DOCUMENT (not a position:fixed overlay — iOS
+   clips fixed content to the short layout viewport and can't reach the bottom
+   safe area). html/body/#root are sized to the real screen (--mvh) so normal-
+   flow content paints edge-to-edge. */
 html.channel-open,
-html.channel-open body {
+html.channel-open body,
+html.channel-open #root {
+  margin: 0;
+  width: var(--mvw, 100vw);
+  height: var(--mvh, 100vh);
+  overflow: hidden;
   background: #ff00ff; /* TEMP diagnostic: any exposed page bg shows as magenta */
 }
 /* Size from the JS-measured PHYSICAL screen (--mvw/--mvh), not inset:0 / vw / vh.
@@ -89,9 +98,7 @@ html.channel-open body {
    can reach. --mvw/--mvh come from window.screen (see LiveMirror); 100vw/100vh
    are the pre-hydration fallback. */
 .channel-root {
-  position: fixed;
-  top: 0;
-  left: 0;
+  position: relative; /* normal-flow block filling the full-screen #root (see above) */
   width: var(--mvw, 100vw);
   height: var(--mvh, 100vh);
   overflow: hidden;
