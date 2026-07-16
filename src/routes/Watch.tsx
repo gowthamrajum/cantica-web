@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getSessions, type SessionSummary } from '../lib/relay'
 import { CHURCH } from '../lib/church'
 import { EmblemBadge } from '../components/Emblem'
@@ -14,9 +14,11 @@ function ago(ts: number, now: number): string {
 }
 
 export function Watch(): JSX.Element {
+  const navigate = useNavigate()
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null)
   const [now, setNow] = useState(Date.now())
   const [error, setError] = useState(false)
+  const [pick, setPick] = useState<SessionSummary | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -66,10 +68,10 @@ export function Watch(): JSX.Element {
         {sessions && sessions.length > 0 && (
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
             {sessions.map((s) => (
-              <Link
+              <button
                 key={s.room}
-                to={`/c/${encodeURIComponent(s.room)}`}
-                className="card-classic group flex items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:shadow-lift"
+                onClick={() => setPick(s)}
+                className="card-classic group flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lift"
               >
                 <span className={`grid h-12 w-12 flex-none place-items-center rounded-full ${s.waiting ? 'bg-gold-100 text-gold-600' : 'bg-red-50 text-red-600'}`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${s.waiting ? 'bg-gold-500' : 'animate-pulse bg-red-600'}`} />
@@ -80,8 +82,8 @@ export function Watch(): JSX.Element {
                     {(s.waiting ? 'Waiting to begin · ' : 'Live · ') + ago(s.updatedAt, now) + (s.viewers ? ` · ${s.viewers} watching` : '')}
                   </div>
                 </div>
-                <span className="btn-primary flex-none px-5 py-2.5 text-sm">Watch</span>
-              </Link>
+                <span className="btn-primary flex-none px-5 py-2.5 text-sm">Follow →</span>
+              </button>
             ))}
           </div>
         )}
@@ -110,6 +112,62 @@ export function Watch(): JSX.Element {
       </main>
 
       <Footer />
+
+      {pick && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          onClick={() => setPick(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl border border-line bg-card p-6 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-lift sm:rounded-2xl sm:pb-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="eyebrow">Join the service</p>
+            <h2 className="mt-3 font-serif text-2xl font-semibold text-ink">{pick.label || 'Sunday Service'}</h2>
+            <p className="mt-1 text-sm text-ink-muted">How would you like to join?</p>
+
+            <div className="mt-5 grid gap-3">
+              <button
+                onClick={() => navigate(`/c/${encodeURIComponent(pick.room)}`)}
+                className="flex items-center gap-4 rounded-xl border border-line bg-paper p-4 text-left transition hover:border-gold-500 hover:shadow-soft"
+              >
+                <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-navy-700 text-paper">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-serif text-lg font-semibold text-ink">Viewer</span>
+                  <span className="block text-sm text-ink-muted">Follow along with the live slides</span>
+                </span>
+                <span className="text-ink-muted">›</span>
+              </button>
+
+              <button
+                onClick={() => navigate(`/remote?room=${encodeURIComponent(pick.room)}`)}
+                className="flex items-center gap-4 rounded-xl border border-line bg-paper p-4 text-left transition hover:border-gold-500 hover:shadow-soft"
+              >
+                <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-gold-500 text-white">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="3" />
+                    <path d="M12 6v6" />
+                  </svg>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-serif text-lg font-semibold text-ink">Operator</span>
+                  <span className="block text-sm text-ink-muted">Enter the PIN and swipe to move slides</span>
+                </span>
+                <span className="text-ink-muted">›</span>
+              </button>
+            </div>
+
+            <button onClick={() => setPick(null)} className="mt-4 w-full py-2 text-sm font-semibold text-ink-muted transition hover:text-ink">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
