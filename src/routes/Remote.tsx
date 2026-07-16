@@ -4,6 +4,7 @@ import { getControlStatus, getSessions, sendControl, type ControlCmd, type Sessi
 import { useLiveState } from '../lib/useLiveState'
 import { LiveMirror } from '../components/LiveMirror'
 import { EmblemBadge } from '../components/Emblem'
+import { prettyServiceName } from '../lib/format'
 
 const STORE_KEY = 'tcc-remote'
 type Saved = { room: string; pin: string; label?: string }
@@ -140,7 +141,7 @@ function Connect({
                 >
                   <span className={`h-2.5 w-2.5 flex-none rounded-full ${s.waiting ? 'bg-amber-400' : 'animate-pulse bg-red-500'}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{s.label || 'Sunday Service'}</span>
+                    <span className="block truncate font-semibold">{prettyServiceName(s.label)}</span>
                     <span className="block text-xs text-white/45">{s.waiting ? 'Waiting to begin' : 'Live now'}</span>
                   </span>
                   <span className="text-white/30">›</span>
@@ -153,7 +154,7 @@ function Connect({
         {room && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
             <div className="mb-1 text-[13px] text-white/50">Connecting to</div>
-            <div className="mb-4 font-serif text-xl font-semibold">{label || 'Live Service'}</div>
+            <div className="mb-4 font-serif text-xl font-semibold">{prettyServiceName(label)}</div>
 
             <label className="mb-1.5 block text-[13px] font-semibold text-white/60">Control PIN</label>
             <input
@@ -208,7 +209,8 @@ function OperatorMirror({
   onBadPin: () => void
 }): JSX.Element {
   const navigate = useNavigate()
-  const { state, connected } = useLiveState(conn.room)
+  // Operators see the unsuppressed deck (every slide), unlike audience/OBS viewers.
+  const { state, connected } = useLiveState(conn.room, 'operator')
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -279,7 +281,7 @@ function OperatorMirror({
           </svg>
         </button>
         <div className="channel-meta">
-          <span className="channel-name">{state?.name || conn.label || 'Live Service'}</span>
+          <span className="channel-name">{prettyServiceName(state?.name || conn.label)}</span>
           <span className="channel-status">
             <span className={`channel-dot ${liveShowing ? 'is-live' : connected ? 'is-wait' : 'is-conn'}`} />
             {liveShowing ? 'Live · Operator' : connected ? 'Operator' : 'Connecting'}

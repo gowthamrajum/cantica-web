@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getSessions, type SessionSummary } from '../lib/relay'
+import { prettyServiceName } from '../lib/format'
 import { CHURCH } from '../lib/church'
 import { EmblemBadge } from '../components/Emblem'
 import { Footer } from '../components/Footer'
@@ -78,7 +79,7 @@ export function Watch(): JSX.Element {
                   <span className={`h-2.5 w-2.5 rounded-full ${s.waiting ? 'bg-gold-500' : 'animate-pulse bg-red-600'}`} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="line-clamp-2 font-serif text-lg font-semibold leading-tight text-ink">{s.label || 'Sunday Service'}</div>
+                  <div className="line-clamp-2 font-serif text-lg font-semibold leading-tight text-ink">{prettyServiceName(s.label)}</div>
                   <div className="mt-0.5 truncate text-sm text-ink-muted">
                     {(s.waiting ? 'Waiting to begin · ' : 'Live · ') + ago(s.updatedAt, now) + (s.viewers ? ` · ${s.viewers} watching` : '')}
                   </div>
@@ -124,7 +125,7 @@ export function Watch(): JSX.Element {
             onClick={(e) => e.stopPropagation()}
           >
             <p className="eyebrow">Join the service</p>
-            <h2 className="mt-3 font-serif text-2xl font-semibold text-ink">{pick.label || 'Sunday Service'}</h2>
+            <h2 className="mt-3 font-serif text-2xl font-semibold text-ink">{prettyServiceName(pick.label)}</h2>
             <p className="mt-1 text-sm text-ink-muted">How would you like to join?</p>
 
             <div className="mt-5 grid gap-3">

@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useLiveState } from '../lib/useLiveState'
 import { LiveMirror } from '../components/LiveMirror'
+import { prettyServiceName } from '../lib/format'
 
 export function Channel(): JSX.Element {
   const { room = '' } = useParams()
@@ -18,7 +19,7 @@ export function Channel(): JSX.Element {
             </svg>
           </Link>
           <div className="channel-meta">
-            <span className="channel-name">{state?.name || 'Live Service'}</span>
+            <span className="channel-name">{prettyServiceName(state?.name)}</span>
             <span className="channel-status">
               <span className={`channel-dot ${liveShowing ? 'is-live' : connected ? 'is-wait' : 'is-conn'}`} />
               {liveShowing ? 'Live' : connected ? 'Waiting' : 'Connecting'}

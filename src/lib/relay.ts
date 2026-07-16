@@ -67,8 +67,13 @@ export async function getSessions(): Promise<{ sessions: SessionSummary[]; now: 
   return (await r.json()) as { sessions: SessionSummary[]; now: number }
 }
 
-export const stateUrl = (room: string): string => `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/state?view=users`
-export const streamUrl = (room: string): string => `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/stream?view=users`
+// Audience 'users' inherits per-item broadcast restrictions; 'operator' is the
+// unsuppressed slice (the phone operator sees every slide like the desktop).
+export type LiveView = 'users' | 'operator'
+export const stateUrl = (room: string, view: LiveView = 'users'): string =>
+  `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/state?view=${view}`
+export const streamUrl = (room: string, view: LiveView = 'users'): string =>
+  `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/stream?view=${view}`
 
 // ---- phone remote control ----
 // The remote drives the same live deck the desktop presenter owns: it POSTs a

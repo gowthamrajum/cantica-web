@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { stateUrl, streamUrl, type LiveState } from './relay'
+import { stateUrl, streamUrl, type LiveState, type LiveView } from './relay'
 
 /** Subscribe to a room's live state — SSE first, short-poll fallback (mirrors the
- *  desktop obs.html audience client). */
-export function useLiveState(room: string): { state: LiveState | null; connected: boolean } {
+ *  desktop obs.html audience client). `view` picks the audience ('users') or the
+ *  unsuppressed operator slice. */
+export function useLiveState(room: string, view: LiveView = 'users'): { state: LiveState | null; connected: boolean } {
   const [state, setState] = useState<LiveState | null>(null)
   const [connected, setConnected] = useState(false)
 
@@ -17,7 +18,7 @@ export function useLiveState(room: string): { state: LiveState | null; connected
     const startPolling = (): void => {
       if (poll) return
       poll = setInterval(() => {
-        fetch(stateUrl(room), { cache: 'no-store' })
+        fetch(stateUrl(room, view), { cache: 'no-store' })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
             if (!alive || !d) return
@@ -33,7 +34,7 @@ export function useLiveState(room: string): { state: LiveState | null; connected
 
     const startSSE = (): void => {
       try {
-        es = new EventSource(streamUrl(room))
+        es = new EventSource(streamUrl(room, view))
         es.addEventListener('open', () => alive && setConnected(true))
         es.addEventListener('state', (e) => {
           try {
@@ -64,7 +65,7 @@ export function useLiveState(room: string): { state: LiveState | null; connected
       es?.close()
       if (poll) clearInterval(poll)
     }
-  }, [room])
+  }, [room, view])
 
   return { state, connected }
 }
