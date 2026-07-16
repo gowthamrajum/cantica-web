@@ -83,7 +83,11 @@ html.channel-open,
 html.channel-open body {
   background: #000;
 }
-.channel-root { position: fixed; inset: 0; height: 100dvh; width: 100dvw; overflow: hidden; background: #000; }
+/* Pin to all four edges with inset:0 (NOT width/height:100dvw/dvh) — in an iOS
+   standalone PWA the vw/vh units don't recalc on rotation, so an explicit
+   100dvw kept the portrait width in landscape and left a black strip. inset:0
+   tracks the real viewport edges in every orientation. */
+.channel-root { position: fixed; inset: 0; overflow: hidden; background: #000; }
 
 /* A landscape canvas that fills the screen. In landscape it's the screen itself;
    on a portrait phone it rotates 90° so the whole broadcast (slide + chrome) is

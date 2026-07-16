@@ -71,13 +71,13 @@ export function Watch(): JSX.Element {
               <button
                 key={s.room}
                 onClick={() => setPick(s)}
-                className="card-classic group flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lift"
+                className="card-classic group flex min-w-0 items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lift"
               >
                 <span className={`grid h-12 w-12 flex-none place-items-center rounded-full ${s.waiting ? 'bg-gold-100 text-gold-600' : 'bg-red-50 text-red-600'}`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${s.waiting ? 'bg-gold-500' : 'animate-pulse bg-red-600'}`} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-serif text-lg font-semibold text-ink">{s.label || 'Sunday Service'}</div>
+                  <div className="line-clamp-2 font-serif text-lg font-semibold leading-tight text-ink">{s.label || 'Sunday Service'}</div>
                   <div className="mt-0.5 truncate text-sm text-ink-muted">
                     {(s.waiting ? 'Waiting to begin · ' : 'Live · ') + ago(s.updatedAt, now) + (s.viewers ? ` · ${s.viewers} watching` : '')}
                   </div>
