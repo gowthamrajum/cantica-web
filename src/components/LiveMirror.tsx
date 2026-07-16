@@ -39,12 +39,18 @@ export function LiveMirror({
   useEffect(() => {
     const html = document.documentElement
     const sync = (): void => {
-      const coarse = window.matchMedia('(pointer: coarse)').matches
+      // Only reach for the physical screen in the INSTALLED (standalone) PWA,
+      // where the layout viewport under-reports the real screen. In a browser
+      // tab innerHeight already excludes the URL bar / toolbar and IS the visible
+      // area — using screen there would push the slide behind the browser chrome.
+      const standalone =
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches
       const sMin = Math.min(window.screen.width, window.screen.height)
       const sMax = Math.max(window.screen.width, window.screen.height)
       const portrait = window.matchMedia('(orientation: portrait)').matches
-      const fullW = coarse ? (portrait ? sMin : sMax) : 0
-      const fullH = coarse ? (portrait ? sMax : sMin) : 0
+      const fullW = standalone ? (portrait ? sMin : sMax) : 0
+      const fullH = standalone ? (portrait ? sMax : sMin) : 0
       const vv = window.visualViewport
       const w = Math.max(fullW, window.innerWidth, Math.round(vv?.width || 0))
       const h = Math.max(fullH, window.innerHeight, Math.round(vv?.height || 0))
@@ -70,9 +76,7 @@ export function LiveMirror({
     }
   }, [])
 
-  // TEMPORARY: always on so the readout shows in the installed PWA (where the URL
-  // can't carry ?debug). Revert to the search-param check once diagnosed.
-  const debug = true
+  const debug = typeof window !== 'undefined' && window.location.search.includes('debug')
 
   return (
     <div className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>

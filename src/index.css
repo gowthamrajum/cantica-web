@@ -90,7 +90,7 @@ html.channel-open #root {
   width: var(--mvw, 100vw);
   height: var(--mvh, 100vh);
   overflow: hidden;
-  background: #ff00ff; /* TEMP diagnostic: any exposed page bg shows as magenta */
+  background: #000;
 }
 /* Size from the JS-measured PHYSICAL screen (--mvw/--mvh), not inset:0 / vw / vh.
    On iOS the layout viewport can be shorter than the real screen (e.g. 894 vs
