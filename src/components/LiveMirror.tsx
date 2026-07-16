@@ -65,7 +65,9 @@ export function LiveMirror({
     }
   }, [])
 
-  const debug = typeof window !== 'undefined' && window.location.search.includes('debug')
+  // TEMPORARY: always on so the readout shows in the installed PWA (where the URL
+  // can't carry ?debug). Revert to the search-param check once diagnosed.
+  const debug = true
 
   return (
     <div ref={rootRef} className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
