@@ -98,8 +98,11 @@ html.channel-open body {
     inset: auto;
     top: 0;
     left: 100%;
-    width: 100dvh;
-    height: 100dvw;
+    /* rotated 90°, so the rotor's width = screen HEIGHT and height = screen WIDTH.
+       --mvh/--mvw come from JS (window.inner*) because iOS PWA dvh/dvw are stale
+       after rotation; dvh/dvw are the fallback before the vars are set. */
+    width: var(--mvh, 100dvh);
+    height: var(--mvw, 100dvw);
     transform-origin: top left;
     transform: rotate(90deg);
   }
