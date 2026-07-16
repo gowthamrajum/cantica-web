@@ -15,9 +15,9 @@ const NBSP = String.fromCharCode(0xa0)
  */
 export function formatLyric(line: string): string {
   return line
-    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
-    .replace(/(\S) *(\|\|[^|]+\|\|)/g, '$1' + NBSP + NBSP + '$2')
+    .replace(/(\S)\s*(\|\|[^|]+\|\|)/g, '$1' + NBSP + NBSP + '$2')
 }
 
 export function textOf(slide?: Slide | null): string[] {
