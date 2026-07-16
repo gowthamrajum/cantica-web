@@ -83,13 +83,17 @@ html.channel-open,
 html.channel-open body {
   background: #000;
 }
-/* Pin to all four edges with inset:0 (NOT width/height:100dvw/dvh) — in an iOS
-   standalone PWA the vw/vh units don't recalc on rotation, so an explicit
-   100dvw kept the portrait width in landscape and left a black strip. inset:0
-   tracks the real viewport edges in every orientation. */
+/* Size from the JS-measured PHYSICAL screen (--mvw/--mvh), not inset:0 / vw / vh.
+   On iOS the layout viewport can be shorter than the real screen (e.g. 894 vs
+   956), so a viewport-pinned element leaves a black band nothing viewport-based
+   can reach. --mvw/--mvh come from window.screen (see LiveMirror); 100vw/100vh
+   are the pre-hydration fallback. */
 .channel-root {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: var(--mvw, 100vw);
+  height: var(--mvh, 100vh);
   overflow: hidden;
   background: #000;
   /* The rotor is always landscape-oriented (naturally in landscape, or rotated

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode, TouchEvent } from 'react'
 import { Stage } from './Stage'
 import type { LiveState } from '../lib/relay'
@@ -21,8 +21,6 @@ export function LiveMirror({
   onTouchStart?: (e: TouchEvent) => void
   onTouchEnd?: (e: TouchEvent) => void
 }): JSX.Element {
-  const rootRef = useRef<HTMLDivElement>(null)
-
   // Paint the whole document black while watching, so no paper page background
   // shows through in the status-bar / home-indicator safe areas.
   useEffect(() => {
@@ -31,34 +29,41 @@ export function LiveMirror({
     return () => html.classList.remove('channel-open')
   }, [])
 
-  // Publish the REAL screen size as CSS vars (--mvw/--mvh). The rotated portrait
-  // rotor and the 16:9 frame are sized from these instead of dvh/dvw — iOS
-  // standalone PWAs compute vw/vh/dvh unreliably and don't refresh on rotation.
-  // We measure the .channel-root element itself (fixed + inset:0, so its painted
-  // rect IS the true screen) via ResizeObserver.
+  // Publish the REAL screen size as CSS vars (--mvw/--mvh); the root, rotor and
+  // 16:9 frame are sized from these. On iOS the layout viewport (innerHeight /
+  // dvh / a fixed inset:0 element) can be SHORTER than the physical screen — e.g.
+  // 894 vs a 956px screen — leaving a black band nothing viewport-based can
+  // reach. window.screen.{width,height} reports the true screen, so on touch
+  // devices we take the max of it (orientation-corrected — iOS screen.* doesn't
+  // swap) and the viewport. Desktop (fine pointer) just uses the window.
   useEffect(() => {
-    const el = rootRef.current
     const html = document.documentElement
     const sync = (): void => {
-      const r = el?.getBoundingClientRect()
-      const w = Math.round(r?.width || window.innerWidth)
-      const h = Math.round(r?.height || window.innerHeight)
+      const coarse = window.matchMedia('(pointer: coarse)').matches
+      const sMin = Math.min(window.screen.width, window.screen.height)
+      const sMax = Math.max(window.screen.width, window.screen.height)
+      const portrait = window.matchMedia('(orientation: portrait)').matches
+      const fullW = coarse ? (portrait ? sMin : sMax) : 0
+      const fullH = coarse ? (portrait ? sMax : sMin) : 0
+      const vv = window.visualViewport
+      const w = Math.max(fullW, window.innerWidth, Math.round(vv?.width || 0))
+      const h = Math.max(fullH, window.innerHeight, Math.round(vv?.height || 0))
       html.style.setProperty('--mvw', `${w}px`)
       html.style.setProperty('--mvh', `${h}px`)
     }
     sync()
-    let ro: ResizeObserver | null = null
-    if (el && 'ResizeObserver' in window) {
-      ro = new ResizeObserver(sync)
-      ro.observe(el)
+    // orientationchange can fire before the new dimensions settle — re-sync a beat later.
+    const resync = (): void => {
+      sync()
+      setTimeout(sync, 150)
+      setTimeout(sync, 400)
     }
     window.addEventListener('resize', sync)
-    window.addEventListener('orientationchange', sync)
+    window.addEventListener('orientationchange', resync)
     window.visualViewport?.addEventListener('resize', sync)
     return () => {
-      ro?.disconnect()
       window.removeEventListener('resize', sync)
-      window.removeEventListener('orientationchange', sync)
+      window.removeEventListener('orientationchange', resync)
       window.visualViewport?.removeEventListener('resize', sync)
       html.style.removeProperty('--mvw')
       html.style.removeProperty('--mvh')
@@ -70,7 +75,7 @@ export function LiveMirror({
   const debug = true
 
   return (
-    <div ref={rootRef} className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="channel-rotor">
         <div className="channel-frame">
           <Stage state={state} />
