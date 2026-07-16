@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { LiveState } from '../lib/relay'
-import { fmtClock, fmtCountdown, isTimer, resolveBackground, sizeFor, textOf } from '../lib/stage'
+import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, sizeFor, textOf } from '../lib/stage'
 import { Emblem } from './Emblem'
 
 /** Full-frame audience mirror of the live service — the React port of the desktop
@@ -79,7 +79,7 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
                 textAlign: (l.align as CSSProperties['textAlign']) || 'center'
               }}
             >
-              {l.text}
+              {formatLyric(l.text)}
             </div>
           ))}
         </div>

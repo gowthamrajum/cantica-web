@@ -3,10 +3,27 @@ import type { Background, Slide } from './relay'
 // Fallback worship backdrop when no reachable background is set.
 export const DEFAULT_BG = 'radial-gradient(circle at 50% 28%, #2a2350 0%, #150f33 55%, #0a0720 100%)'
 
+const NBSP = String.fromCharCode(0xa0)
+
+/**
+ * Tidy a lyric line for display. Collapses ragged runs of whitespace, then pins
+ * any ||repeat|| marker (Telugu song-book notation) exactly TWO NON-BREAKING
+ * spaces after the preceding lyric — so it never collapses to one space, never
+ * grows a ragged gap, and never wraps onto its own line (nbsp doesn't break or
+ * collapse). A standalone marker line (no lyric before it) is left as-is. Mirrors
+ * the desktop composer's single-line look in the live + OBS views.
+ */
+export function formatLyric(line: string): string {
+  return line
+    .replace(/[ \t]+/g, ' ')
+    .trim()
+    .replace(/(\S) *(\|\|[^|]+\|\|)/g, '$1' + NBSP + NBSP + '$2')
+}
+
 export function textOf(slide?: Slide | null): string[] {
   if (!slide) return []
-  if (slide.composed && slide.composed.length) return slide.composed.map((l) => l.text)
-  return slide.lines || []
+  if (slide.composed && slide.composed.length) return slide.composed.map((l) => formatLyric(l.text))
+  return (slide.lines || []).map(formatLyric)
 }
 
 export function isTimer(slide?: Slide | null): boolean {
