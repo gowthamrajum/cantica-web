@@ -42,6 +42,7 @@ export function Watch(): JSX.Element {
   }, [])
 
   const empty = sessions !== null && sessions.length === 0
+  const dbg = typeof window !== 'undefined' && window.location.search.includes('debug') ? '?debug=1' : ''
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -128,7 +129,7 @@ export function Watch(): JSX.Element {
 
             <div className="mt-5 grid gap-3">
               <button
-                onClick={() => navigate(`/c/${encodeURIComponent(pick.room)}`)}
+                onClick={() => navigate(`/c/${encodeURIComponent(pick.room)}${dbg}`)}
                 className="flex items-center gap-4 rounded-xl border border-line bg-paper p-4 text-left transition hover:border-gold-500 hover:shadow-soft"
               >
                 <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-navy-700 text-paper">
@@ -145,7 +146,7 @@ export function Watch(): JSX.Element {
               </button>
 
               <button
-                onClick={() => navigate(`/remote?room=${encodeURIComponent(pick.room)}`)}
+                onClick={() => navigate(`/remote?room=${encodeURIComponent(pick.room)}${dbg ? '&debug=1' : ''}`)}
                 className="flex items-center gap-4 rounded-xl border border-line bg-paper p-4 text-left transition hover:border-gold-500 hover:shadow-soft"
               >
                 <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-gold-500 text-white">

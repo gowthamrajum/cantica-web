@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode, TouchEvent } from 'react'
 import { Stage } from './Stage'
 import type { LiveState } from '../lib/relay'
@@ -33,10 +33,9 @@ export function LiveMirror({
 
   // Publish the REAL screen size as CSS vars (--mvw/--mvh). The rotated portrait
   // rotor and the 16:9 frame are sized from these instead of dvh/dvw — iOS
-  // standalone PWAs compute vw/vh/dvh unreliably and don't refresh on rotation,
-  // which left a black strip. We measure the .channel-root element itself (it's
-  // fixed + inset:0, so its painted rect IS the true screen) via ResizeObserver,
-  // which is the ground truth in every orientation on every device.
+  // standalone PWAs compute vw/vh/dvh unreliably and don't refresh on rotation.
+  // We measure the .channel-root element itself (fixed + inset:0, so its painted
+  // rect IS the true screen) via ResizeObserver.
   useEffect(() => {
     const el = rootRef.current
     const html = document.documentElement
@@ -66,6 +65,8 @@ export function LiveMirror({
     }
   }, [])
 
+  const debug = typeof window !== 'undefined' && window.location.search.includes('debug')
+
   return (
     <div ref={rootRef} className="channel-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="channel-rotor">
@@ -74,6 +75,73 @@ export function LiveMirror({
         </div>
         {chrome}
       </div>
+      {debug && <MirrorDebug />}
     </div>
+  )
+}
+
+/** Temporary on-screen readout of every viewport measurement (append ?debug to
+ *  the URL). Screen-space (not inside the rotor) so it stays upright. */
+function MirrorDebug(): JSX.Element {
+  const [txt, setTxt] = useState('')
+  useEffect(() => {
+    const probe = document.createElement('div')
+    probe.style.cssText =
+      'position:fixed;top:0;left:0;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+    document.body.appendChild(probe)
+    const read = (): void => {
+      const html = document.documentElement
+      const root = document.querySelector('.channel-root')?.getBoundingClientRect()
+      const rotor = document.querySelector('.channel-rotor')?.getBoundingClientRect()
+      const frame = document.querySelector('.channel-frame')?.getBoundingClientRect()
+      const vv = window.visualViewport
+      const cs = getComputedStyle(html)
+      const ps = getComputedStyle(probe)
+      const R = (n?: number): number => Math.round(n || 0)
+      setTxt(
+        [
+          `inner   ${window.innerWidth}x${window.innerHeight}`,
+          `client  ${html.clientWidth}x${html.clientHeight}`,
+          `screen  ${window.screen.width}x${window.screen.height}`,
+          `visualV ${vv ? `${R(vv.width)}x${R(vv.height)} off${R(vv.offsetTop)} sc${vv.scale}` : 'n/a'}`,
+          `root    ${root ? `${R(root.width)}x${R(root.height)} t${R(root.top)} b${R(root.bottom)}` : 'n/a'}`,
+          `rotor   ${rotor ? `${R(rotor.x)},${R(rotor.y)} ${R(rotor.width)}x${R(rotor.height)}` : 'n/a'}`,
+          `frame   ${frame ? `${R(frame.width)}x${R(frame.height)}` : 'n/a'}`,
+          `--mvw/h ${cs.getPropertyValue('--mvw').trim()} / ${cs.getPropertyValue('--mvh').trim()}`,
+          `safe    T${ps.paddingTop} R${ps.paddingRight} B${ps.paddingBottom} L${ps.paddingLeft}`,
+          `dpr ${window.devicePixelRatio}  ${window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape'}`
+        ].join('\n')
+      )
+    }
+    read()
+    const id = setInterval(read, 500)
+    window.addEventListener('resize', read)
+    window.addEventListener('orientationchange', read)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('resize', read)
+      window.removeEventListener('orientationchange', read)
+      document.body.removeChild(probe)
+    }
+  }, [])
+  return (
+    <pre
+      style={{
+        position: 'absolute',
+        top: 'max(env(safe-area-inset-top), 6px)',
+        left: 'max(env(safe-area-inset-left), 6px)',
+        zIndex: 100,
+        margin: 0,
+        padding: '6px 8px',
+        background: 'rgba(0,0,0,0.72)',
+        color: '#4ade80',
+        font: '10px/1.35 ui-monospace, Menlo, monospace',
+        borderRadius: 6,
+        pointerEvents: 'none',
+        whiteSpace: 'pre'
+      }}
+    >
+      {txt}
+    </pre>
   )
 }
