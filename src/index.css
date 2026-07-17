@@ -369,6 +369,9 @@ html.channel-open #root {
 .stage-lyrics { text-align: center; font-weight: 700; line-height: 1.24; max-width: 92%; color: var(--text); text-wrap: balance; }
 .stage-lyrics .line { display: block; }
 .stage-lyrics.nowrap .line { white-space: nowrap; }
+/* Single-line lyrics size to their (nowrap) content — drop the 92% cap so the
+   fit measures/needs no clip; the JS shrinks the font to fit the frame. */
+.stage-lyrics.nowrap { max-width: none; }
 .stage-lyrics.upper { text-transform: uppercase; }
 .stage-lyrics.shadow, .stage-composed.shadow { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55); }
 .stage-caption { margin-top: 1.6cqh; text-align: center; font-weight: 500; color: var(--accent); font-size: 2.6cqh; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7); }

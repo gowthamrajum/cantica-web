@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { LiveState } from '../lib/relay'
 import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, sizeFor, textOf } from '../lib/stage'
 import { Emblem } from './Emblem'
@@ -49,6 +49,41 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
   const qrOn = !!slide?.qr && !composed && !timer
   const caption = !composed ? slide?.caption || '' : ''
 
+  // Single-line lyric slides keep each line on ONE line by shrinking the font to
+  // fit the widest line (the sizeFor value is the ceiling), matching obs.html.
+  const lyricRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = lyricRef.current
+    if (!el || !showLines) return
+    const base = sizeFor(lines.length, scale)
+    // Measure against a FIXED container, not the lyric element itself: it's a
+    // centered flex item that hugs its content, so its own width shrinks with the
+    // font and the fit would never converge. The padded stage-content is stable.
+    const box = el.closest('.stage-content') as HTMLElement | null
+    const fit = (): void => {
+      el.style.fontSize = base
+      if (!slide?.singleLine) return
+      const avail = (box?.clientWidth ?? 0) * 0.86 // ~stage padding + breathing room
+      if (avail <= 0) return
+      // Iterate: one proportional pass can undershoot (glyph metrics); shrink
+      // until the widest line fits.
+      for (let i = 0; i < 5; i++) {
+        const content = el.scrollWidth
+        if (content <= avail) break
+        const cur = parseFloat(getComputedStyle(el).fontSize) || 0
+        if (cur <= 0) break
+        el.style.fontSize = `${cur * (avail / content)}px`
+      }
+    }
+    fit()
+    // Re-fit once the (Telugu) web font loads — measuring with the fallback font
+    // otherwise under-shrinks, then the real, wider glyphs overflow.
+    if (document.fonts?.ready) void document.fonts.ready.then(fit).catch(() => {})
+    const ro = new ResizeObserver(fit)
+    if (el.parentElement) ro.observe(el.parentElement)
+    return () => ro.disconnect()
+  }, [lines.join('\n'), scale, slide?.singleLine, showLines])
+
   return (
     <div className="stage-frame" style={themeVars}>
       {/* background */}
@@ -93,8 +128,9 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
             )}
             {showLines && (
               <div
+                ref={lyricRef}
                 className={`stage-lyrics${slide?.singleLine ? ' nowrap' : ''}${theme?.uppercase ? ' upper' : ''}${theme?.shadow !== false ? ' shadow' : ''}`}
-                style={{ fontSize: sizeFor(lines.length, scale), textAlign: (theme?.textAlign as CSSProperties['textAlign']) || 'center' }}
+                style={{ textAlign: (theme?.textAlign as CSSProperties['textAlign']) || 'center' }}
               >
                 {lines.map((t, i) => (
                   <span key={i} className="line">{t}</span>
