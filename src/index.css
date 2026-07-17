@@ -361,6 +361,52 @@ html.channel-open #root {
   white-space: nowrap;
   pointer-events: none;
 }
+/* Operator confidence monitor: a small preview of the NEXT slide, bottom-right of
+   the rotor (rotates with the view). Non-interactive so swipes pass through. */
+.op-next {
+  position: absolute;
+  z-index: 36;
+  right: max(env(safe-area-inset-right), 2cqw);
+  bottom: max(env(safe-area-inset-bottom), 2.4cqh);
+  width: 26cqw;
+  min-width: 128px;
+  max-width: 340px;
+  border-radius: 1.2cqh;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0.6cqh 2.4cqh rgba(0, 0, 0, 0.55);
+  background: #000;
+  pointer-events: none;
+}
+.op-next-tag {
+  position: absolute;
+  top: 0.6cqh;
+  left: 0.7cqw;
+  z-index: 3;
+  padding: 0.2cqh 1cqw;
+  border-radius: 999px;
+  background: rgba(10, 12, 20, 0.72);
+  color: #fff;
+  font-size: 2.1cqh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.op-next-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.op-next-end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 2.6cqh;
+  background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%);
+}
 .stage-bg { position: absolute; inset: 0; }
 .stage-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .stage-scrim { position: absolute; inset: 0; pointer-events: none; }

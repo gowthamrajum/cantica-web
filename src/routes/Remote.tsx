@@ -4,6 +4,7 @@ import { getControlStatus, getSessions, sendControl, type ControlCmd, type Sessi
 import { useLiveState } from '../lib/useLiveState'
 import { LiveMirror } from '../components/LiveMirror'
 import { MirrorChrome } from '../components/MirrorChrome'
+import { Stage } from '../components/Stage'
 import { EmblemBadge } from '../components/Emblem'
 import { prettyServiceName } from '../lib/format'
 
@@ -300,6 +301,18 @@ function OperatorMirror({
 
       {/* error toast */}
       {flash && <div className="op-toast">{flash}</div>}
+
+      {/* next-slide preview (stage/confidence view) — what a swipe forward brings up */}
+      <div className="op-next">
+        <span className="op-next-tag">Next</span>
+        <div className="op-next-stage">
+          {state?.next ? (
+            <Stage state={{ ...state, slide: state.next, next: null, blackout: false, clearText: false, showLogo: false }} />
+          ) : (
+            <div className="op-next-end">End of service</div>
+          )}
+        </div>
+      </div>
     </>
   )
 
