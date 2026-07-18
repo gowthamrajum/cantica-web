@@ -481,17 +481,10 @@ html.channel-open #root {
 .op2-card { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.12); background: #000; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); }
 .op2-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.4); font-size: 15px; background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%); }
 
-.op2-controls { display: flex; gap: 12px; padding-top: 12px; }
-.op2-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 15px 12px; border-radius: 13px; font-size: 15px; font-weight: 700; }
-.op2-btn span { font-size: 20px; line-height: 1; }
-.op2-btn:active { transform: scale(0.98); }
-.op2-btn-prev { flex: 1; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.82); }
-.op2-btn-next { flex: 2; background: #f59e0b; color: #1a1204; }
-
 .op2-flash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .op2-flash span { font-size: 42vw; font-weight: 900; color: rgba(255, 255, 255, 0.1); line-height: 1; }
 @media (min-width: 640px) { .op2-flash span { font-size: 220px; } }
-.op2-toast { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 92px); transform: translateX(-50%); background: rgba(0, 0, 0, 0.82); color: rgba(255, 255, 255, 0.92); padding: 8px 16px; border-radius: 999px; font-size: 14px; pointer-events: none; white-space: nowrap; }
+.op2-toast { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%); background: rgba(0, 0, 0, 0.82); color: rgba(255, 255, 255, 0.92); padding: 8px 16px; border-radius: 999px; font-size: 14px; pointer-events: none; white-space: nowrap; }
 
 /* ---- confidence card content: the slide's text auto-fit UPRIGHT to the card
        (any aspect), over its real background — sized in JS by ConfidenceCard ---- */

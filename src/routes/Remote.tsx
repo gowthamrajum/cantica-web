@@ -352,15 +352,6 @@ function OperatorMirror({
         </section>
       </div>
 
-      <div className="op2-controls">
-        <button onClick={() => void run('prev')} className="op2-btn op2-btn-prev">
-          <span aria-hidden>‹</span> Prev
-        </button>
-        <button onClick={() => void run('next')} className="op2-btn op2-btn-next">
-          Next <span aria-hidden>›</span>
-        </button>
-      </div>
-
       {feedback && (
         <div className="op2-flash">
           <span>{feedback === 'next' ? '›' : feedback === 'prev' ? '‹' : ''}</span>
