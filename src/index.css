@@ -431,3 +431,65 @@ html.channel-open #root {
 .stage-emblem { width: 13cqh; height: auto; color: #dcb457; filter: drop-shadow(0 0 3cqh rgba(220, 180, 87, 0.4)); }
 .stage-standby-name { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 5cqh; }
 .stage-standby-tag { font-size: 2.1cqh; color: rgba(255, 255, 255, 0.65); }
+
+/* ---- operator confidence view: CURRENT / NEXT stacked cards (upright, readable
+       on a phone — replaces the rotated 16:9 mirror the operator used to get) ---- */
+.op2-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #080b12;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 14px)
+    calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px);
+}
+.op2-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; }
+.op2-clockwrap { min-width: 0; }
+.op2-clock { font-variant-numeric: tabular-nums; font-weight: 800; font-size: clamp(24px, 6vw, 40px); line-height: 1.05; letter-spacing: -0.01em; }
+.op2-service { margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, 0.42); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op2-badges { display: flex; align-items: center; gap: 8px; flex: none; }
+.op2-viewers { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.op2-status { padding: 4px 9px; border-radius: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; }
+.op2-exit { display: inline-flex; padding: 7px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); }
+.op2-exit:active { transform: scale(0.94); }
+
+.op2-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+.op2-section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.op2-section-current { flex: 2; }
+.op2-section-next { flex: 1; }
+.op2-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; color: rgba(255, 255, 255, 0.4); }
+.op2-card { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.12); background: #000; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); }
+.op2-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.4); font-size: 15px; background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%); }
+
+.op2-controls { display: flex; gap: 12px; padding-top: 12px; }
+.op2-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 15px 12px; border-radius: 13px; font-size: 15px; font-weight: 700; }
+.op2-btn span { font-size: 20px; line-height: 1; }
+.op2-btn:active { transform: scale(0.98); }
+.op2-btn-prev { flex: 1; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.82); }
+.op2-btn-next { flex: 2; background: #f59e0b; color: #1a1204; }
+
+.op2-flash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.op2-flash span { font-size: 42vw; font-weight: 900; color: rgba(255, 255, 255, 0.1); line-height: 1; }
+@media (min-width: 640px) { .op2-flash span { font-size: 220px; } }
+.op2-toast { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 92px); transform: translateX(-50%); background: rgba(0, 0, 0, 0.82); color: rgba(255, 255, 255, 0.92); padding: 8px 16px; border-radius: 999px; font-size: 14px; pointer-events: none; white-space: nowrap; }
+
+/* ---- confidence card content: the slide's text auto-fit UPRIGHT to the card
+       (any aspect), over its real background — sized in JS by ConfidenceCard ---- */
+.conf-card { position: absolute; inset: 0; overflow: hidden; }
+.conf-bg { position: absolute; inset: 0; }
+.conf-bg-media { background: #000; }
+.conf-bg-media img, .conf-bg-media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.conf-scrim { position: absolute; inset: 0; pointer-events: none; }
+.conf-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4% 5%; gap: 6px; }
+.conf-text { display: inline-block; font-weight: 700; line-height: 1.2; }
+.conf-text.upper { text-transform: uppercase; }
+.conf-text.shadow { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55); }
+/* Lines wrap on a narrow card (so the font can stay large) but sit whole on a
+   wide one; the JS binary-search sizes the block to the card. */
+.conf-line { white-space: normal; word-break: break-word; text-wrap: balance; }
+.conf-caption { font-weight: 500; font-size: 13px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7); }
+.conf-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.4); font-size: 15px; background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%); }

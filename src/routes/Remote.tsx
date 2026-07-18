@@ -2,9 +2,7 @@ import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getControlStatus, getSessions, sendControl, type ControlCmd, type SessionSummary } from '../lib/relay'
 import { useLiveState } from '../lib/useLiveState'
-import { LiveMirror } from '../components/LiveMirror'
-import { MirrorChrome } from '../components/MirrorChrome'
-import { Stage } from '../components/Stage'
+import { ConfidenceCard } from '../components/ConfidenceCard'
 import { EmblemBadge } from '../components/Emblem'
 import { prettyServiceName } from '../lib/format'
 
@@ -198,8 +196,17 @@ function Connect({
   )
 }
 
-// ------------------------------------------------------- operator (mirror+swipe)
+// ------------------------------------------------------- operator (confidence view)
 const SWIPE_MIN = 45 // px; below this a gesture is a tap, not a swipe
+
+/** Wall clock with seconds — "11:03:53 AM", matching the desktop stage header. */
+function clockText(): string {
+  const d = new Date()
+  const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`)
+  let h = d.getHours() % 12
+  if (h === 0) h = 12
+  return `${h}:${p(d.getMinutes())}:${p(d.getSeconds())} ${d.getHours() >= 12 ? 'PM' : 'AM'}`
+}
 
 function OperatorMirror({
   conn,
@@ -216,8 +223,21 @@ function OperatorMirror({
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
-  const [hint, setHint] = useState(true)
+  const [, forceTick] = useState(0)
   const startRef = useRef<{ x: number; y: number } | null>(null)
+
+  // Re-render every second so the header clock ticks.
+  useEffect(() => {
+    const id = setInterval(() => forceTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Paint the document dark so the site's paper background never peeks through the
+  // safe-area insets while operating.
+  useEffect(() => {
+    document.documentElement.classList.add('channel-open')
+    return () => document.documentElement.classList.remove('channel-open')
+  }, [])
 
   const run = useCallback(
     async (cmd: ControlCmd): Promise<void> => {
@@ -252,17 +272,26 @@ function OperatorMirror({
     const dx = t.clientX - s.x
     const dy = t.clientY - s.y
     if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN) return
-    setHint(false)
-    // Forward (Next) = swipe left OR up; Back (Prev) = swipe right OR down. This
-    // works whether the phone is held landscape or portrait (the slide rotates).
+    // Forward (Next) = swipe left OR up; Back (Prev) = swipe right OR down.
     const forward = Math.abs(dx) >= Math.abs(dy) ? dx < 0 : dy < 0
     void run(forward ? 'next' : 'prev')
   }
 
+  // Desktop: arrow / page keys and space drive the deck.
   useEffect(() => {
-    const t = setTimeout(() => setHint(false), 6000)
-    return () => clearTimeout(t)
-  }, [])
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault()
+        void run('next')
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault()
+        void run('prev')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [run])
+
   useEffect(() => {
     if (!flash) return
     const t = setTimeout(() => setFlash(null), 2200)
@@ -274,47 +303,79 @@ function OperatorMirror({
     navigate('/watch')
   }
 
-  const chrome = (
-    <>
-      <MirrorChrome
-        name={state?.name || conn.label}
-        tone={liveShowing ? 'live' : connected ? 'wait' : 'conn'}
-        statusLabel={liveShowing ? 'Live · Operator' : connected ? 'Operator' : 'Connecting'}
-        onBack={exit}
-        backLabel="Exit operator"
-        watchers={viewers}
-      />
+  const status = liveShowing
+    ? { label: 'LIVE', cls: 'bg-red-500 text-white' }
+    : connected
+      ? { label: 'STANDBY', cls: 'bg-white/15 text-white/70' }
+      : { label: 'OFFLINE', cls: 'bg-white/10 text-white/45' }
 
-      {/* swipe direction flash */}
-      {feedback && (
-        <div className="op-flash">
-          <span>{feedback === 'next' ? '›' : '‹'}</span>
+  // Confidence render of the next slide (with the operator's blank/logo states
+  // cleared so it always previews the actual upcoming content).
+  const nextState = state?.next
+    ? { ...state, slide: state.next, next: null, blackout: false, clearText: false, showLogo: false }
+    : null
+
+  return (
+    <div className="op2-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <header className="op2-head">
+        <div className="op2-clockwrap">
+          <div className="op2-clock">{clockText()}</div>
+          <div className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</div>
         </div>
-      )}
-
-      {/* first-time swipe hint (auto-hides) */}
-      {hint && (
-        <div className="op-hint">
-          <span>‹</span> Swipe to move slides <span>›</span>
-        </div>
-      )}
-
-      {/* error toast */}
-      {flash && <div className="op-toast">{flash}</div>}
-
-      {/* next-slide preview (stage/confidence view) — what a swipe forward brings up */}
-      <div className="op-next">
-        <span className="op-next-tag">Next</span>
-        <div className="op-next-stage">
-          {state?.next ? (
-            <Stage state={{ ...state, slide: state.next, next: null, blackout: false, clearText: false, showLogo: false }} />
-          ) : (
-            <div className="op-next-end">End of service</div>
+        <div className="op2-badges">
+          {typeof viewers === 'number' && viewers >= 0 && (
+            <span className="op2-viewers">
+              <EyeGlyph /> {viewers}
+            </span>
           )}
+          <span className={`op2-status ${status.cls}`}>{status.label}</span>
+          <button onClick={exit} aria-label="Exit operator" className="op2-exit">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
-      </div>
-    </>
-  )
+      </header>
 
-  return <LiveMirror state={state} chrome={chrome} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} />
+      <div className="op2-body">
+        <section className="op2-section op2-section-current">
+          <div className="op2-label">Current</div>
+          <div className="op2-card">
+            <ConfidenceCard state={state} />
+          </div>
+        </section>
+        <section className="op2-section op2-section-next">
+          <div className="op2-label">Next</div>
+          <div className="op2-card">
+            {nextState ? <ConfidenceCard state={nextState} /> : <div className="op2-end">End of service</div>}
+          </div>
+        </section>
+      </div>
+
+      <div className="op2-controls">
+        <button onClick={() => void run('prev')} className="op2-btn op2-btn-prev">
+          <span aria-hidden>‹</span> Prev
+        </button>
+        <button onClick={() => void run('next')} className="op2-btn op2-btn-next">
+          Next <span aria-hidden>›</span>
+        </button>
+      </div>
+
+      {feedback && (
+        <div className="op2-flash">
+          <span>{feedback === 'next' ? '›' : feedback === 'prev' ? '‹' : ''}</span>
+        </div>
+      )}
+      {flash && <div className="op2-toast">{flash}</div>}
+    </div>
+  )
+}
+
+function EyeGlyph(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
 }
