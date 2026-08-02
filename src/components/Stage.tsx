@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import type { LiveState } from '../lib/relay'
 import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, sizeFor, textOf } from '../lib/stage'
 import { Logo } from './Logo'
@@ -139,7 +140,13 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
             )}
             {(caption || (timer && slide?.message)) && <div className="stage-caption">{caption || slide?.message}</div>}
           </div>
-          {qrOn && <img className="stage-qr" src={slide!.qr} alt="Scan to give" />}
+          {/* A QR is useless on the device displaying it — on a phone this is a
+              tap, straight to the giving page. */}
+          {qrOn && (
+            <Link className="stage-give" to="/give">
+              Click to know about ways to contribute
+            </Link>
+          )}
         </div>
       )}
     </div>

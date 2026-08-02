@@ -1077,6 +1077,24 @@ html.channel-open #root {
    trailing ||repeat|| marker — stays on ONE line instead of wrapping. */
 .stage-composed .cline { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; font-weight: 700; }
 .stage-qr { width: 30cqh; height: 30cqh; object-fit: contain; background: #fff; padding: 1.6cqh; border-radius: 2cqh; box-shadow: 0 1cqh 4cqh rgba(0, 0, 0, 0.4); }
+/* Stands in for the QR on a phone, which can't scan the screen it's drawing.
+   Carries its own card so it reads as a control against whatever background the
+   slide happens to be on, and is sized in cq units like the rest of the stage. */
+.stage-give {
+  display: inline-block;
+  max-width: 80%;
+  padding: 2.2cqh 3.4cqh;
+  border-radius: 999px;
+  background: #f4f1e8;
+  color: #16233d;
+  font-size: 3cqh;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 1cqh 4cqh rgba(0, 0, 0, 0.45);
+}
+.stage-give:active { transform: scale(0.97); }
 .stage-standby { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2.4cqh; background: radial-gradient(circle at 50% 30%, #1b2947 0%, #0f1728 100%); color: #fff; text-align: center; padding: 0 6%; }
 /* The church logo is full-colour artwork, so it takes a neutral lift off the
