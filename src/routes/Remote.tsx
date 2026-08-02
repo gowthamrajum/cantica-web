@@ -199,15 +199,6 @@ function Connect({
 // ------------------------------------------------------- operator (confidence view)
 const SWIPE_MIN = 45 // px; below this a gesture is a tap, not a swipe
 
-/** Wall clock with seconds — "11:03:53 AM", matching the desktop stage header. */
-function clockText(): string {
-  const d = new Date()
-  const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`)
-  let h = d.getHours() % 12
-  if (h === 0) h = 12
-  return `${h}:${p(d.getMinutes())}:${p(d.getSeconds())} ${d.getHours() >= 12 ? 'PM' : 'AM'}`
-}
-
 function OperatorMirror({
   conn,
   onDisconnect,
@@ -223,14 +214,7 @@ function OperatorMirror({
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
-  const [, forceTick] = useState(0)
   const startRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Re-render every second so the header clock ticks.
-  useEffect(() => {
-    const id = setInterval(() => forceTick((t) => t + 1), 1000)
-    return () => clearInterval(id)
-  }, [])
 
   // Paint the document dark so the site's paper background never peeks through the
   // safe-area insets while operating.
@@ -318,8 +302,7 @@ function OperatorMirror({
   return (
     <div className="op2-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="op2-head">
-        <div className="op2-clockwrap">
-          <div className="op2-clock">{clockText()}</div>
+        <div className="op2-headmain">
           <div className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</div>
         </div>
         <div className="op2-badges">

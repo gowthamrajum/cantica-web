@@ -1101,9 +1101,11 @@ html.channel-open #root {
     calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px);
 }
 .op2-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; }
-.op2-clockwrap { min-width: 0; }
-.op2-clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(16px, 3vw, 22px); line-height: 1.05; letter-spacing: -0.01em; }
-.op2-service { margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, 0.42); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* No clock here: the phone's own status bar already shows the time, and a
+   1Hz re-render of the whole operator view to tick it was the only reason this
+   component re-rendered off-network. */
+.op2-headmain { min-width: 0; }
+.op2-service { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .op2-badges { display: flex; align-items: center; gap: 8px; flex: none; }
 .op2-viewers { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 .op2-status { padding: 4px 9px; border-radius: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; }
@@ -1115,8 +1117,10 @@ html.channel-open #root {
    force-landscape rule below). */
 .op2-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .op2-section { display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
-.op2-section-current { flex: 2; }
-.op2-section-next { flex: 1; }
+/* 70 / 30 — the operator reads the current slide and only glances at what's
+   coming, so Next gets the smaller share. */
+.op2-section-current { flex: 7; }
+.op2-section-next { flex: 3; }
 
 /* Force landscape on a portrait TOUCH device (phone/tablet) — even when the OS
    rotation lock is on: rotate the whole view 90° and swap width/height to the
