@@ -17,7 +17,7 @@ const TABS: Tab[] = [
   { to: '/watch', label: 'Watch', icon: 'watch' },
   { to: '/bible', label: 'Bible', icon: 'bible' },
   { to: '/songs', label: 'Songs', icon: 'songs', owns: ['/songs/'] },
-  { to: '/more', label: 'More', icon: 'more', owns: ['/services', '/give', '/visit', '/about'] }
+  { to: '/more', label: 'More', icon: 'more', owns: ['/services', '/give', '/visit', '/about', '/build'] }
 ]
 
 function isTabActive(tab: Tab, path: string): boolean {

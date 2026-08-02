@@ -19,6 +19,13 @@ export function More(): JSX.Element {
 
       <ListGroup label="For our team">
         <ListRow
+          icon="sparkle"
+          tint="plum"
+          title="Service Builder"
+          subtitle="Pick Sunday's songs and readings for Cantica"
+          to="/build"
+        />
+        <ListRow
           icon="remote"
           tint="gold"
           title="Operator remote"
