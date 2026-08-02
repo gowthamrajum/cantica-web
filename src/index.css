@@ -1127,7 +1127,31 @@ html.channel-open #root {
    viewport so the operator just turns the phone sideways. When the device really
    is landscape (auto-rotate on), this rule stops matching and it renders native. */
 @media (orientation: portrait) and (pointer: coarse) {
-  .op2-root { inset: auto; top: 0; left: 100vw; width: 100vh; height: 100vw; transform-origin: top left; transform: rotate(90deg); }
+  .op2-root {
+    inset: auto;
+    top: 0;
+    left: 100vw;
+    width: 100vh;
+    height: 100vw;
+    /* Small-viewport units: `vh`/`vw` are the LARGE viewport (browser toolbars
+       retracted), so in Safari this box runs past the visible area and the slide
+       text is cut off under the toolbar. `svh` also holds still while the
+       toolbars hide and show, so the text auto-fit doesn't re-run mid-service.
+       The `vh`/`vw` lines above stay as the fallback for older engines. */
+    left: 100svw;
+    width: 100svh;
+    height: 100svw;
+    transform-origin: top left;
+    transform: rotate(90deg);
+    /* The safe areas have to rotate with the content. Measured mapping of this
+       box's edges once rotated: padding-top lands on the screen's RIGHT,
+       right->bottom, bottom->left, and padding-LEFT lands on the screen's TOP —
+       which is where the status bar sits. Using the upright insets here put
+       `inset-left` (0 in portrait) against the status bar, so the clock, wifi
+       and battery sat on top of the header. */
+    padding: calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 14px)
+      calc(env(safe-area-inset-left) + 12px) calc(env(safe-area-inset-top) + 14px);
+  }
 }
 .op2-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; color: rgba(255, 255, 255, 0.4); }
 .op2-card { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.12); background: #000; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); }
