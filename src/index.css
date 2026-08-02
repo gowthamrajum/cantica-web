@@ -2,14 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================================================================
+   This is a NATIVE-APP SHELL, not a web page. The document itself never
+   scrolls: `.app-shell` is exactly one viewport tall and every screen owns its
+   own scroll container. That kills the mobile-browser URL-bar resize dance,
+   kills rubber-band overscroll onto a blank page background, and lets the app
+   bar / tab bar stay pinned as translucent chrome the content slides under —
+   the things that make a web app read as a "website" when you get them wrong.
+
+   Live-broadcast routes (/c/:room, /remote) render OUTSIDE this shell and are
+   styled by the `channel-*` / `op2-*` / `stage-*` blocks further down, which
+   are unchanged.
+   ========================================================================= */
+
 @layer base {
   html {
-    scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-paper text-ink font-sans antialiased;
     font-optical-sizing: auto;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  /* Chrome (bars, rows, buttons) shouldn't select on a long-press like text. */
+  button,
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
   }
   h1, h2, h3 {
     font-optical-sizing: auto;
@@ -20,57 +41,687 @@
   }
 }
 
-@layer components {
-  .container-x {
-    @apply mx-auto w-full max-w-6xl px-6 sm:px-8;
-  }
-  /* small-caps eyebrow label with a gold rule */
-  .eyebrow {
-    @apply inline-flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-label text-gold-600;
-  }
-  .eyebrow::before {
-    content: '';
-    @apply h-px w-8 bg-gold-500/70;
-  }
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[15px] font-semibold transition duration-200;
-  }
-  .btn-primary {
-    @apply btn bg-navy-700 text-paper shadow-soft hover:bg-navy-800 hover:shadow-lift;
-  }
-  .btn-gold {
-    @apply btn bg-gold-500 text-white shadow-gold hover:bg-gold-600;
-  }
-  .btn-ghost {
-    @apply btn border border-ink/15 text-ink hover:border-gold-500 hover:text-gold-600;
-  }
-  .btn-ghost-light {
-    @apply btn border border-white/25 text-paper hover:border-gold-300 hover:text-gold-200;
-  }
-  .card-classic {
-    @apply rounded-xl2 border border-line bg-card shadow-soft;
-  }
+:root {
+  --appbar-h: 52px;
+  --tabbar-h: 58px;
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --gutter: 16px;
+  /* Height of a screen's pinned affix bar. Declared on :root, not on
+     .appbar-affix — the affix is a SIBLING of .screen-scroll, and custom
+     properties only inherit down, so the scroll container would otherwise
+     resolve it as invalid and silently drop its whole padding-top calc. */
+  --affix-h: 54px;
+  /* Translucent chrome over warm paper. */
+  --chrome: 250, 246, 238;
 }
 
-/* Fade / rise-in as sections enter the viewport */
-.reveal {
+/* ---------------------------------------------------------------- shell ---- */
+.app-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: theme('colors.paper');
+}
+.app-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- screen ---- */
+/* Absolutely positioned so an entering screen can animate over the layout
+   without reflowing it, and so the app bar / scroll area anchor to the screen. */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: theme('colors.paper');
+}
+.screen-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Content clears the translucent chrome by padding, not margin — which also
+     means a `position: sticky` child inside pins at this padding edge with
+     `top: 0` (sticky offsets resolve against the content box, so the padding is
+     already accounted for). See .index-head. */
+  padding-top: calc(var(--appbar-h) + var(--sat));
+  padding-bottom: calc(var(--tabbar-h) + var(--sab) + 20px);
+  scroll-behavior: smooth;
+}
+.screen-scroll.has-affix {
+  padding-top: calc(var(--appbar-h) + var(--sat) + var(--affix-h));
+}
+
+/* A bar pinned under the app bar for the life of the screen (search, filters) —
+   unlike an iOS search field that scrolls away, which is the wrong trade for a
+   thousand-entry songbook. */
+.appbar-affix {
+  position: absolute;
+  z-index: 19;
+  top: calc(var(--appbar-h) + var(--sat));
+  left: 0;
+  right: 0;
+  height: var(--affix-h);
+  display: flex;
+  align-items: center;
+  padding: 0 max(var(--sar), var(--gutter)) 0 max(var(--sal), var(--gutter));
+  border-bottom: 1px solid rgba(232, 221, 201, 0.9);
+  background: rgba(var(--chrome), 0.9);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .appbar-affix { background: rgba(var(--chrome), 0.98); }
+}
+.appbar-affix > * { width: 100%; max-width: 720px; margin: 0 auto; }
+
+/* Push (sub-page) vs. tab-switch entrances — the two motions a native app uses. */
+@keyframes screen-push {
+  from { opacity: 0.5; transform: translate3d(24px, 0, 0); }
+  to   { opacity: 1;   transform: translate3d(0, 0, 0); }
+}
+@keyframes screen-tab {
+  from { opacity: 0; transform: translate3d(0, 7px, 0) scale(0.995); }
+  to   { opacity: 1; transform: none; }
+}
+.screen.enter-push { animation: screen-push 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
+.screen.enter-tab  { animation: screen-tab 0.26s cubic-bezier(0.22, 0.61, 0.36, 1); }
+
+/* -------------------------------------------------------------- app bar ---- */
+.appbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(var(--appbar-h) + var(--sat));
+  padding-top: var(--sat);
+  padding-left: max(var(--sal), 8px);
+  padding-right: max(var(--sar), 8px);
+  border-bottom: 1px solid transparent;
+  background: rgba(var(--chrome), 0);
+  transition: background 0.22s ease, border-color 0.22s ease;
+}
+/* Frosted only once content is behind it — a hairline + blur, never a hard bar. */
+.appbar.is-scrolled {
+  background: rgba(var(--chrome), 0.82);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom-color: rgba(232, 221, 201, 0.9);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .appbar.is-scrolled { background: rgba(var(--chrome), 0.97); }
+}
+/* Compact title: hidden until the large title has scrolled away under the bar. */
+.appbar-title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-family: theme('fontFamily.serif');
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.2;
+  color: theme('colors.ink.DEFAULT');
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transform: translateY(7px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.reveal.in {
-  opacity: 1;
-  transform: none;
+.appbar.is-scrolled .appbar-title { opacity: 1; transform: none; }
+/* Keeps the centred title optically centred when only one side has a button. */
+.appbar-slot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; transition: none; }
-  html { scroll-behavior: auto; }
+.appbar-slot.is-end { justify-content: flex-end; }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  height: 38px;
+  min-width: 38px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: theme('colors.navy.700');
+  transition: background 0.16s ease, transform 0.12s ease;
+}
+.icon-btn:active { transform: scale(0.9); background: rgba(232, 221, 201, 0.6); }
+.icon-btn.is-chip {
+  background: rgba(255, 253, 249, 0.78);
+  box-shadow: 0 1px 2px rgba(36, 31, 24, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+/* iOS-style back affordance: chevron + the title of the screen you came from. */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 38px;
+  padding: 0 10px 0 4px;
+  border-radius: 999px;
+  color: theme('colors.navy.700');
+  font-size: 15px;
+  font-weight: 600;
+  max-width: 46vw;
+  transition: background 0.16s ease, transform 0.12s ease;
+}
+.back-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.back-btn:active { transform: scale(0.95); background: rgba(232, 221, 201, 0.6); }
+
+/* Large title — scrolls with the content and hands off to the compact title. */
+.screen-hero {
+  padding: 6px var(--gutter) 12px;
+}
+.screen-eyebrow {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: theme('colors.gold.600');
+}
+.screen-title {
+  margin-top: 4px;
+  font-family: theme('fontFamily.serif');
+  font-weight: 600;
+  font-size: clamp(29px, 8.2vw, 36px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: theme('colors.ink.DEFAULT');
+  text-wrap: balance;
+}
+.screen-sub {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: theme('colors.ink.soft');
 }
 
-/* Subtle dotted grain for warmth on large panels */
+/* -------------------------------------------------------------- tab bar ---- */
+.tabbar {
+  position: absolute;
+  z-index: 30;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: stretch;
+  height: calc(var(--tabbar-h) + var(--sab));
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+  border-top: 1px solid rgba(232, 221, 201, 0.9);
+  background: rgba(var(--chrome), 0.86);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tabbar { background: rgba(var(--chrome), 0.98); }
+}
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  color: theme('colors.ink.muted');
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  transition: color 0.18s ease, transform 0.12s ease;
+}
+.tab:active { transform: scale(0.92); }
+.tab.is-active { color: theme('colors.navy.700'); }
+/* Active pill behind the glyph — reads instantly as "which tab am I on". */
+.tab-ico {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  width: 50px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tab.is-active .tab-ico { background: rgba(184, 137, 63, 0.16); }
+.tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Unread-style dot for "a service is live right now". */
+.tab-dot {
+  position: absolute;
+  margin: -14px 0 0 22px;
+  height: 7px;
+  width: 7px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(var(--chrome), 0.95);
+  animation: ch-pulse 1.8s ease-in-out infinite;
+}
+
+.brand-rail { display: none; }
+
+/* ------------------------------------------------------------- desktop ----- */
+/* "Widen gracefully": the tab bar becomes a left rail and the content column
+   grows, but every screen, sheet and list is the same component as on phone. */
+@media (min-width: 1024px) {
+  .app-shell { flex-direction: row; }
+  .tabbar {
+    position: static;
+    order: -1;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    width: 258px;
+    flex: none;
+    height: auto;
+    padding: 0 12px calc(var(--sab) + 16px);
+    border-top: 0;
+    border-right: 1px solid rgba(232, 221, 201, 0.9);
+    background: rgba(243, 236, 224, 0.55);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .brand-rail {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: calc(var(--sat) + 20px) 10px 18px;
+  }
+  .tab {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    height: 46px;
+    padding: 0 12px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .tab:active { transform: scale(0.98); }
+  .tab:hover { background: rgba(255, 253, 249, 0.7); }
+  .tab.is-active {
+    background: theme('colors.card');
+    box-shadow: theme('boxShadow.soft');
+  }
+  .tab-ico { height: 24px; width: 24px; background: transparent !important; }
+  .tab-dot { margin: -10px 0 0 -10px; }
+  .screen-scroll { padding-bottom: calc(var(--sab) + 56px); }
+  .appbar { padding-left: max(var(--sal), 20px); padding-right: max(var(--sar), 20px); }
+  /* On a wide rail the compact title belongs at the left, not centred. */
+  .appbar-title { text-align: left; padding-left: 4px; }
+  .screen-hero { padding-left: 24px; padding-right: 24px; }
+  :root { --gutter: 24px; }
+}
+
+/* Every screen's content is measured, not full-bleed, on a large display. */
+.screen-body {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.screen-body.is-wide { max-width: 1040px; }
+
+/* ----------------------------------------------------------- list groups --- */
+/* Grouped inset lists — the single most recognisable "this is an app" pattern. */
+.list-label {
+  padding: 22px var(--gutter) 7px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: theme('colors.ink.muted');
+}
+.list-group {
+  margin: 0 var(--gutter);
+  border-radius: 16px;
+  border: 1px solid theme('colors.line');
+  background: theme('colors.card');
+  box-shadow: theme('boxShadow.soft');
+  overflow: hidden;
+}
+.list-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 11px 14px;
+  text-align: left;
+  transition: background 0.14s ease;
+}
+/* Separator inset past the icon, like a native list. */
+.list-row + .list-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 0;
+  height: 1px;
+  background: rgba(232, 221, 201, 0.85);
+}
+.list-row.has-ico + .list-row.has-ico::before { left: 60px; }
+.list-row:active { background: rgba(232, 221, 201, 0.4); }
+@media (hover: hover) {
+  .list-row:hover { background: rgba(243, 236, 224, 0.5); }
+}
+.list-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 34px;
+  width: 34px;
+  border-radius: 10px;
+  color: #fff;
+}
+.list-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: theme('colors.ink.DEFAULT');
+  line-height: 1.3;
+}
+.list-sub {
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: theme('colors.ink.muted');
+}
+.list-chev { flex: none; color: theme('colors.ink.muted'); opacity: 0.65; }
+
+/* ---------------------------------------------------------------- cards ---- */
+.app-card {
+  margin: 0 var(--gutter);
+  border-radius: 18px;
+  border: 1px solid theme('colors.line');
+  background: theme('colors.card');
+  box-shadow: theme('boxShadow.soft');
+  overflow: hidden;
+}
+.app-card-dark {
+  position: relative;
+  margin: 0 var(--gutter);
+  border-radius: 20px;
+  overflow: hidden;
+  color: theme('colors.paper');
+  background: radial-gradient(120% 110% at 50% -10%, #2a3f6d 0%, #18243f 52%, #0e1526 100%);
+  box-shadow: theme('boxShadow.lift');
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 15px 14px 16px;
+  border-radius: 16px;
+  border: 1px solid theme('colors.line');
+  background: theme('colors.card');
+  box-shadow: theme('boxShadow.soft');
+  text-align: left;
+  transition: transform 0.14s ease, box-shadow 0.2s ease;
+}
+.tile:active { transform: scale(0.972); }
+@media (hover: hover) {
+  .tile:hover { box-shadow: theme('boxShadow.lift'); }
+}
+
+/* Pressable feedback used on any bespoke tappable surface. */
+.pressable { transition: transform 0.14s ease, opacity 0.14s ease; }
+.pressable:active { transform: scale(0.97); opacity: 0.92; }
+
+.btn-app {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: transform 0.14s ease, background 0.18s ease, opacity 0.18s ease;
+}
+.btn-app:active { transform: scale(0.975); }
+.btn-app:disabled { opacity: 0.55; }
+.btn-app-primary { background: theme('colors.navy.700'); color: theme('colors.paper'); box-shadow: theme('boxShadow.soft'); }
+.btn-app-gold { background: theme('colors.gold.500'); color: #fff; box-shadow: theme('boxShadow.gold'); }
+.btn-app-quiet { background: rgba(232, 221, 201, 0.55); color: theme('colors.navy.700'); }
+.btn-app-ghost-light { border: 1px solid rgba(255, 255, 255, 0.28); color: theme('colors.paper'); }
+.btn-block { display: flex; width: 100%; }
+
+/* ------------------------------------------------------------ segmented ---- */
+/* iOS segmented control with a sliding thumb (transform-driven, so it animates
+   on the compositor rather than repainting each segment). */
+.segmented {
+  position: relative;
+  display: flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(232, 221, 201, 0.6);
+  isolation: isolate;
+}
+.segmented-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  border-radius: 9px;
+  background: theme('colors.card');
+  box-shadow: 0 1px 3px rgba(36, 31, 24, 0.14);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), width 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.segmented-opt {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme('colors.ink.soft');
+  transition: color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.segmented-opt.is-active { color: theme('colors.navy.700'); }
+
+/* --------------------------------------------------------------- sheets ---- */
+/* Bottom sheet on phone, centred dialog on desktop. Portalled to <body>, so no
+   ancestor transform can capture its fixed positioning. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(21, 18, 12, 0.42);
+  animation: fade-in 0.2s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  position: fixed;
+  z-index: 61;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 86dvh;
+  padding-bottom: var(--sab);
+  border-radius: 22px 22px 0 0;
+  background: theme('colors.paper');
+  box-shadow: 0 -10px 50px rgba(36, 31, 24, 0.3);
+  animation: sheet-up 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes sheet-up {
+  from { transform: translate3d(0, 100%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+.sheet-grip {
+  flex: none;
+  width: 38px;
+  height: 4px;
+  margin: 8px auto 2px;
+  border-radius: 999px;
+  background: rgba(139, 129, 114, 0.35);
+}
+.sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 10px;
+}
+.sheet-title {
+  flex: 1;
+  min-width: 0;
+  font-family: theme('fontFamily.serif');
+  font-size: 19px;
+  font-weight: 600;
+  color: theme('colors.ink.DEFAULT');
+}
+.sheet-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 16px;
+}
+@media (min-width: 1024px) {
+  .sheet {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    width: min(560px, 92vw);
+    max-height: 80dvh;
+    border-radius: 20px;
+    padding-bottom: 0;
+    animation: sheet-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes sheet-pop {
+    from { opacity: 0; transform: translate(-50%, -47%) scale(0.975); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .sheet-grip { display: none; }
+}
+
+/* ----------------------------------------------------------- misc chrome --- */
+.live-dot {
+  height: 8px;
+  width: 8px;
+  flex: none;
+  border-radius: 999px;
+  background: #ef4444;
+  animation: ch-pulse 1.6s ease-in-out infinite;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+/* Sticky section headers in the songbook — the A/B/C index of a contacts list.
+   `top: 0` pins them exactly at the bottom edge of the chrome: the scroll
+   container's padding-top already shifts the sticky origin clear of it. */
+.index-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 6px var(--gutter);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: theme('colors.ink.muted');
+  background: rgba(var(--chrome), 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(232, 221, 201, 0.7);
+}
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: rgba(232, 221, 201, 0.5);
+  color: theme('colors.ink.muted');
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  outline: none;
+  font-size: 16px; /* < 16px makes iOS zoom the viewport on focus */
+  color: theme('colors.ink.DEFAULT');
+}
+.spinner {
+  height: 20px;
+  width: 20px;
+  border-radius: 999px;
+  border: 2px solid rgba(139, 129, 114, 0.25);
+  border-top-color: theme('colors.gold.500');
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Faint dotted grain, kept from the old site for warmth on dark panels. */
 .grain {
-  background-image: radial-gradient(rgba(36, 31, 24, 0.045) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 4px 4px;
+}
+
+/* Bible reading surface — size driven by the reader's own text-size setting. */
+.verse-body { font-size: var(--read-size, 18px); }
+.verse-te { font-size: var(--read-size, 18px); line-height: 1.75; }
+.verse-en { font-size: calc(var(--read-size, 18px) - 1.5px); line-height: 1.65; }
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .sheet,
+  .sheet-backdrop { animation: none !important; }
+  .segmented-thumb,
+  .appbar,
+  .appbar-title,
+  .tab-ico { transition: none !important; }
+  .live-dot,
+  .tab-dot { animation: none !important; }
+  .screen-scroll { scroll-behavior: auto; }
 }
 
 /* ---- live stage (audience mirror; ported from the desktop obs.html) ---- */

@@ -62,7 +62,7 @@ export default defineConfig({
         name: 'Telugu Community Church',
         short_name: 'Cantica',
         description: 'Telugu Community Church, Irving TX — worship, study, and prayer.',
-        theme_color: '#0f1728',
+        theme_color: '#faf6ee',
         background_color: '#faf6ee',
         display: 'standalone',
         start_url: '.',

@@ -1,19 +1,25 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { PageBar } from '../components/PageBar'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { useParams } from 'react-router-dom'
+import { Screen } from '../components/app/Screen'
+import { Sheet } from '../components/app/Sheet'
+import { Segmented } from '../components/app/Segmented'
+import { Icon } from '../components/app/Icons'
 import { getSong, type Song, type Stanza } from '../lib/songs'
+import { READ_SIZES, usePref, useReadSize } from '../lib/prefs'
 
 type SLang = 'both' | 'te' | 'en'
 const LANGS: { id: SLang; label: string }[] = [
-  { id: 'both', label: 'Both' },
   { id: 'te', label: 'తెలుగు' },
-  { id: 'en', label: 'English' }
+  { id: 'en', label: 'English' },
+  { id: 'both', label: 'Both' }
 ]
 
 export function SongDetail(): JSX.Element {
   const { id = '' } = useParams()
   const [song, setSong] = useState<Song | null | undefined>(undefined)
-  const [lang, setLang] = useState<SLang>('both')
+  const [lang, setLang] = usePref<SLang>('tcc-song-lang', 'both')
+  const [settings, setSettings] = useState(false)
+  const read = useReadSize()
 
   useEffect(() => {
     let alive = true
@@ -26,64 +32,120 @@ export function SongDetail(): JSX.Element {
     }
   }, [id])
 
+  const stanzas = song?.stanzas ?? []
+
   return (
-    <div className="flex min-h-svh flex-col">
-      <PageBar />
-      <main className="container-x flex-1 py-10 sm:py-14">
-        <div className="mx-auto max-w-2xl">
-          <Link to="/songs" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft transition hover:text-gold-600">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-            All songs
-          </Link>
-
-          {song === undefined && <p className="py-20 text-center text-ink-muted">Loading…</p>}
-          {song === null && <p className="py-20 text-center text-ink-muted">Song not found.</p>}
-
+    <Screen
+      variant="push"
+      title={song?.song_name ?? 'Song'}
+      back={{ to: '/songs', label: 'Songs' }}
+      trailing={
+        <button type="button" className="icon-btn" onClick={() => setSettings(true)} aria-label="Reading settings">
+          <Icon name="text" size={21} />
+        </button>
+      }
+      hero={
+        <div className="screen-hero">
+          <span className="screen-eyebrow">Songbook · కీర్తన</span>
+          <h1 className="screen-title">{song?.song_name ?? '…'}</h1>
           {song && (
-            <>
-              <header className="mb-8 mt-4 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
-                <h1 className="font-serif text-3xl font-semibold text-ink sm:text-4xl">{song.song_name}</h1>
-                <div className="flex gap-1 rounded-full border border-line bg-card p-1 shadow-soft">
-                  {LANGS.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => setLang(l.id)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${lang === l.id ? 'bg-navy-700 text-paper' : 'text-ink-soft hover:text-gold-600'}`}
-                    >
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
-              </header>
-
-              <div className="space-y-8">
-                {song.main_stanza && <Block label="Pallavi · పల్లవి" stanza={song.main_stanza} lang={lang} />}
-                {(song.stanzas ?? []).map((st, i) => (
-                  <Block key={i} label={`Stanza ${st.stanza_number ?? i + 1}`} stanza={st} lang={lang} />
-                ))}
-              </div>
-            </>
+            <p className="screen-sub">
+              {song.main_stanza ? 'Pallavi · ' : ''}
+              {stanzas.length} {stanzas.length === 1 ? 'stanza' : 'stanzas'}
+            </p>
           )}
         </div>
-      </main>
-    </div>
+      }
+    >
+      {song === undefined && (
+        <div className="flex items-center justify-center gap-2.5 py-20 text-[15px] text-ink-muted">
+          <span className="spinner" /> Loading…
+        </div>
+      )}
+      {song === null && <p className="py-20 text-center text-[15px] text-ink-muted">Song not found.</p>}
+
+      {song && (
+        <div className="mt-2 space-y-3 px-[var(--gutter)]" style={{ '--read-size': `${read.size}px` } as CSSProperties}>
+          {song.main_stanza && <Block label="Pallavi · పల్లవి" stanza={song.main_stanza} lang={lang} accent />}
+          {stanzas.map((st, i) => (
+            <Block key={i} label={`Stanza ${st.stanza_number ?? i + 1}`} stanza={st} lang={lang} />
+          ))}
+        </div>
+      )}
+
+      <Sheet open={settings} title="Reading" onClose={() => setSettings(false)}>
+        <div className="px-[var(--gutter)]">
+          <p className="mb-2 text-[12px] font-bold uppercase tracking-[0.13em] text-ink-muted">Language</p>
+          <Segmented options={LANGS} value={lang} onChange={setLang} ariaLabel="Song language" />
+
+          <p className="mb-2 mt-6 text-[12px] font-bold uppercase tracking-[0.13em] text-ink-muted">Text size</p>
+          <div className="flex items-center gap-3 pb-3">
+            <button
+              type="button"
+              onClick={read.dec}
+              disabled={!read.canDec}
+              className="btn-app btn-app-quiet h-11 w-14 flex-none disabled:opacity-40"
+              aria-label="Smaller text"
+            >
+              <Icon name="minus" size={18} strokeWidth={2.4} />
+            </button>
+            <div className="flex flex-1 items-center justify-center gap-1">
+              {READ_SIZES.map((_, i) => (
+                <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= read.step ? 'bg-gold-500' : 'bg-line'}`} />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={read.inc}
+              disabled={!read.canInc}
+              className="btn-app btn-app-quiet h-11 w-14 flex-none disabled:opacity-40"
+              aria-label="Larger text"
+            >
+              <Icon name="plus" size={18} strokeWidth={2.4} />
+            </button>
+          </div>
+        </div>
+      </Sheet>
+    </Screen>
   )
 }
 
-function Block({ label, stanza, lang }: { label: string; stanza: Stanza; lang: SLang }): JSX.Element {
+/** One stanza as its own card, so a singer can track where they are at a glance. */
+function Block({
+  label,
+  stanza,
+  lang,
+  accent = false
+}: {
+  label: string
+  stanza: Stanza
+  lang: SLang
+  accent?: boolean
+}): JSX.Element {
   const te = stanza.telugu ?? []
   const en = stanza.english ?? []
-  const showTe = lang !== 'en'
+  const showTe = lang !== 'en' && te.length > 0
   const showEn = lang !== 'te' && en.length > 0
+
   return (
-    <div>
-      <div className="mb-2.5 text-[12px] font-bold uppercase tracking-label text-gold-600">{label}</div>
-      {showTe && te.map((l, i) => <div key={`t${i}`} className="text-[19px] font-medium leading-relaxed text-ink">{l}</div>)}
+    <div className={`app-card mx-0 p-4 ${accent ? 'border-gold-200 bg-gold-50/40' : ''}`}>
+      <div className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.15em] text-gold-600">{label}</div>
+      {showTe &&
+        te.map((l, i) => (
+          <div key={`t${i}`} className="verse-te font-medium text-ink">
+            {l}
+          </div>
+        ))}
       {showEn && (
-        <div className={showTe ? 'mt-2' : ''}>
-          {en.map((l, i) => <div key={`e${i}`} className="text-[16px] leading-relaxed text-ink-soft">{l}</div>)}
+        <div className={showTe ? 'mt-2.5 border-t border-line/70 pt-2.5' : ''}>
+          {en.map((l, i) => (
+            <div key={`e${i}`} className="verse-en text-ink-soft">
+              {l}
+            </div>
+          ))}
         </div>
       )}
+      {!showTe && !showEn && <p className="text-[14px] italic text-ink-muted">Not available in this language.</p>}
     </div>
   )
 }
