@@ -5,6 +5,7 @@ import { useLiveState } from '../lib/useLiveState'
 import { ConfidenceCard } from '../components/ConfidenceCard'
 import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
+import { useScreenVars } from '../lib/screenVars'
 
 const STORE_KEY = 'tcc-remote'
 type Saved = { room: string; pin: string; label?: string }
@@ -215,6 +216,10 @@ function OperatorMirror({
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const startRef = useRef<{ x: number; y: number } | null>(null)
+
+  // The rotated root is sized from the JS-measured screen (--mvw/--mvh), not
+  // from vw/vh — see useScreenVars for why iOS needs that.
+  useScreenVars()
 
   // Paint the document dark so the site's paper background never peeks through the
   // safe-area insets while operating.

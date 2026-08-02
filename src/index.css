@@ -1130,17 +1130,16 @@ html.channel-open #root {
   .op2-root {
     inset: auto;
     top: 0;
-    left: 100vw;
-    width: 100vh;
-    height: 100vw;
-    /* Small-viewport units: `vh`/`vw` are the LARGE viewport (browser toolbars
-       retracted), so in Safari this box runs past the visible area and the slide
-       text is cut off under the toolbar. `svh` also holds still while the
-       toolbars hide and show, so the text auto-fit doesn't re-run mid-service.
-       The `vh`/`vw` lines above stay as the fallback for older engines. */
-    left: 100svw;
-    width: 100svh;
-    height: 100svw;
+    /* Rotated 90°, so this box's width = screen HEIGHT and height = screen WIDTH.
+       Sized from the JS-measured screen (--mvh/--mvw, see useScreenVars) rather
+       than viewport units: in the installed PWA iOS reports a layout viewport
+       SHORTER than the physical screen, leaving a black band nothing vh/dvh-based
+       can reach, while in a browser tab vh is the LARGE viewport and overshoots
+       past the toolbars, cutting off the slide text. The measured value is right
+       in both. dvh/dvw are the pre-hydration fallback. */
+    left: var(--mvw, 100dvw);
+    width: var(--mvh, 100dvh);
+    height: var(--mvw, 100dvw);
     transform-origin: top left;
     transform: rotate(90deg);
     /* The safe areas have to rotate with the content. Measured mapping of this
