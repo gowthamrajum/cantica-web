@@ -1079,7 +1079,9 @@ html.channel-open #root {
 .stage-qr { width: 30cqh; height: 30cqh; object-fit: contain; background: #fff; padding: 1.6cqh; border-radius: 2cqh; box-shadow: 0 1cqh 4cqh rgba(0, 0, 0, 0.4); }
 .stage-standby { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2.4cqh; background: radial-gradient(circle at 50% 30%, #1b2947 0%, #0f1728 100%); color: #fff; text-align: center; padding: 0 6%; }
-.stage-emblem { width: 13cqh; height: auto; color: #dcb457; filter: drop-shadow(0 0 3cqh rgba(220, 180, 87, 0.4)); }
+/* The church logo is full-colour artwork, so it takes a neutral lift off the
+   navy standby card rather than the gold glow the old line glyph wore. */
+.stage-emblem { width: 12cqh; height: auto; filter: drop-shadow(0 1cqh 2.4cqh rgba(0, 0, 0, 0.45)); }
 .stage-standby-name { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 5cqh; }
 .stage-standby-tag { font-size: 2.1cqh; color: rgba(255, 255, 255, 0.65); }
 

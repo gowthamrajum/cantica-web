@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { LiveState } from '../lib/relay'
 import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, sizeFor, textOf } from '../lib/stage'
-import { Emblem } from './Emblem'
+import { Logo } from './Logo'
 
 /** Full-frame audience mirror of the live service — the React port of the desktop
  *  obs.html render(). Uses container-query units so text scales with the frame. */
@@ -94,7 +94,7 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
 
       {standby ? (
         <div className="stage-standby">
-          <Emblem className="stage-emblem" />
+          <Logo className="stage-emblem" />
           <div className="stage-standby-name">{state?.name || standbyName}</div>
           <div className="stage-standby-tag">{standbyTag}</div>
         </div>

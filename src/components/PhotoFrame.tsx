@@ -1,4 +1,4 @@
-import { Emblem } from './Emblem'
+import { Logo } from './Logo'
 
 /** An image slot. Pass `src` to show a real photo; otherwise it renders a warm,
  *  decorative placeholder (swap in real church photography later). */
@@ -29,7 +29,7 @@ export function PhotoFrame({
               : 'bg-[radial-gradient(120%_90%_at_30%_0%,#fffdf9_0%,#f6ecd8_55%,#efe2ca_100%)] text-gold-500/35'
           }`}
         >
-          <Emblem className="h-1/3 w-1/3" />
+          <Logo className="h-1/3 w-1/3 opacity-90" detail={false} />
           <span className={`pointer-events-none absolute inset-3 rounded-[1rem] ring-1 ${tone === 'dark' ? 'ring-white/10' : 'ring-gold-500/20'}`} />
         </div>
       )}

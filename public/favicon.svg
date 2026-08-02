@@ -1,8 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Telugu Community Church">
+  <defs>
+    <linearGradient id="tccg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6aa8ea"/><stop offset="1" stop-color="#2f6bc4"/>
+    </linearGradient>
+  </defs>
   <rect width="64" height="64" rx="15" fill="#0f1728"/>
-  <g transform="translate(12,10)" fill="none" stroke="#dcb457" stroke-width="2.6" stroke-linecap="round">
-    <path d="M8 41V16.5C8 9.4 13.4 4 20 4s12 5.4 12 12.5V41"/>
-    <path d="M6.5 41h27"/>
-    <path d="M20 14v18M13.5 21h13"/>
+  <!-- The mark, centred and scaled from its native 63.5x77.5 artboard. The TCC
+       microtype is dropped: at favicon sizes it is unreadable noise. -->
+  <g transform="translate(32 32) scale(0.6) translate(-51.25 -51.25)">
+    <rect x="22.5" y="15.5" width="60" height="74" rx="5" fill="#d7e6f7"/>
+    <rect x="20" y="13" width="60" height="74" rx="5" fill="url(#tccg)"/>
+    <path d="M26 15.5 V84.5" stroke="#0e2440" stroke-width="1.6" opacity=".22" stroke-linecap="round"/>
+    <path d="M47.25 18 H52.75 V35.25 H73 V40.75 H52.75 V84 H47.25 V40.75 H27 V35.25 H47.25 Z"
+          fill="#f4f1e8" stroke="#2f6bc4" stroke-width="1" stroke-linejoin="round"/>
+    <circle cx="50" cy="38" r="9" fill="#f4f1e8" stroke="#2f6bc4" stroke-width="1"/>
+    <circle cx="50" cy="38" r="6.4" fill="none" stroke="#2f6bc4" stroke-width="1"/>
   </g>
 </svg>

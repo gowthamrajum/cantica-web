@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Screen, Section } from '../components/app/Screen'
 import { ListGroup, ListRow } from '../components/app/List'
 import { Icon } from '../components/app/Icons'
-import { Emblem } from '../components/Emblem'
+import { Logo } from '../components/Logo'
 import { PhotoFrame } from '../components/PhotoFrame'
 import { CHURCH } from '../lib/church'
 
@@ -22,7 +22,7 @@ export function About(): JSX.Element {
       <Section>
         <div className="app-card p-5">
           <div className="flex items-center gap-2.5">
-            <Emblem className="h-5 w-5 text-gold-500" />
+            <Logo className="h-5 w-5" detail={false} />
             <p className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-gold-600">{CHURCH.nameTe}</p>
           </div>
           {CHURCH.about.map((p, i) => (

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Screen, Section } from '../components/app/Screen'
 import { Icon } from '../components/app/Icons'
-import { Emblem } from '../components/Emblem'
+import { Logo } from '../components/Logo'
 import { CHURCH } from '../lib/church'
 
 export function Services(): JSX.Element {
@@ -17,9 +17,9 @@ export function Services(): JSX.Element {
         {CHURCH.services.map((s) => (
           <article key={s.name} className="app-card mx-0 p-5">
             <div className="flex items-start gap-3.5">
-              <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-navy-700 text-gold-300">
-                <Emblem className="h-5 w-5" />
-              </span>
+              {/* Bare mark, not on a navy disc — the logo is blue and needs a
+                  light backing to read. */}
+              <Logo className="h-11 w-9 flex-none" detail={false} />
               <div className="min-w-0 flex-1">
                 <h2 className="font-serif text-[19px] font-semibold leading-tight text-ink">{s.name}</h2>
                 <p className="mt-0.5 text-[15px] font-medium text-gold-600">{s.te}</p>

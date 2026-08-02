@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icon, type IconName } from './Icons'
-import { EmblemBadge } from '../Emblem'
+import { Logo } from '../Logo'
 import { CHURCH } from '../../lib/church'
 import { useSessions } from '../../lib/useSessions'
 
@@ -47,7 +47,7 @@ export function AppShell(): JSX.Element {
 
       <nav className="tabbar no-select" aria-label="Primary">
         <div className="brand-rail">
-          <EmblemBadge className="h-9 w-9" tone="navy" />
+          <Logo className="h-9 w-9 flex-none" detail={false} />
           <div className="min-w-0">
             <div className="line-clamp-2 font-serif text-[14.5px] font-semibold leading-[1.2] text-ink">
               {CHURCH.name}

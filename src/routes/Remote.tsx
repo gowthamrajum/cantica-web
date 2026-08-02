@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getControlStatus, getSessions, sendControl, type ControlCmd, type SessionSummary } from '../lib/relay'
 import { useLiveState } from '../lib/useLiveState'
 import { ConfidenceCard } from '../components/ConfidenceCard'
-import { EmblemBadge } from '../components/Emblem'
+import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
 
 const STORE_KEY = 'tcc-remote'
@@ -113,7 +113,7 @@ function Connect({
     <div className="min-h-[100dvh] bg-[#0b1120] text-white">
       <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col px-5 pt-[calc(env(safe-area-inset-top)+28px)] pb-10">
         <div className="mb-8 flex items-center gap-3">
-          <EmblemBadge className="h-10 w-10" tone="paper" />
+          <LogoBadge className="h-10 w-10" />
           <div>
             <div className="font-serif text-lg font-semibold">Operator</div>
             <div className="text-[13px] text-white/55">Move the live slides from your phone</div>
