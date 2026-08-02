@@ -3,14 +3,16 @@ import { Screen, Section } from '../components/app/Screen'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
 import { SlidePreview } from '../components/app/SlidePreview'
-import { listSongs, getSong, type SongMeta } from '../lib/songs'
+import { SongStructureSheet } from '../components/app/SongStructureSheet'
+import { listSongs, getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
 import {
   buildService,
   countSlides,
   type Pick,
   type PsalmVerse,
-  type ServiceLang
+  type ServiceLang,
+  type SongStructure
 } from '../lib/buildService'
 
 /**
@@ -53,11 +55,18 @@ export function Build(): JSX.Element {
     }
   }, [debounced, source])
 
-  const addSong = async (meta: SongMeta): Promise<void> => {
+  // A song is arranged before it lands: which stanzas play, and which repeats.
+  const [pending, setPending] = useState<Song | null>(null)
+  const openSong = async (meta: SongMeta): Promise<void> => {
     const song = await getSong(meta.song_id)
+    if (song) setPending(song)
+  }
+  const addSong = (structure: SongStructure): void => {
+    const song = pending
     if (!song) return
-    setPicks((p) => [...p, { key: `s-${meta.song_id}-${p.length}`, type: 'song', song, lang }])
-    setNote(`Added ${meta.song_name}`)
+    setPending(null)
+    setPicks((p) => [...p, { key: `s-${song.song_id}-${p.length}`, type: 'song', song, lang, structure }])
+    setNote(`Added ${song.song_name}`)
   }
 
   // ----- psalms -----
@@ -170,7 +179,7 @@ export function Build(): JSX.Element {
                 <button
                   key={s.song_id}
                   className="list-row w-full text-left"
-                  onClick={() => void addSong(s)}
+                  onClick={() => void openSong(s)}
                 >
                   <span className="min-w-0 flex-1">
                     <span className="list-title block truncate">{s.song_name}</span>
@@ -297,6 +306,13 @@ export function Build(): JSX.Element {
           with its transliteration on the same slide, exactly as Cantica splits them.
         </p>
       </Section>
+
+      <SongStructureSheet
+        song={pending}
+        lang={lang}
+        onCancel={() => setPending(null)}
+        onAdd={addSong}
+      />
 
       <SlidePreview
         open={preview !== null}
