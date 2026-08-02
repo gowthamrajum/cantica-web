@@ -288,6 +288,31 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .tabbar { background: rgba(var(--chrome), 0.98); }
 }
+/* Sits just above the tab bar, inside the shell, so it never covers the nav. */
+.install-banner {
+  position: absolute;
+  z-index: 29;
+  left: max(var(--sal), var(--gutter));
+  right: max(var(--sar), var(--gutter));
+  bottom: calc(var(--tabbar-h) + var(--sab) + 10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(232, 221, 201, 0.9);
+  background: rgba(var(--chrome), 0.97);
+  box-shadow: 0 8px 26px rgba(36, 31, 24, 0.16);
+  animation: install-rise 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes install-rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .install-banner { animation: none; }
+}
+
 .tab {
   flex: 1;
   display: flex;

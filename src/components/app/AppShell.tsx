@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icon, type IconName } from './Icons'
 import { useScreenVars } from '../../lib/screenVars'
+import { InstallBanner } from './InstallBanner'
 import { Logo } from '../Logo'
 import { CHURCH } from '../../lib/church'
 import { useSessions } from '../../lib/useSessions'
@@ -50,6 +51,8 @@ export function AppShell(): JSX.Element {
       <main className="app-main">
         <Outlet />
       </main>
+
+      <InstallBanner />
 
       <nav className="tabbar no-select" aria-label="Primary">
         <div className="brand-rail">
