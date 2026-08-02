@@ -22,7 +22,7 @@ export function About(): JSX.Element {
       <Section>
         <div className="app-card p-5">
           <div className="flex items-center gap-2.5">
-            <Logo className="h-5 w-5" detail={false} />
+            <Logo className="h-7 w-6 flex-none" />
             <p className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-gold-600">{CHURCH.nameTe}</p>
           </div>
           {CHURCH.about.map((p, i) => (

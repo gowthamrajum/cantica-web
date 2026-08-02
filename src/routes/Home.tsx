@@ -36,7 +36,7 @@ export function Home(): JSX.Element {
             <div className="grain absolute inset-0 opacity-50" />
             <Lancet className="pointer-events-none absolute -right-8 -top-6 h-[150%] w-auto text-gold-300/[0.09]" />
             <div className="relative">
-              <LogoBadge className="h-12 w-12" />
+              <LogoBadge className="h-14 w-14" />
               <h1 className="mt-4 font-serif text-[27px] font-semibold leading-[1.12] tracking-[-0.02em]">
                 {CHURCH.name}
               </h1>
@@ -139,7 +139,7 @@ export function Home(): JSX.Element {
       <Section>
         <Link to="/about" className="app-card pressable block p-5">
           <div className="flex items-center gap-2.5">
-            <Logo className="h-5 w-5" detail={false} />
+            <Logo className="h-7 w-6 flex-none" />
             <p className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-gold-600">A warm welcome</p>
           </div>
           <p className="mt-3 font-serif text-[20px] font-semibold leading-snug text-ink">

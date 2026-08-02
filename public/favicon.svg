@@ -5,8 +5,7 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="15" fill="#0f1728"/>
-  <!-- The mark, centred and scaled from its native 63.5x77.5 artboard. The TCC
-       microtype is dropped: at favicon sizes it is unreadable noise. -->
+  <!-- The mark, centred and scaled from its native 63.5x77.5 artboard. -->
   <g transform="translate(32 32) scale(0.6) translate(-51.25 -51.25)">
     <rect x="22.5" y="15.5" width="60" height="74" rx="5" fill="#d7e6f7"/>
     <rect x="20" y="13" width="60" height="74" rx="5" fill="url(#tccg)"/>
@@ -15,5 +14,7 @@
           fill="#f4f1e8" stroke="#2f6bc4" stroke-width="1" stroke-linejoin="round"/>
     <circle cx="50" cy="38" r="9" fill="#f4f1e8" stroke="#2f6bc4" stroke-width="1"/>
     <circle cx="50" cy="38" r="6.4" fill="none" stroke="#2f6bc4" stroke-width="1"/>
+    <text x="50" y="38.6" text-anchor="middle" dominant-baseline="central" fill="#2f6bc4"
+          font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="5.6" letter-spacing="0.06">TCC</text>
   </g>
 </svg>

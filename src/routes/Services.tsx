@@ -19,7 +19,7 @@ export function Services(): JSX.Element {
             <div className="flex items-start gap-3.5">
               {/* Bare mark, not on a navy disc — the logo is blue and needs a
                   light backing to read. */}
-              <Logo className="h-11 w-9 flex-none" detail={false} />
+              <Logo className="h-14 w-12 flex-none" />
               <div className="min-w-0 flex-1">
                 <h2 className="font-serif text-[19px] font-semibold leading-tight text-ink">{s.name}</h2>
                 <p className="mt-0.5 text-[15px] font-medium text-gold-600">{s.te}</p>

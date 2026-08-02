@@ -11,17 +11,15 @@ import { useId } from 'react'
  * className — the artwork is taller than it is wide (63.5 × 77.5), so a square
  * box just centres it.
  *
- * `detail={false}` drops the inner ring and the "TCC" microtype, which turn to
- * mush below ~28px. Use it for small decorative marks; keep the default
- * anywhere the logo is doing real brand work.
+ * Always renders complete, TCC roundel included. The lettering is fine at the
+ * ~80px the OBS footer uses and gets soft below ~48px, so give the mark room
+ * rather than dropping parts of it — a partial logo is not the logo.
  */
 export function Logo({
   className,
-  detail = true,
   title = 'Telugu Community Church'
 }: {
   className?: string
-  detail?: boolean
   title?: string
 }): JSX.Element {
   // useId() emits colons, which break an `url(#…)` reference — strip them.
@@ -52,24 +50,20 @@ export function Logo({
 
       {/* intersection: bordered ivory disc + inner ring + TCC */}
       <circle cx="50" cy="38" r="9" fill="#f4f1e8" stroke="#2f6bc4" strokeWidth="1" />
-      {detail && (
-        <>
-          <circle cx="50" cy="38" r="6.4" fill="none" stroke="#2f6bc4" strokeWidth="1" />
-          <text
-            x="50"
-            y="38.6"
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="#2f6bc4"
-            fontFamily="Arial, Helvetica, sans-serif"
-            fontWeight="800"
-            fontSize="5.6"
-            letterSpacing="0.06"
-          >
-            TCC
-          </text>
-        </>
-      )}
+      <circle cx="50" cy="38" r="6.4" fill="none" stroke="#2f6bc4" strokeWidth="1" />
+      <text
+        x="50"
+        y="38.6"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#2f6bc4"
+        fontFamily="Arial, Helvetica, sans-serif"
+        fontWeight="800"
+        fontSize="5.6"
+        letterSpacing="0.06"
+      >
+        TCC
+      </text>
     </svg>
   )
 }
@@ -78,19 +72,13 @@ export function Logo({
  * The mark on an ivory disc, for dark surfaces. The logo is blue, so it needs a
  * light backing to carry contrast — on paper backgrounds use bare <Logo/>.
  *
- * Badges run 40–48px, which puts the roundel at ~7px, so `detail` is off by
- * default here; pass it explicitly only on an unusually large badge.
+ * The disc is sized generously (82%) so the roundel and its TCC stay legible at
+ * the sizes badges actually run.
  */
-export function LogoBadge({
-  className = 'h-11 w-11',
-  detail = false
-}: {
-  className?: string
-  detail?: boolean
-}): JSX.Element {
+export function LogoBadge({ className = 'h-11 w-11' }: { className?: string }): JSX.Element {
   return (
     <span className={`grid flex-none place-items-center rounded-full bg-[#f4f1e8] ring-1 ring-inset ring-navy-900/10 ${className}`}>
-      <Logo className="h-[70%] w-[70%]" detail={detail} />
+      <Logo className="h-[82%] w-[82%]" />
     </span>
   )
 }

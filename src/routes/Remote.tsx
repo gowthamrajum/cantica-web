@@ -113,7 +113,7 @@ function Connect({
     <div className="min-h-[100dvh] bg-[#0b1120] text-white">
       <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col px-5 pt-[calc(env(safe-area-inset-top)+28px)] pb-10">
         <div className="mb-8 flex items-center gap-3">
-          <LogoBadge className="h-10 w-10" />
+          <LogoBadge className="h-11 w-11" />
           <div>
             <div className="font-serif text-lg font-semibold">Operator</div>
             <div className="text-[13px] text-white/55">Move the live slides from your phone</div>

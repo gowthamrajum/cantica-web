@@ -47,7 +47,7 @@ export function AppShell(): JSX.Element {
 
       <nav className="tabbar no-select" aria-label="Primary">
         <div className="brand-rail">
-          <Logo className="h-9 w-9 flex-none" detail={false} />
+          <Logo className="h-10 w-10 flex-none" />
           <div className="min-w-0">
             <div className="line-clamp-2 font-serif text-[14.5px] font-semibold leading-[1.2] text-ink">
               {CHURCH.name}

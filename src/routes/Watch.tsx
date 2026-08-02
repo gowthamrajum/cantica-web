@@ -66,7 +66,7 @@ export function Watch(): JSX.Element {
             <div className="app-card-dark px-6 py-11 text-center">
               <div className="grain absolute inset-0 opacity-40" />
               <div className="relative grid place-items-center gap-3">
-                <Logo className="h-14 w-14" detail={false} />
+                <Logo className="h-16 w-16" />
                 <p className="mt-1 font-serif text-[21px] font-semibold">No service is live right now</p>
                 <p className="text-[14.5px] text-paper/65">Our next live worship is {CHURCH.liveTime}.</p>
               </div>
