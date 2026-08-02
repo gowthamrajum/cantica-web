@@ -13,8 +13,13 @@ import { useEffect } from 'react'
  *
  * Used by the audience mirror (LiveMirror) and the operator confidence view.
  */
+/** How many mounted views are relying on --mvw/--mvh. The app shell holds one
+ *  for the whole session, so the last one out clears them, not the first. */
+let consumers = 0
+
 export function useScreenVars(): void {
   useEffect(() => {
+    consumers++
     const html = document.documentElement
     const sync = (): void => {
       // Only reach for the physical screen in the INSTALLED (standalone) PWA,
@@ -49,8 +54,10 @@ export function useScreenVars(): void {
       window.removeEventListener('resize', sync)
       window.removeEventListener('orientationchange', resync)
       window.visualViewport?.removeEventListener('resize', sync)
-      html.style.removeProperty('--mvw')
-      html.style.removeProperty('--mvh')
+      if (--consumers === 0) {
+        html.style.removeProperty('--mvw')
+        html.style.removeProperty('--mvh')
+      }
     }
   }, [])
 }

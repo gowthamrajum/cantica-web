@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icon, type IconName } from './Icons'
+import { useScreenVars } from '../../lib/screenVars'
 import { Logo } from '../Logo'
 import { CHURCH } from '../../lib/church'
 import { useSessions } from '../../lib/useSessions'
@@ -17,7 +18,7 @@ const TABS: Tab[] = [
   { to: '/watch', label: 'Watch', icon: 'watch' },
   { to: '/bible', label: 'Bible', icon: 'bible' },
   { to: '/songs', label: 'Songs', icon: 'songs', owns: ['/songs/'] },
-  { to: '/more', label: 'More', icon: 'more', owns: ['/services', '/give', '/visit', '/about', '/build'] }
+  { to: '/more', label: 'More', icon: 'more', owns: ['/services', '/give', '/visit', '/about', '/build', '/install'] }
 ]
 
 function isTabActive(tab: Tab, path: string): boolean {
@@ -38,6 +39,11 @@ export function AppShell(): JSX.Element {
   const { pathname } = useLocation()
   const { sessions } = useSessions()
   const liveCount = sessions?.filter((s) => !s.waiting).length ?? 0
+
+  // The shell is sized from the measured screen, not 100dvh: an installed iOS
+  // PWA reports a layout viewport shorter than the physical screen, which left
+  // the tab bar floating above a dead band at the bottom.
+  useScreenVars()
 
   return (
     <div className="app-shell">

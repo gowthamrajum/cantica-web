@@ -63,8 +63,13 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  /* Sized from the JS-measured screen (--mvh, see useScreenVars). An installed
+     iOS PWA reports a layout viewport SHORTER than the physical screen, so a
+     100dvh shell ends early and the tab bar — absolute, bottom:0 — floats above
+     a dead band. dvh/vh are the pre-hydration fallback. */
   height: 100vh;
   height: 100dvh;
+  height: var(--mvh, 100dvh);
   overflow: hidden;
   background: theme('colors.paper');
 }
