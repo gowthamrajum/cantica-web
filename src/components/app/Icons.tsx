@@ -33,6 +33,7 @@ export type IconName =
   | 'minus'
   | 'info'
   | 'sparkle'
+  | 'grip'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
 
@@ -163,5 +164,6 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M12 11v5.4M12 7.8v.2" />
     </>
   ),
-  sparkle: <path d="M12 3l2.1 5.6L20 10.5l-5.9 1.9L12 18l-2.1-5.6L4 10.5l5.9-1.9z" />
+  sparkle: <path d="M12 3l2.1 5.6L20 10.5l-5.9 1.9L12 18l-2.1-5.6L4 10.5l5.9-1.9z" />,
+  grip: <path d="M6 9.5h12M6 14.5h12" />
 }

@@ -217,6 +217,21 @@ export function autoGroups(lines: string[], bilingual: boolean, lpp: number): nu
 export const groupsFit = (groups: number[] | undefined, unitCount: number): boolean =>
   !!groups?.length && groups.reduce((a, b) => a + b, 0) === unitCount
 
+/** A reordering describes its section only while it is a permutation of every
+ *  unit — one that dropped or repeated a line would lose or duplicate lyrics. */
+export const orderFits = (order: number[] | undefined, unitCount: number): boolean =>
+  !!order &&
+  order.length === unitCount &&
+  new Set(order).size === unitCount &&
+  order.every((i) => Number.isInteger(i) && i >= 0 && i < unitCount)
+
+/** Units in the operator's order. A stale or malformed order is ignored rather
+ *  than applied partly. */
+export function applyOrder<T>(units: T[], order?: number[]): T[] {
+  if (!orderFits(order, units.length)) return units
+  return (order as number[]).map((i) => units[i])
+}
+
 /** Strict check: every Telugu line on a slide keeps its transliteration. */
 export function isSlidePaired(lines: string[]): boolean {
   const te = lines.filter((l) => l.trim() && isTelugu(l)).length
@@ -305,6 +320,8 @@ export interface SongStructure {
   recurringId?: string | null
   /** section id -> how many units sit on each slide, when the operator chose */
   groups?: Record<string, number[]>
+  /** section id -> the units' order, when the operator moved a line */
+  order?: Record<string, number[]>
 }
 
 /** A song → one Cantica item. Omit `structure` and the whole song plays in
@@ -327,15 +344,22 @@ export function songToItem(
   for (const sec of sections) {
     const lines = sec.lines.filter((l) => l && l.trim()).map(formatLyricLine)
     if (!lines.length) continue
-    const units = sectionUnits(lines, both)
+    const natural = sectionUnits(lines, both)
+    const moved = structure?.order?.[sec.id]
+    const units = applyOrder(natural, moved)
+    const reordered = units !== natural
     const chosen = structure?.groups?.[sec.id]
     // An operator grouping wins while it still accounts for every unit; a stale
-    // one falls back to the automatic split rather than mis-slicing.
+    // one falls back to the automatic split rather than mis-slicing. Once lines
+    // have been moved the fallback has to slice the moved order, not the written
+    // one — otherwise the split would silently undo the move.
     const chunks = groupsFit(chosen, units.length)
       ? applyGroups(units, chosen as number[])
-      : both
-        ? chunkBilingualLines(lines, Math.max(1, Math.round(lpp / 2)))
-        : chunkLyricLines(lines, lpp, true)
+      : reordered
+        ? applyGroups(units, autoGroups(lines, both, lpp))
+        : both
+          ? chunkBilingualLines(lines, Math.max(1, Math.round(lpp / 2)))
+          : chunkLyricLines(lines, lpp, true)
     chunks.forEach((chunk, i) => {
       slides.push({
         id: uid(),

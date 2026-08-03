@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Sheet } from './Sheet'
 import { Icon } from './Icons'
 import {
+  applyOrder,
   autoGroups,
   buildSongArrangement,
   detectRecurringSection,
@@ -44,8 +45,12 @@ export function SongStructureSheet({
   const [recurring, setRecurring] = useState<string | null>(null)
   /** section id -> units per slide. Absent = however the automatic split falls. */
   const [groups, setGroups] = useState<Record<string, number[]>>({})
+  /** section id -> the units' order, once a line has been moved. */
+  const [lineOrder, setLineOrder] = useState<Record<string, number[]>>({})
   /** which section's slides are open for editing */
   const [editing, setEditing] = useState<string | null>(null)
+  /** the line being held, and where it would land */
+  const [drag, setDrag] = useState<{ sec: string; from: number; to: number } | null>(null)
 
   // Re-seed whenever a different song (or language) opens the sheet.
   useEffect(() => {
@@ -54,24 +59,24 @@ export function SongStructureSheet({
     setIncluded(new Set(sections.map((s) => s.id)))
     setRecurring(detectRecurringSection(sections))
     setGroups({})
+    setLineOrder({})
     setEditing(null)
   }, [song, lang]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const byId = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections])
   const bilingual = lang === 'both'
   const lpp = bilingual ? 4 : 2
-  /** A section's lines as indivisible units — in bilingual mode a Telugu line
-   *  and its transliteration are one unit and can never be split apart. */
-  const unitsOf = (id: string): ReturnType<typeof sectionUnits> => {
-    const sec = byId.get(id)
-    if (!sec) return []
-    return sectionUnits(sec.lines.filter((l) => l && l.trim()).map(formatLyricLine), bilingual)
-  }
+  const linesOf = (id: string): string[] =>
+    (byId.get(id)?.lines ?? []).filter((l) => l && l.trim()).map(formatLyricLine)
+  /** A section's lines as indivisible units, in the operator's order — in
+   *  bilingual mode a Telugu line and its transliteration are one unit and can
+   *  never be split apart or moved apart. */
+  const unitsOf = (id: string): ReturnType<typeof sectionUnits> =>
+    applyOrder(sectionUnits(linesOf(id), bilingual), lineOrder[id])
   const groupsOf = (id: string): number[] => {
     const chosen = groups[id]
     if (chosen?.length) return chosen
-    const sec = byId.get(id)
-    if (!sec) return []
-    return autoGroups(sec.lines.filter((l) => l && l.trim()).map(formatLyricLine), bilingual, lpp)
+    return autoGroups(linesOf(id), bilingual, lpp)
   }
   /** Groups as the set of unit indexes a slide STARTS at — the form a tap edits. */
   const breaksOf = (id: string): Set<number> => {
@@ -94,7 +99,166 @@ export function SongStructureSheet({
     setGroups((prev) => ({ ...prev, [id]: next }))
   }
 
-  const byId = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections])
+  /** Which slide each unit sits on, in display order — the form a move edits. */
+  const slideOfUnit = (id: string): number[] => {
+    const out: number[] = []
+    groupsOf(id).forEach((g, gi) => {
+      for (let k = 0; k < g; k++) out.push(gi)
+    })
+    return out
+  }
+
+  /**
+   * Move a line to sit before display position `to`.
+   *
+   * The line joins the slide it was dropped into and every other line stays
+   * where it was — so dragging one line never shuffles its neighbours onto
+   * different slides. That means carrying each unit's slide with it and
+   * re-counting afterwards, rather than keeping the slide sizes fixed and
+   * letting the contents slide along underneath.
+   */
+  const moveUnit = (id: string, from: number, to: number): void => {
+    const total = unitsOf(id).length
+    const seats = slideOfUnit(id)
+    if (seats.length !== total || from < 0 || from >= total) return
+    const at = to > from ? to - 1 : to
+    if (at === from) return
+
+    const current = lineOrder[id] ?? Array.from({ length: total }, (_, i) => i)
+    const next = current.slice()
+    const [moved] = next.splice(from, 1)
+    next.splice(at, 0, moved)
+
+    // A line dropped between two slides joins the one above it; at the very top
+    // there is nothing above, so it joins the one below.
+    const seated = seats.slice()
+    seated.splice(from, 1)
+    seated.splice(at, 0, at > 0 ? seated[at - 1] : (seated[at] ?? 0))
+
+    // Slides stay contiguous through both splices, so a run length per slide is
+    // the whole grouping. An emptied slide simply has no run and disappears.
+    const counts: number[] = []
+    let run = 0
+    for (let i = 0; i < seated.length; i++) {
+      run++
+      if (i === seated.length - 1 || seated[i + 1] !== seated[i]) {
+        counts.push(run)
+        run = 0
+      }
+    }
+    setLineOrder((prev) => ({ ...prev, [id]: next }))
+    setGroups((prev) => ({ ...prev, [id]: counts }))
+  }
+
+  // --- hold and move -------------------------------------------------------
+  // A press that stays put for a moment lifts the line; a press that moves
+  // first is the operator scrolling the sheet and must be left alone.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const holdRef = useRef<{ sec: string; index: number; x: number; y: number; el: HTMLElement; pid: number } | null>(null)
+  const timerRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+  /** a press that lifted a line is a move, never a tap */
+  const liftedRef = useRef(false)
+  const frameRef = useRef<number | null>(null)
+  const pointerY = useRef(0)
+
+  const endHold = (): void => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    timerRef.current = null
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+    frameRef.current = null
+    const h = holdRef.current
+    if (h?.el.hasPointerCapture?.(h.pid)) h.el.releasePointerCapture(h.pid)
+    holdRef.current = null
+    draggingRef.current = false
+    setDrag(null)
+  }
+  useEffect(() => endHold, [])
+
+  // While a line is held, the finger is moving the line and not the sheet. The
+  // listener has to be non-passive to say so, which React's onTouchMove is not.
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const hold = (e: TouchEvent): void => {
+      if (draggingRef.current) e.preventDefault()
+    }
+    el.addEventListener('touchmove', hold, { passive: false })
+    return () => el.removeEventListener('touchmove', hold)
+  }, [editing])
+
+  const dropIndex = (clientY: number): number => {
+    const rows = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-unit]') ?? [])]
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i].getBoundingClientRect()
+      if (clientY < r.top + r.height / 2) return i
+    }
+    return rows.length
+  }
+
+  // A long stanza is taller than the sheet, so a line has to be able to travel
+  // past what is on screen: held near an edge, the sheet comes to meet it.
+  const creep = (): void => {
+    const box = listRef.current?.closest('.sheet-scroll') as HTMLElement | null
+    if (!draggingRef.current || !box) {
+      frameRef.current = null
+      return
+    }
+    const r = box.getBoundingClientRect()
+    const edge = 56
+    const above = pointerY.current - r.top
+    const below = r.bottom - pointerY.current
+    const step = above < edge ? -Math.ceil((edge - above) / 5) : below < edge ? Math.ceil((edge - below) / 5) : 0
+    if (step) {
+      const was = box.scrollTop
+      box.scrollTop += step
+      if (box.scrollTop !== was) {
+        const to = dropIndex(pointerY.current)
+        setDrag((d) => (d && d.to !== to ? { ...d, to } : d))
+      }
+    }
+    frameRef.current = requestAnimationFrame(creep)
+  }
+
+  const onLinePointerDown = (sec: string, index: number, e: ReactPointerEvent<HTMLElement>): void => {
+    const el = e.currentTarget
+    const pid = e.pointerId
+    holdRef.current = { sec, index, x: e.clientX, y: e.clientY, el, pid }
+    liftedRef.current = false
+    pointerY.current = e.clientY
+    timerRef.current = window.setTimeout(() => {
+      draggingRef.current = true
+      liftedRef.current = true
+      try {
+        el.setPointerCapture(pid)
+      } catch {
+        /* a pointer that already went away */
+      }
+      navigator.vibrate?.(8)
+      setDrag({ sec, from: index, to: index })
+      frameRef.current = requestAnimationFrame(creep)
+    }, 280)
+  }
+
+  const onLinePointerMove = (e: ReactPointerEvent<HTMLElement>): void => {
+    const h = holdRef.current
+    if (!h) return
+    pointerY.current = e.clientY
+    if (!draggingRef.current) {
+      // Moving before the line lifts means this was a scroll all along.
+      if (Math.abs(e.clientY - h.y) > 8 || Math.abs(e.clientX - h.x) > 8) endHold()
+      return
+    }
+    const to = dropIndex(e.clientY)
+    setDrag((d) => (d && d.to !== to ? { ...d, to } : d))
+  }
+
+  const onLinePointerUp = (): void => {
+    const h = holdRef.current
+    if (draggingRef.current && drag && h) moveUnit(h.sec, drag.from, drag.to)
+    endHold()
+  }
+
   const includedInOrder = order.filter((id) => included.has(id))
 
   const toggle = (id: string): void =>
@@ -117,7 +281,12 @@ export function SongStructureSheet({
 
   // The real arrangement and the real slide count, from the same functions the
   // export uses — so what this promises is what lands in Cantica.
-  const structure: SongStructure = { includedIds: includedInOrder, recurringId: recurring, groups }
+  const structure: SongStructure = {
+    includedIds: includedInOrder,
+    recurringId: recurring,
+    groups,
+    order: lineOrder
+  }
   const playOrder = buildSongArrangement(sections, includedInOrder, recurring)
   const slideCount = song ? (songToItem(song, lang, structure)?.slides.length ?? 0) : 0
 
@@ -213,20 +382,39 @@ export function SongStructureSheet({
             </div>
 
             {editing === id && (
-              <div className="border-t border-black/5 bg-black/[0.02] px-3 py-2">
+              <div ref={listRef} className="border-t border-black/5 bg-black/[0.02] px-3 py-2">
                 <p className="mb-2 text-[12px] text-ink-muted">
-                  Tap a line to start a new slide there.
+                  Tap a line to start a new slide there, or hold and drag it somewhere else.
                   {bilingual && ' A Telugu line and its transliteration always stay together.'}
                 </p>
                 {units.map((u, ui) => {
                   const isBreak = ui === 0 || breaks.has(ui)
                   const slideNo = [...breaks].filter((b) => b <= ui).length + 1
+                  const held = drag?.sec === id && drag.from === ui
+                  // The drop mark is a border on the row it would land above, so
+                  // nothing shifts under the finger while it is being aimed.
+                  const dropAbove = drag?.sec === id && drag.to === ui
+                  const dropBelow = drag?.sec === id && drag.to === units.length && ui === units.length - 1
                   return (
                     <button
                       key={ui}
-                      className="block w-full text-left"
-                      onClick={() => ui > 0 && toggleBreak(id, ui)}
-                      disabled={ui === 0}
+                      data-unit={ui}
+                      className={`block w-full touch-pan-y select-none border-y-2 border-transparent text-left transition-opacity ${
+                        dropAbove ? '!border-t-gold-500' : ''
+                      } ${dropBelow ? '!border-b-gold-500' : ''} ${held ? 'opacity-40' : ''}`}
+                      onPointerDown={(e) => onLinePointerDown(id, ui, e)}
+                      onPointerMove={onLinePointerMove}
+                      onPointerUp={onLinePointerUp}
+                      onPointerCancel={endHold}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onClick={() => {
+                        // A press that lifted the line was a move, not a tap.
+                        if (liftedRef.current) {
+                          liftedRef.current = false
+                          return
+                        }
+                        if (ui > 0) toggleBreak(id, ui)
+                      }}
                     >
                       {isBreak && (
                         <span className="mt-1.5 block text-[10px] font-bold uppercase tracking-wider text-ink-muted first:mt-0">
@@ -234,15 +422,18 @@ export function SongStructureSheet({
                         </span>
                       )}
                       <span
-                        className={`block rounded-md px-2 py-1 text-[13px] leading-snug ${
-                          isBreak && ui > 0 ? 'bg-gold-500/15' : ''
+                        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] leading-snug ${
+                          held ? 'bg-navy-700/10 ring-1 ring-navy-700/25' : isBreak && ui > 0 ? 'bg-gold-500/15' : ''
                         }`}
                       >
-                        {unitLines(u).map((l, li) => (
-                          <span key={li} className={`block truncate ${li >= u.lines.length ? 'text-ink-muted' : ''}`}>
-                            {l}
-                          </span>
-                        ))}
+                        <span className="min-w-0 flex-1">
+                          {unitLines(u).map((l, li) => (
+                            <span key={li} className={`block truncate ${li >= u.lines.length ? 'text-ink-muted' : ''}`}>
+                              {l}
+                            </span>
+                          ))}
+                        </span>
+                        <Icon name="grip" size={14} className="flex-none text-ink-muted/50" />
                       </span>
                     </button>
                   )
