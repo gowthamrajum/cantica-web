@@ -49,6 +49,13 @@ export interface ServiceEnvelope {
  */
 export const SLOT_WORSHIP = 'worship'
 export const SLOT_OFFERING = 'offering'
+/**
+ * Communion, served on the month's first Sunday. Cantica's importer currently
+ * routes only 'offering' to a slot of its own and files everything else into
+ * the worship set, so a communion item lands there until lumen-presenter's
+ * mergeImport learns this slot. The deck still carries the right answer.
+ */
+export const SLOT_COMMUNION = 'communion'
 
 let _uid = 0
 const uid = (): string =>
@@ -445,14 +452,28 @@ const CANTICA_BACKGROUND = {
 }
 
 /**
- * What part a song plays in the service.
+ * What part a song plays, beyond simply being in the worship set.
  *
- *  - undefined  worship set only (the default)
- *  - 'only'     sung at the offering and nowhere else
- *  - 'both'     sung in the worship set AND again at the offering, which is two
- *               items in the deck, not one — Cantica drops each into its slot.
+ *  - undefined            worship set only (the default)
+ *  - 'offering'           sung at the offering and nowhere else
+ *  - 'offering+general'   sung in the worship set AND again at the offering
+ *  - 'communion'          sung at communion and nowhere else
+ *  - 'communion+general'  sung in the worship set AND again at communion
+ *
+ * A '+general' role is two items in the deck, not one, each carrying its own
+ * slot — that is the whole difference between it and the '-only' forms.
  */
-export type OfferingUse = 'only' | 'both'
+export type SongRole = 'offering' | 'offering+general' | 'communion' | 'communion+general'
+
+/** The slot a role sends the song to, or null for the worship set alone. */
+export function roleSlot(role?: SongRole): string | null {
+  if (!role) return null
+  return role.startsWith('communion') ? SLOT_COMMUNION : SLOT_OFFERING
+}
+/** Whether the song is ALSO sung in the ordinary worship set. */
+export function roleAlsoGeneral(role?: SongRole): boolean {
+  return !role || role.endsWith('+general')
+}
 
 export type Pick =
   | {
@@ -460,7 +481,7 @@ export type Pick =
       type: 'song'
       song: Song
       lang: ServiceLang
-      offering?: OfferingUse
+      role?: SongRole
       structure?: SongStructure | null
     }
   | { key: string; type: 'psalm'; chapter: number; verses: PsalmVerse[]; lang: ServiceLang }
@@ -470,16 +491,18 @@ export function buildService(name: string, picks: Pick[] = []): ServiceEnvelope 
   const items: ServiceItem[] = []
   for (const p of picks) {
     if (p.type === 'song') {
-      // 'both' emits the song twice — once into the worship set, once at the
-      // offering. songToItem is called per copy so each carries its own item and
-      // slide ids; sharing them would give Cantica two items claiming one id.
-      if (p.offering !== 'only') {
+      // A '+general' role emits the song twice — once into the worship set,
+      // once into its slot. songToItem is called per copy so each carries its
+      // own item and slide ids; sharing them would give Cantica two items
+      // claiming one id.
+      if (roleAlsoGeneral(p.role)) {
         const worship = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
         if (worship) items.push({ ...worship, slot: SLOT_WORSHIP })
       }
-      if (p.offering === 'only' || p.offering === 'both') {
-        const offering = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
-        if (offering) items.push({ ...offering, slot: SLOT_OFFERING })
+      const special = roleSlot(p.role)
+      if (special) {
+        const extra = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
+        if (extra) items.push({ ...extra, slot: special })
       }
     } else {
       // A psalm is a reading, never the offering song.

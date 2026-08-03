@@ -84,6 +84,17 @@ export function defaultSlot(now: Date = new Date()): ServiceSlot {
 }
 
 /**
+ * Whether a date is the month's first Sunday — by definition the Sunday falling
+ * on the 1st to the 7th. Communion is served then, so the builder only offers
+ * the communion roles on such a date. Mirrors lumen-presenter's isFirstSunday;
+ * keep the two in step or the two apps disagree about which Sunday it is.
+ */
+export function isFirstSundayOfMonth(iso: string): boolean {
+  const d = fromISODate(iso)
+  return !!d && d.getDay() === 0 && d.getDate() <= 7
+}
+
+/**
  * How far past its date a service is, in whole days — the relay purges anything
  * more than 7 days old, so the builder can warn before you save into that.
  */

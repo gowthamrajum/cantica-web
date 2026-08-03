@@ -34,6 +34,8 @@ export type IconName =
   | 'info'
   | 'sparkle'
   | 'gear'
+  | 'offering'
+  | 'communion'
   | 'grip'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
@@ -166,6 +168,25 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   sparkle: <path d="M12 3l2.1 5.6L20 10.5l-5.9 1.9L12 18l-2.1-5.6L4 10.5l5.9-1.9z" />,
+  // The offering plate: a coin above a shallow footed dish. A heart would read
+  // as "donate" generically; this is the thing that is actually passed down the
+  // row on a Sunday.
+  offering: (
+    <>
+      <circle cx="12" cy="5.6" r="2.7" />
+      <path d="M3.4 12.2h17.2c0 3.9-3.85 6.6-8.6 6.6s-8.6-2.7-8.6-6.6z" />
+      <path d="M12 18.8v1.9M9.1 20.7h5.8" />
+    </>
+  ),
+  // Communion: the cup with the bread above it. A chalice on its own reads as a
+  // trophy or a wine glass — the wafer is what names it.
+  communion: (
+    <>
+      <circle cx="12" cy="3.5" r="2.1" />
+      <path d="M6.9 8.1h10.2v2.4a5.1 5.1 0 0 1-10.2 0z" />
+      <path d="M12 15.6v3.9M8.7 19.9h6.6" />
+    </>
+  ),
   // Six teeth rather than the usual eight or twelve: at the ~17px this renders
   // at, finer teeth close up into a solid ring.
   gear: (

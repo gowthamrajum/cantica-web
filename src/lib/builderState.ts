@@ -1,6 +1,6 @@
 import { getSong } from './songs'
 import { loadBible } from './bible'
-import type { OfferingUse, Pick, PsalmVerse, ServiceLang, SongStructure } from './buildService'
+import type { Pick, PsalmVerse, ServiceLang, SongRole, SongStructure } from './buildService'
 
 /**
  * A compact record of *how* a service was assembled, saved alongside the deck so
@@ -24,12 +24,13 @@ export type SavedPick =
       type: 'song'
       songId: number
       lang: ServiceLang
+      role?: SongRole
       /**
-       * Sidecars written before the offering role became a choice stored `true`
-       * for what is now 'only', so the stored shape has to admit both and be
-       * normalised on the way in. See readOffering.
+       * Legacy, read but never written. The field was called `offering` and
+       * held `true`, then 'only' | 'both', before communion made it a role.
+       * See readRole.
        */
-      offering?: OfferingUse | boolean
+      offering?: 'only' | 'both' | boolean
       structure?: SongStructure | null
     }
   | {
@@ -60,7 +61,7 @@ export function toBuilderState(day: string, date: string, picks: Pick[]): Builde
             type: 'song',
             songId: p.song.song_id,
             lang: p.lang,
-            offering: p.offering,
+            role: p.role,
             structure: p.structure ?? null
           }
         : {
@@ -76,10 +77,11 @@ export function toBuilderState(day: string, date: string, picks: Pick[]): Builde
   }
 }
 
-/** Legacy `true` meant offering-only; `false`/absent means the worship set. */
-function readOffering(v: OfferingUse | boolean | undefined): OfferingUse | undefined {
-  if (v === true) return 'only'
-  if (v === 'only' || v === 'both') return v
+/** A stored pick's role, migrating the two older offering encodings. */
+function readRole(p: { role?: SongRole; offering?: 'only' | 'both' | boolean }): SongRole | undefined {
+  if (p.role) return p.role
+  if (p.offering === true || p.offering === 'only') return 'offering'
+  if (p.offering === 'both') return 'offering+general'
   return undefined
 }
 
@@ -123,7 +125,7 @@ export async function fromBuilderState(
         type: 'song',
         song,
         lang: p.lang,
-        offering: readOffering(p.offering),
+        role: readRole(p),
         structure: p.structure ?? null
       })
     } else {

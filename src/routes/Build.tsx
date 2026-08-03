@@ -8,16 +8,18 @@ import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
 import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
 import { ConfirmSheet } from '../components/app/ConfirmSheet'
-import { OfferingRoleSheet, type OfferingRole } from '../components/app/OfferingRoleSheet'
+import { SongRoleSheet, type Role } from '../components/app/SongRoleSheet'
 import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
 import { createService, findService, getService, updateService } from '../lib/relay'
 import { fromBuilderState, readBuilderState, toBuilderState } from '../lib/builderState'
-import { daysPast, defaultSlot, prettyDate, type ServiceSlot } from '../lib/serviceSlot'
+import { daysPast, defaultSlot, isFirstSundayOfMonth, prettyDate, type ServiceSlot } from '../lib/serviceSlot'
+import { buildServicePdf } from '../lib/servicePdf'
+import { shareFiles } from '../lib/shareFiles'
 import {
   buildService,
   countSlides,
-  type OfferingUse,
+  roleAlsoGeneral,
   type Pick,
   type PsalmVerse,
   type ServiceLang,
@@ -32,6 +34,15 @@ import {
  * bibles), so it works with no network and no backend — which is the point of
  * moving it here from Worship Ready.
  */
+
+/** Short forms for the role chip on a picked song. */
+const ROLE_LABEL: Record<string, string> = {
+  general: 'General',
+  offering: 'Offering only',
+  'offering+general': 'General + offering',
+  communion: 'Communion only',
+  'communion+general': 'General + communion'
+}
 
 const LANGS: { id: ServiceLang; label: string }[] = [
   { id: 'both', label: 'Both' },
@@ -140,10 +151,25 @@ export function Build(): JSX.Element {
     setPending(p.song)
   }
 
-  const setOfferingAt = (i: number, role: OfferingRole): void =>
-    setPicks((p) =>
-      p.map((x, j) => (j === i && x.type === 'song' ? { ...x, offering: role as OfferingUse | undefined } : x))
-    )
+  const setRoleAt = (i: number, role: Role): void =>
+    setPicks((p) => p.map((x, j) => (j === i && x.type === 'song' ? { ...x, role } : x)))
+
+  /** Communion is only served on the month's first Sunday. */
+  const firstSunday = isFirstSundayOfMonth(slot.date)
+
+  // Moving the service off a first Sunday leaves any communion role standing on
+  // a service that has no communion, so those fall back to the worship set
+  // rather than lingering as a choice the UI would no longer even offer.
+  useEffect(() => {
+    if (firstSunday) return
+    setPicks((p) => {
+      if (!p.some((x) => x.type === 'song' && x.role?.startsWith('communion'))) return p
+      setNote('This service isn’t the month’s first Sunday, so communion songs became general songs.')
+      return p.map((x) =>
+        x.type === 'song' && x.role?.startsWith('communion') ? { ...x, role: undefined } : x
+      )
+    })
+  }, [firstSunday])
 
   // ----- psalms -----
   // Returns whether it landed, so the picker knows whether to close.
@@ -201,18 +227,38 @@ export function Build(): JSX.Element {
   const labelOf = (p: Pick): string =>
     p.type === 'song' ? p.song.song_name : `Psalm ${p.chapter}`
 
-  const exportFile = (): void => {
-    if (!picks.length) return
-    // `name` already carries the day and the date, so it is the filename.
-    const safe = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
-    const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${safe}.cantica.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    setNote('Downloaded — open it in Cantica via Sessions ▸ ⋯ ▸ Import service.')
+  /**
+   * Share the service as two files: a PDF to read from, one item per page, and
+   * the .cantica.json Cantica imports. The PDF is built by rendering and
+   * capturing pages, so it takes a moment on a long service.
+   */
+  const [sharing, setSharing] = useState(false)
+  const shareService = async (): Promise<void> => {
+    if (!picks.length || sharing) return
+    setSharing(true)
+    setNote('Building the PDF…')
+    try {
+      // `name` already carries the day and the date, so it is the filename.
+      const safe = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
+      const json = new File([JSON.stringify(envelope, null, 2)], `${safe}.cantica.json`, {
+        type: 'application/json'
+      })
+      const pdf = new File([await buildServicePdf(envelope, name)], `${safe}.pdf`, {
+        type: 'application/pdf'
+      })
+      const outcome = await shareFiles([pdf, json], name, `${name} — ${picks.length} items`)
+      setNote(
+        outcome === 'shared'
+          ? 'Shared the PDF and the Cantica file.'
+          : outcome === 'cancelled'
+            ? 'Sharing cancelled.'
+            : 'Saved the PDF and the Cantica file. Import the .cantica.json via Sessions ▸ ⋯ ▸ Import service.'
+      )
+    } catch (e) {
+      setNote(e instanceof Error ? `Couldn’t build the PDF: ${e.message}` : 'Couldn’t build the PDF.')
+    } finally {
+      setSharing(false)
+    }
   }
 
   /** Read a stored service well enough to say what can be done with it. */
@@ -442,19 +488,26 @@ export function Build(): JSX.Element {
                     ))}
                   </select>
 
+                  {/* The role reads as symbols rather than a phrase: an offering
+                      plate, a communion cup, and a note for the worship set —
+                      two glyphs when the song is sung twice. The words stay on
+                      the button's label for anyone who needs them. */}
                   {p.type === 'song' && (
                     <button
-                      className={`min-w-0 truncate rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                        p.offering ? 'bg-amber-100 text-amber-700' : 'bg-black/5 text-ink-muted'
+                      className={`flex flex-none items-center gap-1 rounded-full px-2.5 py-1.5 ${
+                        p.role?.startsWith('communion')
+                          ? 'bg-red-50 text-red-600'
+                          : p.role
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-black/5 text-ink-muted'
                       }`}
                       onClick={() => setRolePick(i)}
-                      title="When is this sung?"
+                      title={ROLE_LABEL[p.role ?? 'general']}
+                      aria-label={`When is this sung? Currently: ${ROLE_LABEL[p.role ?? 'general']}`}
                     >
-                      {p.offering === 'only'
-                        ? 'Offering only'
-                        : p.offering === 'both'
-                          ? 'General + offering'
-                          : 'General'}
+                      {roleAlsoGeneral(p.role) && <Icon name="songs" size={15} strokeWidth={2} />}
+                      {p.role?.startsWith('offering') && <Icon name="offering" size={15} strokeWidth={2} />}
+                      {p.role?.startsWith('communion') && <Icon name="communion" size={15} strokeWidth={2} />}
                     </button>
                   )}
                 </div>
@@ -524,8 +577,12 @@ export function Build(): JSX.Element {
           )}
         </div>
         <div className="mt-2 flex gap-2 px-[var(--gutter)]">
-          <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={exportFile} disabled={!picks.length}>
-            Export file
+          <button
+            className="btn-app btn-app-quiet flex-1 text-[15px]"
+            onClick={() => void shareService()}
+            disabled={!picks.length || sharing}
+          >
+            {sharing ? 'Preparing…' : 'Share'}
           </button>
           <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => setPreview('all')} disabled={!picks.length}>
             Preview
@@ -621,8 +678,9 @@ export function Build(): JSX.Element {
         onAdd={addSong}
       />
 
-      <OfferingRoleSheet
+      <SongRoleSheet
         open={rolePick !== null}
+        firstSunday={firstSunday}
         songName={
           rolePick !== null && picks[rolePick]?.type === 'song'
             ? (picks[rolePick] as Extract<Pick, { type: 'song' }>).song.song_name
@@ -630,10 +688,10 @@ export function Build(): JSX.Element {
         }
         value={
           rolePick !== null && picks[rolePick]?.type === 'song'
-            ? (picks[rolePick] as Extract<Pick, { type: 'song' }>).offering
+            ? (picks[rolePick] as Extract<Pick, { type: 'song' }>).role
             : undefined
         }
-        onChange={(role) => rolePick !== null && setOfferingAt(rolePick, role)}
+        onChange={(role) => rolePick !== null && setRoleAt(rolePick, role)}
         onClose={() => setRolePick(null)}
       />
 
