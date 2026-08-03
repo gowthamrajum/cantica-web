@@ -8,6 +8,8 @@ import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
 import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
 import { ConfirmSheet } from '../components/app/ConfirmSheet'
+import { Sheet } from '../components/app/Sheet'
+import { PsalmFields } from '../components/app/PsalmFields'
 import { Collapsible } from '../components/app/Collapsible'
 import { useDisclosure } from '../components/app/useDisclosure'
 import { SongRoleSheet, type Role } from '../components/app/SongRoleSheet'
@@ -160,12 +162,28 @@ export function Build(): JSX.Element {
     setNote(`Added ${song.song_name}`)
   }
 
-  /** Reopen a picked song's arrangement for editing. */
+  /** A psalm being changed: which pick, and the reference to seed the sheet. */
+  const [editingPsalm, setEditingPsalm] = useState<
+    { at: number; chapter: number; from?: number; to?: number } | null
+  >(null)
+
+  /** Reopen a picked item for editing — its arrangement, or its reference. */
   const editPick = (i: number): void => {
     const p = picks[i]
-    if (p?.type !== 'song') return
-    setEditingPick(i)
-    setPending(p.song)
+    if (!p) return
+    if (p.type === 'song') {
+      setEditingPick(i)
+      setPending(p.song)
+      return
+    }
+    // The pick keeps resolved verses, not the range that produced them; the
+    // ends of the list are that range.
+    setEditingPsalm({
+      at: i,
+      chapter: p.chapter,
+      from: p.verses[0]?.verse,
+      to: p.verses[p.verses.length - 1]?.verse
+    })
   }
 
   const setRoleAt = (i: number, role: Role): void =>
@@ -196,7 +214,12 @@ export function Build(): JSX.Element {
 
   // ----- psalms -----
   // Returns whether it landed, so the picker knows whether to close.
-  const addPsalm = async (chapter: string, from: string, to: string): Promise<boolean> => {
+  const addPsalm = async (
+    chapter: string,
+    from: string,
+    to: string,
+    replaceAt?: number
+  ): Promise<boolean> => {
     const ch = Math.max(1, Math.min(150, Number(chapter) || 1))
     const [te, en] = await Promise.all([loadBible('telugu'), loadBible('web')])
     const teV = te.byBook['Psalms']?.[ch] ?? []
@@ -220,8 +243,17 @@ export function Build(): JSX.Element {
       setNote('No verses for that reference.')
       return false
     }
+    const ref = `Psalm ${ch}${from && to ? `:${lo}-${hi}` : ''}`
+    if (replaceAt != null) {
+      const at = replaceAt
+      setPicks((p) =>
+        p.map((x, j) => (j === at ? { ...x, type: 'psalm', chapter: ch, verses, lang: x.lang } : x))
+      )
+      setNote(`Changed to ${ref}`)
+      return true
+    }
     setPicks((p) => [...p, { key: `p-${ch}-${p.length}`, type: 'psalm', chapter: ch, verses, lang }])
-    setNote(`Added Psalm ${ch}${from && to ? `:${lo}-${hi}` : ''}`)
+    setNote(`Added ${ref}`)
     return true
   }
 
@@ -242,10 +274,23 @@ export function Build(): JSX.Element {
   // What gets stored: the deck Cantica reads, plus a record of how it was
   // assembled so this builder can reopen it. The exported FILE stays the plain
   // envelope — Cantica has no use for the sidecar.
-  const payload = useMemo(
-    () => ({ ...envelope, builder: toBuilderState(slot.day, slot.date, picks) }),
-    [envelope, slot.day, slot.date, picks]
+  const builderState = useMemo(
+    () => toBuilderState(slot.day, slot.date, picks),
+    [slot.day, slot.date, picks]
   )
+  const payload = useMemo(() => ({ ...envelope, builder: builderState }), [envelope, builderState])
+
+  /**
+   * What was last written to (or read from) the store, so "Save changes" can
+   * tell whether there is anything to save.
+   *
+   * The comparison is against the BUILDER state, not the payload: the envelope
+   * carries an exportedAt stamped at build time, so comparing payloads would
+   * report a change on every render.
+   */
+  const stateKey = useMemo(() => JSON.stringify(builderState), [builderState])
+  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const dirty = savedKey === null || stateKey !== savedKey
   const slides = countSlides(envelope)
   const labelOf = (p: Pick): string =>
     p.type === 'song' ? p.song.song_name : `Psalm ${p.chapter}`
@@ -317,6 +362,7 @@ export function Build(): JSX.Element {
     const token = ++checkToken.current
     setSavedId(null)
     setEditing(false)
+    setSavedKey(null)
     setExists(null)
     setChecking(true)
     try {
@@ -353,6 +399,10 @@ export function Build(): JSX.Element {
       }
       const { picks: restored, skipped } = await fromBuilderState(state)
       setPicks(restored)
+      // The baseline is what the RESTORED picks produce, not the stored
+      // sidecar: a psalm's range is re-derived from its verses, so the two can
+      // differ harmlessly and would otherwise read as an unsaved change.
+      setSavedKey(JSON.stringify(toBuilderState(slot.day, slot.date, restored)))
       setSavedId(exists.id)
       setEditing(true)
       setExists(null)
@@ -392,6 +442,7 @@ export function Build(): JSX.Element {
       if (r.ok) {
         setSavedId(r.service.id)
         setEditing(true)
+        setSavedKey(stateKey)
         setNote(`${editing ? 'Saved changes to' : 'Created'} ${slot.day} · ${prettyDate(slot.date)}.`)
       } else if ('conflict' in r) {
         // Someone claimed the slot between our check and this write.
@@ -555,12 +606,9 @@ export function Build(): JSX.Element {
                     open rather than collapsed. */}
                 <div className="flex w-full items-center justify-end gap-1.5">
                   <button
-                    className={`icon-btn${p.type === 'song' ? '' : ' invisible'}`}
+                    className="icon-btn"
                     onClick={() => editPick(i)}
-                    aria-label="Edit arrangement"
-                    aria-hidden={p.type !== 'song'}
-                    tabIndex={p.type === 'song' ? 0 : -1}
-                    disabled={p.type !== 'song'}
+                    aria-label={p.type === 'song' ? 'Edit arrangement' : 'Change the psalm'}
                   >
                     <Icon name="gear" size={17} />
                   </button>
@@ -607,19 +655,23 @@ export function Build(): JSX.Element {
           <button
             className="btn-app btn-app-primary btn-block"
             onClick={() => void saveService()}
-            disabled={!picks.length || saving || checking}
+            disabled={!picks.length || saving || checking || (editing && !dirty)}
           >
             {saving
               ? 'Saving…'
               : checking
                 ? 'Checking…'
                 : editing
-                  ? 'Save changes'
+                  ? dirty
+                    ? 'Save changes'
+                    : 'Saved'
                   : `Create ${slot.day} service`}
           </button>
           {!saving && !checking && editing && (
             <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-              Editing the service saved for {slot.day} · {prettyDate(slot.date)}.
+              {dirty
+                ? `Editing the service saved for ${slot.day} · ${prettyDate(slot.date)}.`
+                : 'No changes since this was last saved.'}
             </p>
           )}
           {!saving && !checking && !editing && savedId !== null && (
@@ -677,6 +729,26 @@ export function Build(): JSX.Element {
           if (meta) void beginSong(meta)
         }}
       />
+
+      <Sheet
+        open={editingPsalm !== null}
+        title="Change the psalm"
+        onClose={() => setEditingPsalm(null)}
+      >
+        {editingPsalm && (
+          <PsalmFields
+            // Re-seed whenever a different psalm is opened.
+            key={`${editingPsalm.at}-${editingPsalm.chapter}`}
+            initial={editingPsalm}
+            submitVerb="Save"
+            onSubmit={async (c, f, t) => {
+              const ok = await addPsalm(c, f, t, editingPsalm.at)
+              if (ok) setEditingPsalm(null)
+              return ok
+            }}
+          />
+        )}
+      </Sheet>
 
       <ServicePickerSheet
         open={pickerOpen}
