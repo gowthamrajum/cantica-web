@@ -97,15 +97,17 @@ export function Build(): JSX.Element {
   const [note, setNote] = useState('')
   // Sections and items are closed by default; the setup opens on a fresh
   // service because there is nothing else to look at yet.
-  // "Add to service" stays open — it is the primary action. "When" closes,
-  // because it has already been answered in the sheet and its summary says
-  // everything the card would.
-  const disc = useDisclosure(['add'])
+  // "When" opens by default; items start closed, which is what keeps a long
+  // service readable on a phone.
+  const disc = useDisclosure(['when'])
 
   const openPicker = (s: PickSource): void => {
     setSource(s)
     setPickerOpen(true)
   }
+
+  /** Guards the picker against reopening on a tab that no longer exists. */
+  const pickerSource = (): PickSource => (hasPsalm ? 'songs' : source)
 
   // A song is arranged before it lands: which stanzas play, and which repeats.
   // Picking one closes the picker so the structure sheet has the screen to
@@ -168,6 +170,12 @@ export function Build(): JSX.Element {
 
   const setRoleAt = (i: number, role: Role): void =>
     setPicks((p) => p.map((x, j) => (j === i && x.type === 'song' ? { ...x, role } : x)))
+
+  /**
+   * A service takes one responsive reading, so once a psalm is placed the way
+   * to add another is withdrawn rather than left to be refused later.
+   */
+  const hasPsalm = picks.some((p) => p.type === 'psalm')
 
   /** Communion is only served on the month's first Sunday. */
   const firstSunday = isFirstSundayOfMonth(slot.date)
@@ -455,33 +463,6 @@ export function Build(): JSX.Element {
         </div>
       </Collapsible>
 
-      <Collapsible
-        title="Add to service"
-        open={disc.isOpen('add')}
-        onToggle={() => disc.toggle('add')}
-        summary="Songs · Psalms"
-      >
-        <div className="mb-1 grid grid-cols-2 gap-3 px-[var(--gutter)]">
-          <button type="button" className="tile" onClick={() => openPicker('songs')}>
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold-500 text-white">
-              <Icon name="songs" size={20} strokeWidth={2} />
-            </span>
-            <span>
-              <span className="block font-serif text-[17px] font-semibold text-ink">Songs</span>
-              <span className="mt-0.5 block text-[13px] text-ink-muted">Search the songbook</span>
-            </span>
-          </button>
-          <button type="button" className="tile" onClick={() => openPicker('psalms')}>
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-navy-700 text-white">
-              <Icon name="bible" size={20} strokeWidth={2} />
-            </span>
-            <span>
-              <span className="block font-serif text-[17px] font-semibold text-ink">Psalms</span>
-              <span className="mt-0.5 block text-[13px] text-ink-muted">Responsive reading</span>
-            </span>
-          </button>
-        </div>
-      </Collapsible>
 
       <Section>
         <div className="flex items-baseline gap-2 px-[var(--gutter)]">
@@ -609,6 +590,19 @@ export function Build(): JSX.Element {
           </div>
         )}
 
+        {/* Adding lands you at the bottom of the list, so the way to add the
+            next one is here too rather than only back up at the top. */}
+        <div className="mt-3 flex gap-2 px-[var(--gutter)]">
+          <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => openPicker('songs')}>
+            <Icon name="plus" size={17} strokeWidth={2.4} /> Add song
+          </button>
+          {!hasPsalm && (
+            <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => openPicker('psalms')}>
+              <Icon name="plus" size={17} strokeWidth={2.4} /> Add psalm
+            </button>
+          )}
+        </div>
+
         <div className="mt-3 px-[var(--gutter)]">
           <button
             className="btn-app btn-app-primary btn-block"
@@ -686,7 +680,8 @@ export function Build(): JSX.Element {
 
       <ServicePickerSheet
         open={pickerOpen}
-        source={source}
+        source={pickerSource()}
+        allowPsalms={!hasPsalm}
         onSourceChange={setSource}
         onClose={() => setPickerOpen(false)}
         onPickSong={(m) => void openSong(m)}

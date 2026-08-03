@@ -26,6 +26,7 @@ const PAGE_SIZE = 6
 export function ServicePickerSheet({
   open,
   source,
+  allowPsalms,
   onSourceChange,
   onClose,
   onPickSong,
@@ -33,6 +34,8 @@ export function ServicePickerSheet({
 }: {
   open: boolean
   source: PickSource
+  /** False once the service already has its psalm — see Build.tsx. */
+  allowPsalms: boolean
   onSourceChange: (s: PickSource) => void
   onClose: () => void
   onPickSong: (meta: SongMeta) => void
@@ -135,19 +138,23 @@ export function ServicePickerSheet({
 
   return (
     <Sheet open={open} title="Add to service" onClose={onClose}>
-      <div className="px-[var(--gutter)]">
-        <Segmented
-          options={[
-            { id: 'songs', label: 'Songs' },
-            { id: 'psalms', label: 'Psalms' }
-          ]}
-          value={source}
-          onChange={onSourceChange}
-          ariaLabel="What to add"
-        />
-      </div>
+      {/* With the psalm already placed there is nothing to switch between, so
+          the control goes rather than sitting there disabled. */}
+      {allowPsalms && (
+        <div className="px-[var(--gutter)]">
+          <Segmented
+            options={[
+              { id: 'songs', label: 'Songs' },
+              { id: 'psalms', label: 'Psalms' }
+            ]}
+            value={source}
+            onChange={onSourceChange}
+            ariaLabel="What to add"
+          />
+        </div>
+      )}
 
-      {source === 'songs' ? (
+      {source === 'songs' || !allowPsalms ? (
         <>
           <div className="mt-3 px-[var(--gutter)]">
             <SearchField

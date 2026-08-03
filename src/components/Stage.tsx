@@ -53,10 +53,18 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
   // Single-line lyric slides keep each line on ONE line by shrinking the font to
   // fit the widest line (the sizeFor value is the ceiling), matching obs.html.
   const lyricRef = useRef<HTMLDivElement>(null)
+  // The fit depends on the lyric text and on how many lines there are. Both are
+  // named here rather than computed inside the dependency list: an inline
+  // `lines.join()` cannot be checked statically, and `lines.length` was being
+  // read by the effect without being declared. Naming them changes nothing at
+  // runtime — the text cannot change without the count being re-read — but it
+  // makes the dependency list say what the effect actually uses.
+  const lyricText = lines.join('\n')
+  const lyricCount = lines.length
   useLayoutEffect(() => {
     const el = lyricRef.current
     if (!el || !showLines) return
-    const base = sizeFor(lines.length, scale)
+    const base = sizeFor(lyricCount, scale)
     // Measure against a FIXED container, not the lyric element itself: it's a
     // centered flex item that hugs its content, so its own width shrinks with the
     // font and the fit would never converge. The padded stage-content is stable.
@@ -83,7 +91,7 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
     const ro = new ResizeObserver(fit)
     if (el.parentElement) ro.observe(el.parentElement)
     return () => ro.disconnect()
-  }, [lines.join('\n'), scale, slide?.singleLine, showLines])
+  }, [lyricText, lyricCount, scale, slide?.singleLine, showLines])
 
   return (
     <div className="stage-frame" style={themeVars}>
