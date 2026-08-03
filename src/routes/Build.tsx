@@ -391,13 +391,20 @@ export function Build(): JSX.Element {
               >
                 {saving ? 'Replacing…' : 'Replace it'}
               </button>
-              <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => setConflict(null)}>
-                Keep both
+              <button
+                className="btn-app btn-app-quiet flex-1 text-[15px]"
+                onClick={() => {
+                  setConflict(null)
+                  setNote('Left the saved service as it is — nothing was saved.')
+                }}
+                disabled={saving}
+              >
+                Leave it
               </button>
             </div>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-              “Keep both” leaves the saved service alone — change the day or date above to file this one somewhere
-              else.
+              <b>Replace it</b> overwrites the saved service with what you have here. <b>Leave it</b> keeps the saved
+              one untouched and saves nothing — to keep both, change the day or date above and save again.
             </p>
           </div>
         )}
