@@ -5,9 +5,11 @@ import { Icon } from '../components/app/Icons'
 import { SlidePreview } from '../components/app/SlidePreview'
 import { SongStructureSheet } from '../components/app/SongStructureSheet'
 import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
-import { listSongs, getSong, type Song, type SongMeta } from '../lib/songs'
+import { ServiceConflictSheet } from '../components/app/ServiceConflictSheet'
+import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
+import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
-import { createService, updateService, type ServiceConflict } from '../lib/relay'
+import { createService, findService, updateService } from '../lib/relay'
 import { daysPast, defaultSlot, prettyDate, type ServiceSlot } from '../lib/serviceSlot'
 import {
   buildService,
@@ -47,34 +49,33 @@ export function Build(): JSX.Element {
   const name = `${slot.day} Service · ${prettyDate(slot.date)}`
 
   const [saving, setSaving] = useState(false)
-  const [conflict, setConflict] = useState<ServiceConflict | null>(null)
+  /** The stored service standing in this slot's way, once a save has hit it. */
+  const [clash, setClash] = useState<{ id: number; message: string } | null>(null)
+
+  // The relay row this builder is bound to, if this slot is already filed.
+  // Knowing it up front turns the second save of a slot into a plain update
+  // instead of a create that has to be rejected and recovered from.
+  const [savedId, setSavedId] = useState<number | null>(null)
+  const [checking, setChecking] = useState(false)
 
   const [lang, setLang] = useState<ServiceLang>('both')
   const [picks, setPicks] = useState<Pick[]>([])
-  const [source, setSource] = useState<'songs' | 'psalms'>('songs')
+  const [source, setSource] = useState<PickSource>('songs')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [preview, setPreview] = useState<number | 'all' | null>(null)
   const [note, setNote] = useState('')
 
-  // ----- songs -----
-  const [q, setQ] = useState('')
-  const [debounced, setDebounced] = useState('')
-  const [results, setResults] = useState<SongMeta[]>([])
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(q.trim()), 200)
-    return () => clearTimeout(t)
-  }, [q])
-  useEffect(() => {
-    let alive = true
-    if (source !== 'songs') return
-    void listSongs(debounced).then((s) => alive && setResults(s.slice(0, 40)))
-    return () => {
-      alive = false
-    }
-  }, [debounced, source])
+  const openPicker = (s: PickSource): void => {
+    setSource(s)
+    setPickerOpen(true)
+  }
 
   // A song is arranged before it lands: which stanzas play, and which repeats.
+  // Picking one closes the picker so the structure sheet has the screen to
+  // itself rather than stacking two modals.
   const [pending, setPending] = useState<Song | null>(null)
   const openSong = async (meta: SongMeta): Promise<void> => {
+    setPickerOpen(false)
     const song = await getSong(meta.song_id)
     if (song) setPending(song)
   }
@@ -87,42 +88,34 @@ export function Build(): JSX.Element {
   }
 
   // ----- psalms -----
-  const [chapter, setChapter] = useState('23')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const addPsalm = async (): Promise<void> => {
+  // Returns whether it landed, so the picker knows whether to close.
+  const addPsalm = async (chapter: string, from: string, to: string): Promise<boolean> => {
     const ch = Math.max(1, Math.min(150, Number(chapter) || 1))
-    setBusy(true)
-    try {
-      const [te, en] = await Promise.all([loadBible('telugu'), loadBible('web')])
-      const teV = te.byBook['Psalms']?.[ch] ?? []
-      const enV = en.byBook['Psalms']?.[ch] ?? []
-      const enByVerse = new Map(enV.map((v) => [v.verse, v.text]))
-      let verses: PsalmVerse[] = teV.map((v) => ({
-        verse: v.verse,
-        telugu: v.text,
-        english: enByVerse.get(v.verse) ?? ''
-      }))
-      const lo = Number(from)
-      const hi = Number(to)
-      if (from.trim() && to.trim()) {
-        if (lo > hi) {
-          setNote('First verse must not be after the last.')
-          return
-        }
-        verses = verses.filter((v) => v.verse >= lo && v.verse <= hi)
+    const [te, en] = await Promise.all([loadBible('telugu'), loadBible('web')])
+    const teV = te.byBook['Psalms']?.[ch] ?? []
+    const enV = en.byBook['Psalms']?.[ch] ?? []
+    const enByVerse = new Map(enV.map((v) => [v.verse, v.text]))
+    let verses: PsalmVerse[] = teV.map((v) => ({
+      verse: v.verse,
+      telugu: v.text,
+      english: enByVerse.get(v.verse) ?? ''
+    }))
+    const lo = Number(from)
+    const hi = Number(to)
+    if (from.trim() && to.trim()) {
+      if (lo > hi) {
+        setNote('First verse must not be after the last.')
+        return false
       }
-      if (!verses.length) {
-        setNote('No verses for that reference.')
-        return
-      }
-      setPicks((p) => [...p, { key: `p-${ch}-${p.length}`, type: 'psalm', chapter: ch, verses, lang }])
-      setNote(`Added Psalm ${ch}${from && to ? `:${lo}-${hi}` : ''}`)
-    } finally {
-      setBusy(false)
+      verses = verses.filter((v) => v.verse >= lo && v.verse <= hi)
     }
+    if (!verses.length) {
+      setNote('No verses for that reference.')
+      return false
+    }
+    setPicks((p) => [...p, { key: `p-${ch}-${p.length}`, type: 'psalm', chapter: ch, verses, lang }])
+    setNote(`Added Psalm ${ch}${from && to ? `:${lo}-${hi}` : ''}`)
+    return true
   }
 
   // ----- the picked list -----
@@ -161,34 +154,68 @@ export function Build(): JSX.Element {
     setNote('Downloaded — open it in Cantica via Sessions ▸ ⋯ ▸ Import service.')
   }
 
-  // Save the deck to the relay under this slot. The store keys on
-  // (date, day), so a second save of the same slot comes back 409 with the
-  // existing service and we offer to replace it rather than fork a duplicate.
+  // Ask the store whether this slot is taken as soon as it's chosen, so the
+  // button can say "Update" before you press it rather than after.
+  useEffect(() => {
+    let alive = true
+    setSavedId(null)
+    setClash(null)
+    setChecking(true)
+    void findService(slot.day, slot.date)
+      .then((s) => {
+        if (!alive) return
+        setSavedId(s ? s.id : null)
+      })
+      .finally(() => alive && setChecking(false))
+    return () => {
+      alive = false
+    }
+  }, [slot.day, slot.date])
+
+  // Save the deck under this slot. The store holds one service per (date, day),
+  // so a slot that's already filed never gets overwritten on a single tap — it
+  // raises the conflict sheet and waits to be told which way to go.
   const saveService = async (): Promise<void> => {
     if (!picks.length) return
+    if (savedId !== null) {
+      setClash({
+        id: savedId,
+        message: `A service is already saved for this day and date. Continuing replaces it.`
+      })
+      return
+    }
     setSaving(true)
-    setConflict(null)
     setNote('')
     try {
       const r = await createService(slot.day, slot.date, envelope)
-      if (r.ok) setNote(`Saved ${slot.day} · ${prettyDate(slot.date)} to the service store.`)
-      else if ('conflict' in r) setConflict(r.conflict)
-      else setNote(r.message)
+      if (r.ok) {
+        setSavedId(r.service.id)
+        setNote(`Saved ${slot.day} · ${prettyDate(slot.date)} to the service store.`)
+      } else if ('conflict' in r) {
+        // Someone claimed the slot between our check and this write.
+        setClash({ id: r.conflict.existing.id, message: r.conflict.message })
+      } else setNote(r.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const replaceExisting = async (): Promise<void> => {
-    if (!conflict) return
+  /** "Continue with new service" — push this deck over the stored one. */
+  const continueWithNew = async (): Promise<void> => {
+    if (!clash) return
     setSaving(true)
     try {
-      const r = await updateService(conflict.existing.id, envelope)
+      const r = await updateService(clash.id, envelope, { serviceDay: slot.day, serviceDate: slot.date })
       if (r.ok) {
-        setConflict(null)
+        setClash(null)
+        setSavedId(r.service.id)
         setNote(`Replaced the service for ${slot.day} · ${prettyDate(slot.date)}.`)
-      } else if ('conflict' in r) setConflict(r.conflict)
-      else setNote(r.message)
+      } else if ('conflict' in r) {
+        setClash({ id: clash.id, message: r.conflict.message })
+      } else {
+        setClash(null)
+        setNote(r.message)
+      }
     } finally {
       setSaving(false)
     }
@@ -229,65 +256,27 @@ export function Build(): JSX.Element {
       </Section>
 
       <Section>
-        <Segmented
-          options={[
-            { id: 'songs', label: 'Songs' },
-            { id: 'psalms', label: 'Psalms' }
-          ]}
-          value={source}
-          onChange={setSource}
-          ariaLabel="What to add"
-        />
-
-        {source === 'songs' ? (
-          <>
-            <label className="search-field mt-3 mx-[var(--gutter)]">
-              <Icon name="search" size={18} />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search 1,596 songs" />
-            </label>
-            <div className="list-group mt-2 max-h-72 overflow-auto">
-              {results.map((s) => (
-                <button
-                  key={s.song_id}
-                  className="list-row w-full text-left"
-                  onClick={() => void openSong(s)}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="list-title block truncate">{s.song_name}</span>
-                  </span>
-                  <Icon name="plus" size={18} className="list-chev" />
-                </button>
-              ))}
-              {results.length === 0 && <div className="px-4 py-3 text-[14px] text-ink-muted">No matches.</div>}
-            </div>
-          </>
-        ) : (
-          <div className="mt-3 px-[var(--gutter)]">
-            <div className="grid grid-cols-3 gap-2">
-              <label className="min-w-0">
-                <span className="list-label">Psalm</span>
-                <span className="search-field mt-1">
-                  <input inputMode="numeric" value={chapter} onChange={(e) => setChapter(e.target.value)} />
-                </span>
-              </label>
-              <label className="min-w-0">
-                <span className="list-label">From</span>
-                <span className="search-field mt-1">
-                  <input inputMode="numeric" value={from} placeholder="all" onChange={(e) => setFrom(e.target.value)} />
-                </span>
-              </label>
-              <label className="min-w-0">
-                <span className="list-label">To</span>
-                <span className="search-field mt-1">
-                  <input inputMode="numeric" value={to} placeholder="all" onChange={(e) => setTo(e.target.value)} />
-                </span>
-              </label>
-            </div>
-            <button className="btn-app btn-app-primary btn-block mt-3" onClick={() => void addPsalm()} disabled={busy}>
-              Add psalm
-            </button>
-          </div>
-        )}
+        <span className="list-label">Add to service</span>
+        <div className="mt-1 grid grid-cols-2 gap-3 px-[var(--gutter)]">
+          <button type="button" className="tile" onClick={() => openPicker('songs')}>
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold-500 text-white">
+              <Icon name="songs" size={20} strokeWidth={2} />
+            </span>
+            <span>
+              <span className="block font-serif text-[17px] font-semibold text-ink">Songs</span>
+              <span className="mt-0.5 block text-[13px] text-ink-muted">Search the songbook</span>
+            </span>
+          </button>
+          <button type="button" className="tile" onClick={() => openPicker('psalms')}>
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-navy-700 text-white">
+              <Icon name="bible" size={20} strokeWidth={2} />
+            </span>
+            <span>
+              <span className="block font-serif text-[17px] font-semibold text-ink">Psalms</span>
+              <span className="mt-0.5 block text-[13px] text-ink-muted">Responsive reading</span>
+            </span>
+          </button>
+        </div>
       </Section>
 
       <Section>
@@ -366,10 +355,24 @@ export function Build(): JSX.Element {
           <button
             className="btn-app btn-app-primary btn-block"
             onClick={() => void saveService()}
-            disabled={!picks.length || saving}
+            disabled={!picks.length || saving || checking}
           >
-            {saving ? 'Saving…' : `Create ${slot.day} service`}
+            {saving
+              ? savedId
+                ? 'Updating…'
+                : 'Saving…'
+              : checking
+                ? 'Checking…'
+                : savedId
+                  ? `Update ${slot.day} service`
+                  : `Create ${slot.day} service`}
           </button>
+          {savedId !== null && !saving && (
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+              A service is already filed for {slot.day} · {prettyDate(slot.date)} — saving replaces it. Pick another
+              day or date to file a second one.
+            </p>
+          )}
         </div>
         <div className="mt-2 flex gap-2 px-[var(--gutter)]">
           <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={exportFile} disabled={!picks.length}>
@@ -380,35 +383,6 @@ export function Build(): JSX.Element {
           </button>
         </div>
 
-        {conflict && (
-          <div className="app-card mt-3 border-amber-300 bg-amber-50/60 p-4">
-            <p className="text-[14.5px] leading-relaxed text-ink">{conflict.message}</p>
-            <div className="mt-3 flex gap-2">
-              <button
-                className="btn-app btn-app-primary flex-1 text-[15px]"
-                onClick={() => void replaceExisting()}
-                disabled={saving}
-              >
-                {saving ? 'Replacing…' : 'Replace it'}
-              </button>
-              <button
-                className="btn-app btn-app-quiet flex-1 text-[15px]"
-                onClick={() => {
-                  setConflict(null)
-                  setNote('Left the saved service as it is — nothing was saved.')
-                }}
-                disabled={saving}
-              >
-                Leave it
-              </button>
-            </div>
-            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-              <b>Replace it</b> overwrites the saved service with what you have here. <b>Leave it</b> keeps the saved
-              one untouched and saves nothing — to keep both, change the day or date above and save again.
-            </p>
-          </div>
-        )}
-
         {note && <p className="mt-2 px-[var(--gutter)] text-[13px] text-ink-muted">{note}</p>}
 
         <p className="mt-4 px-[var(--gutter)] text-[13px] leading-relaxed text-ink-muted">
@@ -417,6 +391,27 @@ export function Build(): JSX.Element {
         </p>
       </Section>
 
+      <ServicePickerSheet
+        open={pickerOpen}
+        source={source}
+        onSourceChange={setSource}
+        onClose={() => setPickerOpen(false)}
+        onPickSong={(m) => void openSong(m)}
+        onAddPsalm={addPsalm}
+      />
+
+      <ServiceConflictSheet
+        open={clash !== null}
+        message={clash?.message ?? ''}
+        slotLabel={`${slot.day} · ${prettyDate(slot.date)}`}
+        saving={saving}
+        onEdit={() => {
+          setClash(null)
+          setNote('Nothing saved — the service already stored is untouched.')
+        }}
+        onContinue={() => void continueWithNew()}
+      />
+
       <ServiceSlotSheet
         open={slotOpen}
         slot={slot}
@@ -424,8 +419,9 @@ export function Build(): JSX.Element {
         onConfirm={(s) => {
           setSlot(s)
           setSlotOpen(false)
-          // A new slot invalidates a conflict raised against the old one.
-          setConflict(null)
+          // A new slot invalidates a clash raised against the old one; the
+          // slot-change effect re-checks the store and clears it too.
+          setClash(null)
         }}
       />
 

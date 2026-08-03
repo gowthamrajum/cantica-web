@@ -160,6 +160,28 @@ async function readError(r: Response): Promise<string> {
   }
 }
 
+/**
+ * The service already filed under this slot, if any. Lets a caller know it is
+ * about to update rather than create — the list endpoint is narrow (`from`/`to`
+ * bracket a single date) and omits the deck, so this is cheap.
+ */
+export async function findService(
+  serviceDay: string,
+  serviceDate: string
+): Promise<ServiceSummary | null> {
+  try {
+    const r = await fetch(
+      `${RELAY_BASE}/services?from=${encodeURIComponent(serviceDate)}&to=${encodeURIComponent(serviceDate)}`,
+      { cache: 'no-store' }
+    )
+    if (!r.ok) return null
+    const j = (await r.json()) as { services: ServiceSummary[] }
+    return j.services.find((s) => s.serviceDay === serviceDay) ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function createService(
   serviceDay: string,
   serviceDate: string,
