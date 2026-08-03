@@ -63,9 +63,8 @@ export function Build(): JSX.Element {
   // save races another caller to it).
   const [exists, setExists] = useState<{ id: number; detail: string; canLoad: boolean } | null>(null)
   const [loadingExisting, setLoadingExisting] = useState(false)
-  // Only prompt for a slot the user actually just chose, not the default one
-  // the builder opens on.
-  const askOnFound = useRef(false)
+  // Guards against a stale slot check landing after a newer one.
+  const checkToken = useRef(0)
 
   const [lang, setLang] = useState<ServiceLang>('both')
   const [picks, setPicks] = useState<Pick[]>([])
@@ -170,37 +169,14 @@ export function Build(): JSX.Element {
     setNote('Downloaded — open it in Cantica via Sessions ▸ ⋯ ▸ Import service.')
   }
 
-  // Ask the store whether this slot is taken as soon as it's chosen. If the user
-  // just picked it, offer to open that service rather than letting them build a
-  // second one they can't save.
-  useEffect(() => {
-    let alive = true
-    setSavedId(null)
-    setEditing(false)
-    setExists(null)
-    setChecking(true)
-    void findService(slot.day, slot.date)
-      .then(async (s) => {
-        if (!alive) return
-        setSavedId(s ? s.id : null)
-        if (!s || !askOnFound.current) return
-        askOnFound.current = false
-        await raiseExists(s.id)
-      })
-      .finally(() => alive && setChecking(false))
-    return () => {
-      alive = false
-    }
-  }, [slot.day, slot.date])
-
-  /**
-   * Raise the "this slot is taken" prompt for a stored service, reading its
-   * deck first so we can say whether it can be reopened.
-   */
-  const raiseExists = async (id: number, message?: string): Promise<void> => {
+  /** Read a stored service well enough to say what can be done with it. */
+  const describeExisting = async (
+    id: number,
+    message?: string
+  ): Promise<{ id: number; detail: string; canLoad: boolean }> => {
     const full = await getService(id)
     const state = full ? readBuilderState(full.serviceData) : null
-    setExists({
+    return {
       id,
       canLoad: !!state,
       detail:
@@ -208,8 +184,46 @@ export function Build(): JSX.Element {
         (state
           ? `Saved with ${state.picks.length} item${state.picks.length === 1 ? '' : 's'}.`
           : 'This day and date already has a service saved.')
-    })
+    }
   }
+
+  /**
+   * Find out whether a slot already holds a service, and say so immediately
+   * when the user has just chosen it.
+   *
+   * Called explicitly rather than from an effect keyed on the slot: confirming
+   * the pre-filled Sunday changes neither the day nor the date, so an effect
+   * would never re-run and the user would build an entire service before
+   * discovering the slot was taken.
+   */
+  const checkSlot = async (s: ServiceSlot, ask: boolean): Promise<void> => {
+    // Monotonic token: a slow answer for an abandoned slot must not overwrite
+    // the answer for the one now on screen.
+    const token = ++checkToken.current
+    setSavedId(null)
+    setEditing(false)
+    setExists(null)
+    setChecking(true)
+    try {
+      const found = await findService(s.day, s.date)
+      if (token !== checkToken.current) return
+      setSavedId(found ? found.id : null)
+      if (found && ask) {
+        const described = await describeExisting(found.id)
+        if (token !== checkToken.current) return
+        setExists(described)
+      }
+    } finally {
+      if (token === checkToken.current) setChecking(false)
+    }
+  }
+
+  // The slot the builder opens on was chosen by nobody, so learn its state for
+  // the button but don't interrupt with it before the user has said anything.
+  useEffect(() => {
+    void checkSlot(slot, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** Reopen the builder on the service already filed under this slot. */
   const loadExisting = async (): Promise<void> => {
@@ -253,7 +267,7 @@ export function Build(): JSX.Element {
       // The slot holds a service we never opened — never overwrite it silently,
       // ask whether to open it or move this one elsewhere.
       if (!editing && savedId !== null) {
-        await raiseExists(savedId)
+        setExists(await describeExisting(savedId))
         return
       }
 
@@ -266,7 +280,7 @@ export function Build(): JSX.Element {
         setNote(`${editing ? 'Saved changes to' : 'Created'} ${slot.day} · ${prettyDate(slot.date)}.`)
       } else if ('conflict' in r) {
         // Someone claimed the slot between our check and this write.
-        await raiseExists(r.conflict.existing.id, r.conflict.message)
+        setExists(await describeExisting(r.conflict.existing.id, r.conflict.message))
       } else setNote(r.message)
     } finally {
       setSaving(false)
@@ -291,6 +305,18 @@ export function Build(): JSX.Element {
           <span className="min-w-0 flex-1">
             <span className="list-title block">{slot.day}</span>
             <span className="list-sub block">{prettyDate(slot.date)}</span>
+            {/* The slot's state stays on screen, not only in a modal that can
+                be dismissed — this is what tells you whether you're starting
+                fresh or standing on an existing service. */}
+            {checking ? (
+              <span className="mt-1 block text-[12.5px] text-ink-muted">Checking this slot…</span>
+            ) : editing ? (
+              <span className="pill mt-1.5 bg-emerald-50 text-emerald-700">Editing the saved service</span>
+            ) : savedId !== null ? (
+              <span className="pill mt-1.5 bg-amber-100 text-amber-800">Already has a service</span>
+            ) : (
+              <span className="pill mt-1.5 bg-line/60 text-ink-muted">Free — no service yet</span>
+            )}
           </span>
           <Icon name="chevron" size={17} className="list-chev" />
         </button>
@@ -474,11 +500,12 @@ export function Build(): JSX.Element {
         slot={slot}
         onCancel={() => setSlotOpen(false)}
         onConfirm={(s) => {
-          // A slot the user picked deliberately: if it's already taken, the
-          // check that follows should offer to open it rather than stay silent.
-          askOnFound.current = true
           setSlot(s)
           setSlotOpen(false)
+          // Always re-check, even when the slot is unchanged: this is the
+          // moment the user committed to it, so it's the moment to say whether
+          // it is already taken.
+          void checkSlot(s, true)
         }}
       />
 
