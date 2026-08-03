@@ -84,6 +84,35 @@ export function defaultSlot(now: Date = new Date()): ServiceSlot {
 }
 
 /**
+ * The dates a given weekday actually falls on, around today: `back` that have
+ * been and gone, then `ahead` still to come.
+ *
+ * The builder offers these instead of a free date field. A service is filed
+ * under a weekday, so every other date in a month is not a slower choice — it
+ * is a wrong one, and a picker that offers it invites a Tuesday service nobody
+ * meant to create.
+ */
+export function occurrencesFor(
+  day: DayName,
+  opts: { back?: number; ahead?: number; from?: Date } = {}
+): string[] {
+  const { back = 1, ahead = 11, from = new Date() } = opts
+  const first = fromISODate(nextDateFor(day, from))
+  if (!first) return []
+  const out: string[] = []
+  for (let i = -back; i < ahead; i++) {
+    out.push(toISODate(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i * 7)))
+  }
+  return out
+}
+
+/** "Aug 9" — compact enough to sit in a grid of dates. */
+export function shortDate(iso: string): string {
+  const d = fromISODate(iso)
+  return d ? `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}` : iso
+}
+
+/**
  * Whether a date is the month's first Sunday — by definition the Sunday falling
  * on the 1st to the 7th. Communion is served then, so the builder only offers
  * the communion roles on such a date. Mirrors lumen-presenter's isFirstSunday;

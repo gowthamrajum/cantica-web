@@ -168,23 +168,27 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   sparkle: <path d="M12 3l2.1 5.6L20 10.5l-5.9 1.9L12 18l-2.1-5.6L4 10.5l5.9-1.9z" />,
-  // The offering plate: a coin above a shallow footed dish. A heart would read
-  // as "donate" generically; this is the thing that is actually passed down the
-  // row on a Sunday.
+  // A collection box with a slot, a coin, and a hand reaching over to post it.
+  // The hand is what says "giving"; the slot is what says this is the offering
+  // box and not a drawer, so the hand is placed to the right of it rather than
+  // across it.
   offering: (
     <>
-      <circle cx="12" cy="5.6" r="2.7" />
-      <path d="M3.4 12.2h17.2c0 3.9-3.85 6.6-8.6 6.6s-8.6-2.7-8.6-6.6z" />
-      <path d="M12 18.8v1.9M9.1 20.7h5.8" />
+      <path d="M2.9 14.2h18.2v5.6a1.8 1.8 0 0 1-1.8 1.8H4.7a1.8 1.8 0 0 1-1.8-1.8z" />
+      <path d="M8.4 17.4h7.2" />
+      <circle cx="7.2" cy="8.4" r="2.2" />
+      <path d="M12.2 12.1V7.4a1.5 1.5 0 0 1 3 0v3.1M15.2 9.6a1.4 1.4 0 0 1 2.8 0v1.4M18 10.4a1.35 1.35 0 0 1 2.7 0v1.7c0 1.9-1.5 3.2-3.4 3.2h-1.9" />
     </>
   ),
-  // Communion: the cup with the bread above it. A chalice on its own reads as a
-  // trophy or a wine glass — the wafer is what names it.
+  // The cup and the bread. The line across the bowl is the wine: without it the
+  // glass reads as an empty goblet, or a trophy.
   communion: (
     <>
-      <circle cx="12" cy="3.5" r="2.1" />
-      <path d="M6.9 8.1h10.2v2.4a5.1 5.1 0 0 1-10.2 0z" />
-      <path d="M12 15.6v3.9M8.7 19.9h6.6" />
+      <path d="M3.6 3.4h6.8v3.4a3.4 3.4 0 0 1-6.8 0z" />
+      <path d="M3.9 5.6h6.2" />
+      <path d="M7 10.2v7.4M4.5 18.2h5" />
+      <path d="M12.6 18.2v-3a4.9 3.9 0 0 1 9.8 0v3z" />
+      <path d="M15.4 13.6l1-1.5M18.6 13.4l1-1.5" />
     </>
   ),
   // Six teeth rather than the usual eight or twelve: at the ~17px this renders

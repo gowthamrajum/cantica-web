@@ -505,9 +505,9 @@ export function Build(): JSX.Element {
                       title={ROLE_LABEL[p.role ?? 'general']}
                       aria-label={`When is this sung? Currently: ${ROLE_LABEL[p.role ?? 'general']}`}
                     >
-                      {roleAlsoGeneral(p.role) && <Icon name="songs" size={15} strokeWidth={2} />}
-                      {p.role?.startsWith('offering') && <Icon name="offering" size={15} strokeWidth={2} />}
-                      {p.role?.startsWith('communion') && <Icon name="communion" size={15} strokeWidth={2} />}
+                      {roleAlsoGeneral(p.role) && <Icon name="songs" size={17} strokeWidth={2} />}
+                      {p.role?.startsWith('offering') && <Icon name="offering" size={17} strokeWidth={2} />}
+                      {p.role?.startsWith('communion') && <Icon name="communion" size={17} strokeWidth={2} />}
                     </button>
                   )}
                 </div>

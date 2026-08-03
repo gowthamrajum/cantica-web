@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import {
   DAYS,
   dayOf,
+  isFirstSundayOfMonth,
   nextDateFor,
+  occurrencesFor,
   prettyDate,
+  shortDate,
+  toISODate,
   type DayName,
   type ServiceSlot
 } from '../../lib/serviceSlot'
@@ -46,12 +50,16 @@ export function ServiceSlotSheet({
     setDate(nextDateFor(d))
   }
 
-  const pickDate = (iso: string): void => {
-    setDate(iso)
-    const d = dayOf(iso)
-    if (d) setDay(d)
-  }
-
+  // Only the chosen weekday's own dates are offered, so the two can never
+  // disagree and there is no such thing as an invalid pick.
+  const dates = useMemo(() => occurrencesFor(day), [day])
+  // A slot being edited may sit outside the offered window; keep it selectable
+  // rather than silently moving the service.
+  const options = useMemo(
+    () => (dates.includes(date) ? dates : [date, ...dates].filter((d) => dayOf(d) === day)),
+    [dates, date, day]
+  )
+  const today = toISODate(new Date())
   const valid = !!dayOf(date)
 
   return (
@@ -78,18 +86,35 @@ export function ServiceSlotSheet({
           ))}
         </div>
 
-        <p className="mb-2 mt-6 text-[12px] font-bold uppercase tracking-[0.13em] text-ink-muted">Date of service</p>
-        <label className="search-field">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => pickDate(e.target.value)}
-            aria-label="Date of service"
-            className="w-full bg-transparent outline-none"
-          />
-        </label>
-        <p className="mt-2 text-[13px] text-ink-muted">
-          {valid ? `Saving as ${day} · ${prettyDate(date)}` : 'Choose a valid date.'}
+        <p className="mb-2 mt-6 text-[12px] font-bold uppercase tracking-[0.13em] text-ink-muted">
+          Which {day}?
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {options.map((iso) => {
+            const on = iso === date
+            const past = iso < today
+            return (
+              <button
+                key={iso}
+                type="button"
+                onClick={() => setDate(iso)}
+                aria-pressed={on}
+                className={`pressable rounded-xl border px-2 py-2 text-center transition ${
+                  on ? 'border-gold-400 bg-gold-50' : 'border-line bg-card'
+                } ${past && !on ? 'opacity-55' : ''}`}
+              >
+                <span className={`block text-[13.5px] font-semibold ${on ? 'text-gold-700' : 'text-ink'}`}>
+                  {shortDate(iso)}
+                </span>
+                <span className="mt-0.5 block text-[10.5px] leading-tight text-ink-muted">
+                  {iso === today ? 'Today' : isFirstSundayOfMonth(iso) ? '1st Sunday' : past ? 'Past' : '\u00a0'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2.5 text-[13px] text-ink-muted">
+          {valid ? `Saving as ${day} · ${prettyDate(date)}` : 'Choose a date.'}
         </p>
 
         <button
