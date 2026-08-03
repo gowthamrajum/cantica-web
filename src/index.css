@@ -617,6 +617,12 @@
   from { transform: translate3d(0, 100%, 0); }
   to   { transform: translate3d(0, 0, 0); }
 }
+/* Desktop entrance. Both frames carry the centring translate, so the dialog
+   never leaves centre while it animates. */
+@keyframes sheet-pop {
+  from { opacity: 0; transform: translate(-50%, -47%) scale(0.975); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
 .sheet-grip {
   flex: none;
   width: 38px;
@@ -654,15 +660,17 @@
     right: auto;
     top: 50%;
     bottom: auto;
+    /* The centring transform MUST be a static rule, not only the animation's
+       end frame: the animation has no `forwards` fill, so once it finishes the
+       transform reverts to none and the dialog snaps down-right by half its own
+       size. It also keeps the dialog centred when animation is suppressed by
+       prefers-reduced-motion. */
+    transform: translate(-50%, -50%);
     width: min(560px, 92vw);
     max-height: 80dvh;
     border-radius: 20px;
     padding-bottom: 0;
     animation: sheet-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  @keyframes sheet-pop {
-    from { opacity: 0; transform: translate(-50%, -47%) scale(0.975); }
-    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   }
   .sheet-grip { display: none; }
 }
