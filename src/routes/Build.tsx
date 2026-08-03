@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Screen, Section } from '../components/app/Screen'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
 import { SlidePreview } from '../components/app/SlidePreview'
 import { SongStructureSheet } from '../components/app/SongStructureSheet'
 import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
-import { ServiceConflictSheet } from '../components/app/ServiceConflictSheet'
+import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
 import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
 import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
-import { createService, findService, updateService } from '../lib/relay'
+import { createService, findService, getService, updateService } from '../lib/relay'
+import { fromBuilderState, readBuilderState, toBuilderState } from '../lib/builderState'
 import { daysPast, defaultSlot, prettyDate, type ServiceSlot } from '../lib/serviceSlot'
 import {
   buildService,
@@ -49,14 +50,22 @@ export function Build(): JSX.Element {
   const name = `${slot.day} Service · ${prettyDate(slot.date)}`
 
   const [saving, setSaving] = useState(false)
-  /** The stored service standing in this slot's way, once a save has hit it. */
-  const [clash, setClash] = useState<{ id: number; message: string } | null>(null)
 
-  // The relay row this builder is bound to, if this slot is already filed.
-  // Knowing it up front turns the second save of a slot into a plain update
-  // instead of a create that has to be rejected and recovered from.
+  // The relay row this builder is bound to. Set when this slot's service has
+  // been loaded for editing, or when we've just saved into it — either way,
+  // saving from here on is an edit of that row, not a new service.
   const [savedId, setSavedId] = useState<number | null>(null)
   const [checking, setChecking] = useState(false)
+  /** True once the loaded service's picks are in hand, so saves are edits. */
+  const [editing, setEditing] = useState(false)
+
+  // The "this slot is taken" prompt, raised when a slot is chosen (or when a
+  // save races another caller to it).
+  const [exists, setExists] = useState<{ id: number; detail: string; canLoad: boolean } | null>(null)
+  const [loadingExisting, setLoadingExisting] = useState(false)
+  // Only prompt for a slot the user actually just chose, not the default one
+  // the builder opens on.
+  const askOnFound = useRef(false)
 
   const [lang, setLang] = useState<ServiceLang>('both')
   const [picks, setPicks] = useState<Pick[]>([])
@@ -136,6 +145,13 @@ export function Build(): JSX.Element {
     )
 
   const envelope = useMemo(() => buildService(name, picks), [name, picks])
+  // What gets stored: the deck Cantica reads, plus a record of how it was
+  // assembled so this builder can reopen it. The exported FILE stays the plain
+  // envelope — Cantica has no use for the sidecar.
+  const payload = useMemo(
+    () => ({ ...envelope, builder: toBuilderState(slot.day, slot.date, picks) }),
+    [envelope, slot.day, slot.date, picks]
+  )
   const slides = countSlides(envelope)
   const labelOf = (p: Pick): string =>
     p.type === 'song' ? p.song.song_name : `Psalm ${p.chapter}`
@@ -154,17 +170,22 @@ export function Build(): JSX.Element {
     setNote('Downloaded — open it in Cantica via Sessions ▸ ⋯ ▸ Import service.')
   }
 
-  // Ask the store whether this slot is taken as soon as it's chosen, so the
-  // button can say "Update" before you press it rather than after.
+  // Ask the store whether this slot is taken as soon as it's chosen. If the user
+  // just picked it, offer to open that service rather than letting them build a
+  // second one they can't save.
   useEffect(() => {
     let alive = true
     setSavedId(null)
-    setClash(null)
+    setEditing(false)
+    setExists(null)
     setChecking(true)
     void findService(slot.day, slot.date)
-      .then((s) => {
+      .then(async (s) => {
         if (!alive) return
         setSavedId(s ? s.id : null)
+        if (!s || !askOnFound.current) return
+        askOnFound.current = false
+        await raiseExists(s.id)
       })
       .finally(() => alive && setChecking(false))
     return () => {
@@ -172,50 +193,81 @@ export function Build(): JSX.Element {
     }
   }, [slot.day, slot.date])
 
-  // Save the deck under this slot. The store holds one service per (date, day),
-  // so a slot that's already filed never gets overwritten on a single tap — it
-  // raises the conflict sheet and waits to be told which way to go.
-  const saveService = async (): Promise<void> => {
-    if (!picks.length) return
-    if (savedId !== null) {
-      setClash({
-        id: savedId,
-        message: `A service is already saved for this day and date. Continuing replaces it.`
-      })
-      return
-    }
-    setSaving(true)
-    setNote('')
+  /**
+   * Raise the "this slot is taken" prompt for a stored service, reading its
+   * deck first so we can say whether it can be reopened.
+   */
+  const raiseExists = async (id: number, message?: string): Promise<void> => {
+    const full = await getService(id)
+    const state = full ? readBuilderState(full.serviceData) : null
+    setExists({
+      id,
+      canLoad: !!state,
+      detail:
+        message ??
+        (state
+          ? `Saved with ${state.picks.length} item${state.picks.length === 1 ? '' : 's'}.`
+          : 'This day and date already has a service saved.')
+    })
+  }
+
+  /** Reopen the builder on the service already filed under this slot. */
+  const loadExisting = async (): Promise<void> => {
+    if (!exists) return
+    setLoadingExisting(true)
     try {
-      const r = await createService(slot.day, slot.date, envelope)
-      if (r.ok) {
-        setSavedId(r.service.id)
-        setNote(`Saved ${slot.day} · ${prettyDate(slot.date)} to the service store.`)
-      } else if ('conflict' in r) {
-        // Someone claimed the slot between our check and this write.
-        setClash({ id: r.conflict.existing.id, message: r.conflict.message })
-      } else setNote(r.message)
+      const full = await getService(exists.id)
+      const state = full ? readBuilderState(full.serviceData) : null
+      if (!state) {
+        setNote('That service couldn’t be reopened.')
+        return
+      }
+      const { picks: restored, skipped } = await fromBuilderState(state)
+      setPicks(restored)
+      setSavedId(exists.id)
+      setEditing(true)
+      setExists(null)
+      setNote(
+        `Loaded ${restored.length} item${restored.length === 1 ? '' : 's'} — saving updates this service.` +
+          (skipped ? ` ${skipped} item${skipped === 1 ? '' : 's'} could not be restored.` : '')
+      )
     } finally {
-      setSaving(false)
+      setLoadingExisting(false)
     }
   }
 
-  /** "Continue with new service" — push this deck over the stored one. */
-  const continueWithNew = async (): Promise<void> => {
-    if (!clash) return
+  /**
+   * Save the deck under this slot.
+   *
+   * Editing a service that was loaded here is an update, no questions asked —
+   * that decision was made when it was opened. A save into a slot we haven't
+   * opened is a create, and if the slot turns out to be taken (someone else got
+   * there first) it raises the same prompt the slot picker does rather than
+   * overwriting a deck nobody asked us to touch.
+   */
+  const saveService = async (): Promise<void> => {
+    if (!picks.length) return
     setSaving(true)
+    setNote('')
     try {
-      const r = await updateService(clash.id, envelope, { serviceDay: slot.day, serviceDate: slot.date })
-      if (r.ok) {
-        setClash(null)
-        setSavedId(r.service.id)
-        setNote(`Replaced the service for ${slot.day} · ${prettyDate(slot.date)}.`)
-      } else if ('conflict' in r) {
-        setClash({ id: clash.id, message: r.conflict.message })
-      } else {
-        setClash(null)
-        setNote(r.message)
+      // The slot holds a service we never opened — never overwrite it silently,
+      // ask whether to open it or move this one elsewhere.
+      if (!editing && savedId !== null) {
+        await raiseExists(savedId)
+        return
       }
+
+      const r = editing
+        ? await updateService(savedId!, payload, { serviceDay: slot.day, serviceDate: slot.date })
+        : await createService(slot.day, slot.date, payload)
+      if (r.ok) {
+        setSavedId(r.service.id)
+        setEditing(true)
+        setNote(`${editing ? 'Saved changes to' : 'Created'} ${slot.day} · ${prettyDate(slot.date)}.`)
+      } else if ('conflict' in r) {
+        // Someone claimed the slot between our check and this write.
+        await raiseExists(r.conflict.existing.id, r.conflict.message)
+      } else setNote(r.message)
     } finally {
       setSaving(false)
     }
@@ -358,19 +410,22 @@ export function Build(): JSX.Element {
             disabled={!picks.length || saving || checking}
           >
             {saving
-              ? savedId
-                ? 'Updating…'
-                : 'Saving…'
+              ? 'Saving…'
               : checking
                 ? 'Checking…'
-                : savedId
-                  ? `Update ${slot.day} service`
+                : editing
+                  ? 'Save changes'
                   : `Create ${slot.day} service`}
           </button>
-          {savedId !== null && !saving && (
+          {!saving && !checking && editing && (
             <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-              A service is already filed for {slot.day} · {prettyDate(slot.date)} — saving replaces it. Pick another
-              day or date to file a second one.
+              Editing the service saved for {slot.day} · {prettyDate(slot.date)}.
+            </p>
+          )}
+          {!saving && !checking && !editing && savedId !== null && (
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+              {slot.day} · {prettyDate(slot.date)} already has a service — saving will ask whether to open it or pick
+              another day.
             </p>
           )}
         </div>
@@ -400,16 +455,18 @@ export function Build(): JSX.Element {
         onAddPsalm={addPsalm}
       />
 
-      <ServiceConflictSheet
-        open={clash !== null}
-        message={clash?.message ?? ''}
+      <ServiceExistsSheet
+        open={exists !== null}
         slotLabel={`${slot.day} · ${prettyDate(slot.date)}`}
-        saving={saving}
-        onEdit={() => {
-          setClash(null)
-          setNote('Nothing saved — the service already stored is untouched.')
+        detail={exists?.detail}
+        canLoad={exists?.canLoad ?? false}
+        busy={loadingExisting}
+        onLoad={() => void loadExisting()}
+        onNewSlot={() => {
+          setExists(null)
+          setSlotOpen(true)
         }}
-        onContinue={() => void continueWithNew()}
+        onDismiss={() => setExists(null)}
       />
 
       <ServiceSlotSheet
@@ -417,11 +474,11 @@ export function Build(): JSX.Element {
         slot={slot}
         onCancel={() => setSlotOpen(false)}
         onConfirm={(s) => {
+          // A slot the user picked deliberately: if it's already taken, the
+          // check that follows should offer to open it rather than stay silent.
+          askOnFound.current = true
           setSlot(s)
           setSlotOpen(false)
-          // A new slot invalidates a clash raised against the old one; the
-          // slot-change effect re-checks the store and clears it too.
-          setClash(null)
         }}
       />
 

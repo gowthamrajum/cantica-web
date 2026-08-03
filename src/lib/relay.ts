@@ -182,6 +182,19 @@ export async function findService(
   }
 }
 
+/** One stored service, deck included — what the builder reopens itself on. */
+export async function getService(
+  id: number
+): Promise<(ServiceSummary & { serviceData: unknown }) | null> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/services/${id}`, { cache: 'no-store' })
+    if (!r.ok) return null
+    return (await r.json()) as ServiceSummary & { serviceData: unknown }
+  } catch {
+    return null
+  }
+}
+
 export async function createService(
   serviceDay: string,
   serviceDate: string,
