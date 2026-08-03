@@ -39,10 +39,12 @@ export function Build(): JSX.Element {
   const [slot, setSlot] = useState<ServiceSlot>(defaultSlot)
   const [slotOpen, setSlotOpen] = useState(true)
 
-  // The name follows the day until it's typed over, so it can't drift out of
-  // step with the slot on its own.
-  const [customName, setCustomName] = useState<string | null>(null)
-  const name = customName ?? `${slot.day} Service`
+  // The day and date ARE the service's identity — the relay keys on them and one
+  // service exists per slot — so there's nothing for a separate name to add.
+  // Cantica still wants a session title on import, so it's derived here, in the
+  // same shape as the exports Cantica already writes ("Sunday Service · August
+  // 9, 2026") rather than asked for.
+  const name = `${slot.day} Service · ${prettyDate(slot.date)}`
 
   const [saving, setSaving] = useState(false)
   const [conflict, setConflict] = useState<ServiceConflict | null>(null)
@@ -147,7 +149,8 @@ export function Build(): JSX.Element {
 
   const exportFile = (): void => {
     if (!picks.length) return
-    const safe = `${name || 'Sunday Service'} · ${slot.date}`.replace(/[\\/:*?"<>|]+/g, ' ').trim()
+    // `name` already carries the day and the date, so it is the filename.
+    const safe = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -219,11 +222,6 @@ export function Build(): JSX.Element {
           </p>
         )}
 
-        <span className="list-label mt-3 block">Service name</span>
-        <label className="search-field mt-1 mx-[var(--gutter)]">
-          <Icon name="text" size={17} />
-          <input value={name} onChange={(e) => setCustomName(e.target.value)} placeholder="Sunday Service" />
-        </label>
         <div className="mt-3">
           <span className="list-label">Language for new items</span>
           <Segmented options={LANGS} value={lang} onChange={setLang} ariaLabel="Lyric language" />
