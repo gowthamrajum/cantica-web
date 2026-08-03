@@ -114,3 +114,91 @@ export async function sendControl(
   const j = (await r.json().catch(() => ({}))) as { error?: string }
   return { ok: r.ok, status: r.status, error: j.error }
 }
+
+// ---- saved services ----
+// A service is one gathering: its weekday, its calendar date, and the whole deck
+// stored verbatim. `(serviceDate, serviceDay)` is UNIQUE on the relay, so
+// creating the same slot twice answers 409 carrying the existing row and the
+// exact call to edit it — see CreateResult below. Services are purged once
+// their date is more than a week past.
+export interface ServiceSummary {
+  id: number
+  serviceDay: string
+  serviceDate: string
+  active: boolean
+  createdDateTime: string
+  updatedDateTime: string
+  /** characters of stored deck — only present on the list endpoint */
+  serviceDataLength?: number
+}
+
+export interface ServiceConflict {
+  error: 'conflict'
+  message: string
+  existing: ServiceSummary
+  editWith: { method: 'PUT'; url: string }
+}
+
+/**
+ * Three outcomes worth distinguishing at the call site: it saved; the slot is
+ * taken (and we know exactly how to overwrite it); or it failed.
+ */
+export type SaveServiceResult =
+  | { ok: true; service: ServiceSummary }
+  | { ok: false; conflict: ServiceConflict }
+  | { ok: false; message: string }
+
+/** The relay answers 400/500 as plain text but 409 as JSON — read either. */
+async function readError(r: Response): Promise<string> {
+  const body = await r.text().catch(() => '')
+  if (!body) return `Request failed (HTTP ${r.status}).`
+  try {
+    const j = JSON.parse(body) as { message?: string; error?: string }
+    return j.message || j.error || body
+  } catch {
+    return body
+  }
+}
+
+export async function createService(
+  serviceDay: string,
+  serviceDate: string,
+  serviceData: unknown
+): Promise<SaveServiceResult> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/services`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serviceDay, serviceDate, serviceData })
+    })
+    if (r.status === 409) {
+      return { ok: false, conflict: (await r.json()) as ServiceConflict }
+    }
+    if (!r.ok) return { ok: false, message: await readError(r) }
+    return { ok: true, service: (await r.json()) as ServiceSummary }
+  } catch {
+    return { ok: false, message: 'Could not reach the service store. Check your connection.' }
+  }
+}
+
+/** Replace an existing service's deck (and optionally move its slot). */
+export async function updateService(
+  id: number,
+  serviceData: unknown,
+  slot?: { serviceDay: string; serviceDate: string }
+): Promise<SaveServiceResult> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/services/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serviceData, ...slot })
+    })
+    if (r.status === 409) {
+      return { ok: false, conflict: (await r.json()) as ServiceConflict }
+    }
+    if (!r.ok) return { ok: false, message: await readError(r) }
+    return { ok: true, service: (await r.json()) as ServiceSummary }
+  } catch {
+    return { ok: false, message: 'Could not reach the service store. Check your connection.' }
+  }
+}

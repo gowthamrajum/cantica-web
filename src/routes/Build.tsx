@@ -4,8 +4,11 @@ import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
 import { SlidePreview } from '../components/app/SlidePreview'
 import { SongStructureSheet } from '../components/app/SongStructureSheet'
+import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { listSongs, getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
+import { createService, updateService, type ServiceConflict } from '../lib/relay'
+import { daysPast, defaultSlot, prettyDate, type ServiceSlot } from '../lib/serviceSlot'
 import {
   buildService,
   countSlides,
@@ -31,7 +34,19 @@ const LANGS: { id: ServiceLang; label: string }[] = [
 ]
 
 export function Build(): JSX.Element {
-  const [name, setName] = useState('Sunday Service')
+  // The slot comes first: the builder opens on this sheet, and everything picked
+  // afterwards is filed under the day and date it settles.
+  const [slot, setSlot] = useState<ServiceSlot>(defaultSlot)
+  const [slotOpen, setSlotOpen] = useState(true)
+
+  // The name follows the day until it's typed over, so it can't drift out of
+  // step with the slot on its own.
+  const [customName, setCustomName] = useState<string | null>(null)
+  const name = customName ?? `${slot.day} Service`
+
+  const [saving, setSaving] = useState(false)
+  const [conflict, setConflict] = useState<ServiceConflict | null>(null)
+
   const [lang, setLang] = useState<ServiceLang>('both')
   const [picks, setPicks] = useState<Pick[]>([])
   const [source, setSource] = useState<'songs' | 'psalms'>('songs')
@@ -132,7 +147,7 @@ export function Build(): JSX.Element {
 
   const exportFile = (): void => {
     if (!picks.length) return
-    const safe = (name || 'Sunday Service').replace(/[\\/:*?"<>|]+/g, ' ').trim()
+    const safe = `${name || 'Sunday Service'} · ${slot.date}`.replace(/[\\/:*?"<>|]+/g, ' ').trim()
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -143,13 +158,71 @@ export function Build(): JSX.Element {
     setNote('Downloaded — open it in Cantica via Sessions ▸ ⋯ ▸ Import service.')
   }
 
+  // Save the deck to the relay under this slot. The store keys on
+  // (date, day), so a second save of the same slot comes back 409 with the
+  // existing service and we offer to replace it rather than fork a duplicate.
+  const saveService = async (): Promise<void> => {
+    if (!picks.length) return
+    setSaving(true)
+    setConflict(null)
+    setNote('')
+    try {
+      const r = await createService(slot.day, slot.date, envelope)
+      if (r.ok) setNote(`Saved ${slot.day} · ${prettyDate(slot.date)} to the service store.`)
+      else if ('conflict' in r) setConflict(r.conflict)
+      else setNote(r.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const replaceExisting = async (): Promise<void> => {
+    if (!conflict) return
+    setSaving(true)
+    try {
+      const r = await updateService(conflict.existing.id, envelope)
+      if (r.ok) {
+        setConflict(null)
+        setNote(`Replaced the service for ${slot.day} · ${prettyDate(slot.date)}.`)
+      } else if ('conflict' in r) setConflict(r.conflict)
+      else setNote(r.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // The relay purges a service once its date is more than a week past.
+  const stale = daysPast(slot.date) > 7
+
   return (
-    <Screen title="Service Builder" subtitle="Pick Sunday's songs and readings, then hand them to Cantica.">
+    <Screen title="Service Builder" subtitle="Say when the service is, pick its songs and readings, then save it.">
       <Section>
-        <span className="list-label">Service name</span>
+        <span className="list-label">When</span>
+        <button
+          type="button"
+          onClick={() => setSlotOpen(true)}
+          className="app-card pressable mt-1 flex w-full items-center gap-3 p-4 text-left"
+        >
+          <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-navy-700 text-gold-300">
+            <Icon name="calendar" size={19} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="list-title block">{slot.day}</span>
+            <span className="list-sub block">{prettyDate(slot.date)}</span>
+          </span>
+          <Icon name="chevron" size={17} className="list-chev" />
+        </button>
+        {stale && (
+          <p className="mt-2 px-[var(--gutter)] text-[13px] leading-relaxed text-amber-700">
+            That date is over a week past — the service store purges services more than 7 days old, so this one may
+            not survive. You can still export the file.
+          </p>
+        )}
+
+        <span className="list-label mt-3 block">Service name</span>
         <label className="search-field mt-1 mx-[var(--gutter)]">
           <Icon name="text" size={17} />
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Sunday Service" />
+          <input value={name} onChange={(e) => setCustomName(e.target.value)} placeholder="Sunday Service" />
         </label>
         <div className="mt-3">
           <span className="list-label">Language for new items</span>
@@ -291,14 +364,46 @@ export function Build(): JSX.Element {
           </div>
         )}
 
-        <div className="mt-3 flex gap-2 px-[var(--gutter)]">
-          <button className="btn-app btn-app-primary flex-1 text-[15px]" onClick={exportFile} disabled={!picks.length}>
-            Export for Cantica
+        <div className="mt-3 px-[var(--gutter)]">
+          <button
+            className="btn-app btn-app-primary btn-block"
+            onClick={() => void saveService()}
+            disabled={!picks.length || saving}
+          >
+            {saving ? 'Saving…' : `Create ${slot.day} service`}
+          </button>
+        </div>
+        <div className="mt-2 flex gap-2 px-[var(--gutter)]">
+          <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={exportFile} disabled={!picks.length}>
+            Export file
           </button>
           <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => setPreview('all')} disabled={!picks.length}>
             Preview
           </button>
         </div>
+
+        {conflict && (
+          <div className="app-card mt-3 border-amber-300 bg-amber-50/60 p-4">
+            <p className="text-[14.5px] leading-relaxed text-ink">{conflict.message}</p>
+            <div className="mt-3 flex gap-2">
+              <button
+                className="btn-app btn-app-primary flex-1 text-[15px]"
+                onClick={() => void replaceExisting()}
+                disabled={saving}
+              >
+                {saving ? 'Replacing…' : 'Replace it'}
+              </button>
+              <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => setConflict(null)}>
+                Keep both
+              </button>
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+              “Keep both” leaves the saved service alone — change the day or date above to file this one somewhere
+              else.
+            </p>
+          </div>
+        )}
+
         {note && <p className="mt-2 px-[var(--gutter)] text-[13px] text-ink-muted">{note}</p>}
 
         <p className="mt-4 px-[var(--gutter)] text-[13px] leading-relaxed text-ink-muted">
@@ -306,6 +411,18 @@ export function Build(): JSX.Element {
           with its transliteration on the same slide, exactly as Cantica splits them.
         </p>
       </Section>
+
+      <ServiceSlotSheet
+        open={slotOpen}
+        slot={slot}
+        onCancel={() => setSlotOpen(false)}
+        onConfirm={(s) => {
+          setSlot(s)
+          setSlotOpen(false)
+          // A new slot invalidates a conflict raised against the old one.
+          setConflict(null)
+        }}
+      />
 
       <SongStructureSheet
         song={pending}
