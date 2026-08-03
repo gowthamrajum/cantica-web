@@ -427,55 +427,70 @@ export function Build(): JSX.Element {
                   </span>
                 </span>
 
-                <div className="flex items-center gap-1.5">
-                <select
-                  className="search-field px-2 text-[13px]"
-                  value={p.lang}
-                  onChange={(e) => setLangAt(i, e.target.value as ServiceLang)}
-                  aria-label="Language"
-                >
-                  {LANGS.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
+                {/* Settings: variable width, and only a song has a role. */}
+                <div className="flex w-full min-w-0 items-center gap-1.5">
+                  <select
+                    className="search-field flex-none px-2 text-[13px]"
+                    value={p.lang}
+                    onChange={(e) => setLangAt(i, e.target.value as ServiceLang)}
+                    aria-label="Language"
+                  >
+                    {LANGS.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
 
-                {p.type === 'song' && (
-                  <>
+                  {p.type === 'song' && (
                     <button
-                      className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                      className={`min-w-0 truncate rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
                         p.offering ? 'bg-amber-100 text-amber-700' : 'bg-black/5 text-ink-muted'
                       }`}
                       onClick={() => setRolePick(i)}
                       title="When is this sung?"
                     >
-                      {p.offering === 'only' ? 'Offering only' : p.offering === 'both' ? 'General + offering' : 'General'}
+                      {p.offering === 'only'
+                        ? 'Offering only'
+                        : p.offering === 'both'
+                          ? 'General + offering'
+                          : 'General'}
                     </button>
-                    {/* Arrangement is chosen before a song lands, so it has to
-                        be reachable again afterwards. */}
-                    <button className="icon-btn" onClick={() => editPick(i)} aria-label="Edit arrangement">
-                      <Icon name="text" size={17} />
-                    </button>
-                  </>
-                )}
-                <button className="icon-btn" onClick={() => setPreview(i)} aria-label="Preview">
-                  <Icon name="eye" size={17} />
-                </button>
-                <button className="icon-btn" onClick={() => moveAt(i, -1)} disabled={i === 0} aria-label="Move up">
-                  <Icon name="chevron" size={17} className="-rotate-90" />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={() => moveAt(i, 1)}
-                  disabled={i === picks.length - 1}
-                  aria-label="Move down"
-                >
-                  <Icon name="chevron" size={17} className="rotate-90" />
-                </button>
-                <button className="icon-btn" onClick={() => removeAt(i)} aria-label="Remove">
-                  <Icon name="close" size={17} />
-                </button>
+                  )}
+                </div>
+
+                {/* Actions: five fixed slots on every row, right-aligned, so an
+                    icon sits at the same place whether the item is a song or a
+                    psalm. A psalm has no arrangement, so its gear slot is held
+                    open rather than collapsed. */}
+                <div className="flex w-full items-center justify-end gap-1.5">
+                  <button
+                    className={`icon-btn${p.type === 'song' ? '' : ' invisible'}`}
+                    onClick={() => editPick(i)}
+                    aria-label="Edit arrangement"
+                    aria-hidden={p.type !== 'song'}
+                    tabIndex={p.type === 'song' ? 0 : -1}
+                    disabled={p.type !== 'song'}
+                  >
+                    <Icon name="gear" size={17} />
+                  </button>
+                  <button className="icon-btn" onClick={() => setPreview(i)} aria-label="Preview">
+                    <Icon name="eye" size={17} />
+                  </button>
+                  <button className="icon-btn" onClick={() => moveAt(i, -1)} disabled={i === 0} aria-label="Move up">
+                    <Icon name="chevron" size={17} className="-rotate-90" />
+                  </button>
+                  <button
+                    className="icon-btn"
+                    onClick={() => moveAt(i, 1)}
+                    disabled={i === picks.length - 1}
+                    aria-label="Move down"
+                  >
+                    <Icon name="chevron" size={17} className="rotate-90" />
+                  </button>
+                  <button className="icon-btn" onClick={() => removeAt(i)} aria-label="Remove">
+                    <Icon name="close" size={17} />
+                  </button>
                 </div>
               </div>
             ))}
