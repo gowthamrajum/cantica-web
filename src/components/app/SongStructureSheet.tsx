@@ -31,11 +31,17 @@ import type { Song } from '../../lib/songs'
 export function SongStructureSheet({
   song,
   lang,
+  initial = null,
+  confirmVerb = 'Add',
   onCancel,
   onAdd
 }: {
   song: Song | null
   lang: ServiceLang
+  /** An arrangement to reopen on, when editing a song already in the service. */
+  initial?: SongStructure | null
+  /** 'Add' when the song is landing, 'Save' when an existing one is reopened. */
+  confirmVerb?: string
   onCancel: () => void
   onAdd: (structure: SongStructure) => void
 }): JSX.Element | null {
@@ -52,16 +58,26 @@ export function SongStructureSheet({
   /** the line being held, and where it would land */
   const [drag, setDrag] = useState<{ sec: string; from: number; to: number } | null>(null)
 
-  // Re-seed whenever a different song (or language) opens the sheet.
+  // Re-seed whenever a different song (or language) opens the sheet. An
+  // `initial` arrangement means we're reopening a song already in the service,
+  // so restore what was chosen last time instead of guessing afresh; the
+  // included ids also carry the play order, which is what the sheet edits.
   useEffect(() => {
     if (!song) return
-    setOrder(sections.map((s) => s.id))
-    setIncluded(new Set(sections.map((s) => s.id)))
-    setRecurring(detectRecurringSection(sections))
-    setGroups({})
-    setLineOrder({})
+    const all = sections.map((s) => s.id)
+    const kept = initial?.includedIds?.filter((id) => all.includes(id))
+    // includedIds is the arrangement WITH the repeat woven in; the sheet works
+    // in distinct sections, so take each id once, in first-seen order.
+    const distinct = kept ? [...new Set(kept)] : null
+    setOrder(distinct?.length ? [...distinct, ...all.filter((id) => !distinct.includes(id))] : all)
+    setIncluded(new Set(distinct?.length ? distinct : all))
+    setRecurring(
+      initial ? (initial.recurringId ?? null) : detectRecurringSection(sections)
+    )
+    setGroups(initial?.groups ?? {})
+    setLineOrder(initial?.order ?? {})
     setEditing(null)
-  }, [song, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [song, lang, initial]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const byId = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections])
   const bilingual = lang === 'both'
@@ -305,7 +321,7 @@ export function SongStructureSheet({
             disabled={!includedInOrder.length}
             onClick={() => onAdd(structure)}
           >
-            Add {slideCount} slide{slideCount === 1 ? '' : 's'}
+            {confirmVerb} {slideCount} slide{slideCount === 1 ? '' : 's'}
           </button>
         </div>
       }

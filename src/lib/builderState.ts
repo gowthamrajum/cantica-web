@@ -1,6 +1,6 @@
 import { getSong } from './songs'
 import { loadBible } from './bible'
-import type { Pick, PsalmVerse, ServiceLang, SongStructure } from './buildService'
+import type { OfferingUse, Pick, PsalmVerse, ServiceLang, SongStructure } from './buildService'
 
 /**
  * A compact record of *how* a service was assembled, saved alongside the deck so
@@ -24,7 +24,12 @@ export type SavedPick =
       type: 'song'
       songId: number
       lang: ServiceLang
-      offering?: boolean
+      /**
+       * Sidecars written before the offering role became a choice stored `true`
+       * for what is now 'only', so the stored shape has to admit both and be
+       * normalised on the way in. See readOffering.
+       */
+      offering?: OfferingUse | boolean
       structure?: SongStructure | null
     }
   | {
@@ -71,6 +76,13 @@ export function toBuilderState(day: string, date: string, picks: Pick[]): Builde
   }
 }
 
+/** Legacy `true` meant offering-only; `false`/absent means the worship set. */
+function readOffering(v: OfferingUse | boolean | undefined): OfferingUse | undefined {
+  if (v === true) return 'only'
+  if (v === 'only' || v === 'both') return v
+  return undefined
+}
+
 /** Pull a builder sidecar out of a stored service, if it carries one. */
 export function readBuilderState(serviceData: unknown): BuilderState | null {
   if (!serviceData || typeof serviceData !== 'object') return null
@@ -111,7 +123,7 @@ export async function fromBuilderState(
         type: 'song',
         song,
         lang: p.lang,
-        offering: p.offering,
+        offering: readOffering(p.offering),
         structure: p.structure ?? null
       })
     } else {

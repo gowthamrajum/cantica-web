@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Screen } from '../components/app/Screen'
 import { useScreenScroll } from '../components/app/screenScroll'
 import { Icon } from '../components/app/Icons'
+import { SearchField } from '../components/app/SearchField'
 import { listSongs, type SongMeta } from '../lib/songs'
 
 const PAGE = 80
@@ -68,21 +69,7 @@ export function Songs(): JSX.Element {
       eyebrow="Worship songbook · కీర్తనలు"
       subtitle={songs ? `${songs.length.toLocaleString()} songs, available offline` : 'Our worship songbook'}
       affix={
-        <label className="search-field">
-          <Icon name="search" size={18} />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search songs…"
-            aria-label="Search songs"
-            enterKeyHint="search"
-          />
-          {q && (
-            <button type="button" onClick={() => setQ('')} aria-label="Clear search">
-              <Icon name="close" size={16} />
-            </button>
-          )}
-        </label>
+        <SearchField value={q} onChange={setQ} placeholder="Search songs…" ariaLabel="Search songs" />
       }
     >
       {songs === null && !error && (

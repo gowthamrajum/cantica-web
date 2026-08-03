@@ -7,6 +7,8 @@ import { SongStructureSheet } from '../components/app/SongStructureSheet'
 import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
 import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
+import { ConfirmSheet } from '../components/app/ConfirmSheet'
+import { OfferingRoleSheet, type OfferingRole } from '../components/app/OfferingRoleSheet'
 import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
 import { createService, findService, getService, updateService } from '../lib/relay'
@@ -15,6 +17,7 @@ import { daysPast, defaultSlot, prettyDate, type ServiceSlot } from '../lib/serv
 import {
   buildService,
   countSlides,
+  type OfferingUse,
   type Pick,
   type PsalmVerse,
   type ServiceLang,
@@ -82,18 +85,65 @@ export function Build(): JSX.Element {
   // Picking one closes the picker so the structure sheet has the screen to
   // itself rather than stacking two modals.
   const [pending, setPending] = useState<Song | null>(null)
-  const openSong = async (meta: SongMeta): Promise<void> => {
+  /** A song already in the service, held while we ask whether to repeat it. */
+  const [duplicate, setDuplicate] = useState<{ meta: SongMeta; at: number[] } | null>(null)
+  /** Index of the pick whose arrangement is being reopened, if any. */
+  const [editingPick, setEditingPick] = useState<number | null>(null)
+  /** Index of the pick whose offering role is being chosen. */
+  const [rolePick, setRolePick] = useState<number | null>(null)
+
+  const beginSong = async (meta: SongMeta): Promise<void> => {
     setPickerOpen(false)
     const song = await getSong(meta.song_id)
     if (song) setPending(song)
+  }
+
+  /**
+   * Adding the same song twice is occasionally deliberate (a reprise) and far
+   * more often a slip, so it asks rather than either silently allowing or
+   * silently refusing — and it says where the existing copies already sit.
+   */
+  const openSong = async (meta: SongMeta): Promise<void> => {
+    const at = picks.reduce<number[]>((acc, p, i) => {
+      if (p.type === 'song' && p.song.song_id === meta.song_id) acc.push(i + 1)
+      return acc
+    }, [])
+    if (at.length) {
+      setPickerOpen(false)
+      setDuplicate({ meta, at })
+      return
+    }
+    await beginSong(meta)
   }
   const addSong = (structure: SongStructure): void => {
     const song = pending
     if (!song) return
     setPending(null)
+    // Reopened from the service list: replace that pick's arrangement in place
+    // rather than appending the song a second time.
+    if (editingPick !== null) {
+      const i = editingPick
+      setEditingPick(null)
+      setPicks((p) => p.map((x, j) => (j === i && x.type === 'song' ? { ...x, structure } : x)))
+      setNote(`Updated ${song.song_name}`)
+      return
+    }
     setPicks((p) => [...p, { key: `s-${song.song_id}-${p.length}`, type: 'song', song, lang, structure }])
     setNote(`Added ${song.song_name}`)
   }
+
+  /** Reopen a picked song's arrangement for editing. */
+  const editPick = (i: number): void => {
+    const p = picks[i]
+    if (p?.type !== 'song') return
+    setEditingPick(i)
+    setPending(p.song)
+  }
+
+  const setOfferingAt = (i: number, role: OfferingRole): void =>
+    setPicks((p) =>
+      p.map((x, j) => (j === i && x.type === 'song' ? { ...x, offering: role as OfferingUse | undefined } : x))
+    )
 
   // ----- psalms -----
   // Returns whether it landed, so the picker knows whether to close.
@@ -138,10 +188,6 @@ export function Build(): JSX.Element {
     })
   const setLangAt = (i: number, l: ServiceLang): void =>
     setPicks((p) => p.map((x, j) => (j === i ? { ...x, lang: l } : x)))
-  const toggleOffering = (i: number): void =>
-    setPicks((p) =>
-      p.map((x, j) => (j === i && x.type === 'song' ? { ...x, offering: !x.offering } : x))
-    )
 
   const envelope = useMemo(() => buildService(name, picks), [name, picks])
   // What gets stored: the deck Cantica reads, plus a record of how it was
@@ -396,15 +442,22 @@ export function Build(): JSX.Element {
                 </select>
 
                 {p.type === 'song' && (
-                  <button
-                    className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                      p.offering ? 'bg-amber-100 text-amber-700' : 'bg-black/5 text-ink-muted'
-                    }`}
-                    onClick={() => toggleOffering(i)}
-                    title="Cantica puts the offering song at Offerings"
-                  >
-                    Offering
-                  </button>
+                  <>
+                    <button
+                      className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                        p.offering ? 'bg-amber-100 text-amber-700' : 'bg-black/5 text-ink-muted'
+                      }`}
+                      onClick={() => setRolePick(i)}
+                      title="When is this sung?"
+                    >
+                      {p.offering === 'only' ? 'Offering only' : p.offering === 'both' ? 'General + offering' : 'General'}
+                    </button>
+                    {/* Arrangement is chosen before a song lands, so it has to
+                        be reachable again afterwards. */}
+                    <button className="icon-btn" onClick={() => editPick(i)} aria-label="Edit arrangement">
+                      <Icon name="text" size={17} />
+                    </button>
+                  </>
                 )}
                 <button className="icon-btn" onClick={() => setPreview(i)} aria-label="Preview">
                   <Icon name="eye" size={17} />
@@ -472,6 +525,34 @@ export function Build(): JSX.Element {
         </p>
       </Section>
 
+      <ConfirmSheet
+        open={duplicate !== null}
+        title="Already in this service"
+        message={
+          duplicate && (
+            <>
+              <b className="text-ink">{duplicate.meta.song_name}</b> is already in this service at{' '}
+              {duplicate.at.length === 1
+                ? `position ${duplicate.at[0]}`
+                : `positions ${duplicate.at.slice(0, -1).join(', ')} and ${duplicate.at[duplicate.at.length - 1]}`}
+              . Add it again?
+            </>
+          )
+        }
+        confirmLabel="Add it again"
+        cancelLabel="Don’t add"
+        tone="warn"
+        onCancel={() => {
+          setDuplicate(null)
+          setPickerOpen(true)
+        }}
+        onConfirm={() => {
+          const meta = duplicate?.meta
+          setDuplicate(null)
+          if (meta) void beginSong(meta)
+        }}
+      />
+
       <ServicePickerSheet
         open={pickerOpen}
         source={source}
@@ -511,9 +592,34 @@ export function Build(): JSX.Element {
 
       <SongStructureSheet
         song={pending}
-        lang={lang}
-        onCancel={() => setPending(null)}
+        lang={editingPick !== null ? (picks[editingPick] as Extract<Pick, { type: 'song' }>).lang : lang}
+        initial={
+          editingPick !== null
+            ? ((picks[editingPick] as Extract<Pick, { type: 'song' }>).structure ?? null)
+            : null
+        }
+        confirmVerb={editingPick !== null ? 'Save' : 'Add'}
+        onCancel={() => {
+          setPending(null)
+          setEditingPick(null)
+        }}
         onAdd={addSong}
+      />
+
+      <OfferingRoleSheet
+        open={rolePick !== null}
+        songName={
+          rolePick !== null && picks[rolePick]?.type === 'song'
+            ? (picks[rolePick] as Extract<Pick, { type: 'song' }>).song.song_name
+            : ''
+        }
+        value={
+          rolePick !== null && picks[rolePick]?.type === 'song'
+            ? (picks[rolePick] as Extract<Pick, { type: 'song' }>).offering
+            : undefined
+        }
+        onChange={(role) => rolePick !== null && setOfferingAt(rolePick, role)}
+        onClose={() => setRolePick(null)}
       />
 
       <SlidePreview

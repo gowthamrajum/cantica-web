@@ -444,8 +444,25 @@ const CANTICA_BACKGROUND = {
   fit: 'cover'
 }
 
+/**
+ * What part a song plays in the service.
+ *
+ *  - undefined  worship set only (the default)
+ *  - 'only'     sung at the offering and nowhere else
+ *  - 'both'     sung in the worship set AND again at the offering, which is two
+ *               items in the deck, not one — Cantica drops each into its slot.
+ */
+export type OfferingUse = 'only' | 'both'
+
 export type Pick =
-  | { key: string; type: 'song'; song: Song; lang: ServiceLang; offering?: boolean; structure?: SongStructure | null }
+  | {
+      key: string
+      type: 'song'
+      song: Song
+      lang: ServiceLang
+      offering?: OfferingUse
+      structure?: SongStructure | null
+    }
   | { key: string; type: 'psalm'; chapter: number; verses: PsalmVerse[]; lang: ServiceLang }
 
 /** Build the `cantica-service` envelope from an ordered selection. */
@@ -453,8 +470,17 @@ export function buildService(name: string, picks: Pick[] = []): ServiceEnvelope 
   const items: ServiceItem[] = []
   for (const p of picks) {
     if (p.type === 'song') {
-      const it = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
-      if (it) items.push({ ...it, slot: p.offering ? SLOT_OFFERING : SLOT_WORSHIP })
+      // 'both' emits the song twice — once into the worship set, once at the
+      // offering. songToItem is called per copy so each carries its own item and
+      // slide ids; sharing them would give Cantica two items claiming one id.
+      if (p.offering !== 'only') {
+        const worship = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
+        if (worship) items.push({ ...worship, slot: SLOT_WORSHIP })
+      }
+      if (p.offering === 'only' || p.offering === 'both') {
+        const offering = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
+        if (offering) items.push({ ...offering, slot: SLOT_OFFERING })
+      }
     } else {
       // A psalm is a reading, never the offering song.
       items.push(...psalmToItems(p.chapter, p.verses, p.lang ?? 'both').map((it) => ({ ...it, slot: SLOT_WORSHIP })))

@@ -4,6 +4,7 @@ import { useScreenScroll } from '../components/app/screenScroll'
 import { Sheet } from '../components/app/Sheet'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
+import { SearchField } from '../components/app/SearchField'
 import { loadBible, teBook, type IndexedBible, type Lang } from '../lib/bible'
 import { READ_SIZES, useBiblePlace, usePref, useReadSize, useSwipe } from '../lib/prefs'
 
@@ -186,20 +187,12 @@ export function Bible(): JSX.Element {
       {/* -------------------------------------------------------- book picker */}
       <Sheet open={picker === 'book'} title="Choose a book" onClose={() => setPicker('none')}>
         <div className="px-[var(--gutter)] pb-3">
-          <label className="search-field">
-            <Icon name="search" size={18} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search books…"
-              aria-label="Search books"
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery('')} aria-label="Clear search">
-                <Icon name="close" size={16} />
-              </button>
-            )}
-          </label>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search books…"
+            ariaLabel="Search books"
+          />
         </div>
         <BookList
           order={order}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Segmented } from './Segmented'
 import { Icon } from './Icons'
+import { SearchField } from './SearchField'
 import { listSongs, type SongMeta } from '../../lib/songs'
 import { loadBible } from '../../lib/bible'
 
@@ -149,23 +150,18 @@ export function ServicePickerSheet({
       {source === 'songs' ? (
         <>
           <div className="mt-3 px-[var(--gutter)]">
-            <label className="search-field">
-              <Icon name="search" size={18} />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search 1,596 songs"
-                aria-label="Search songs"
-                enterKeyHint="search"
-              />
-              {q && (
-                <button type="button" onClick={() => setQ('')} aria-label="Clear search">
-                  <Icon name="close" size={16} />
-                </button>
-              )}
-            </label>
+            <SearchField
+              value={q}
+              onChange={setQ}
+              placeholder="Search 1,596 songs"
+              ariaLabel="Search songs"
+            />
           </div>
 
+          {/* A fixed-height results area: the sheet is anchored to the bottom of
+              the screen, so letting it grow and shrink with the match count
+              slides every control under the user's finger while they type. */}
+          <div className="picker-results">
           {matches === null ? (
             <div className="flex items-center justify-center gap-2.5 py-10 text-[14px] text-ink-muted">
               <span className="spinner" /> Loading the songbook…
@@ -217,6 +213,7 @@ export function ServicePickerSheet({
               )}
             </>
           )}
+          </div>
         </>
       ) : (
         <div className="mt-3 px-[var(--gutter)]">

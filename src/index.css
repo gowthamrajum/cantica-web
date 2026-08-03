@@ -728,6 +728,45 @@
   font-size: 16px; /* < 16px makes iOS zoom the viewport on focus */
   color: theme('colors.ink.DEFAULT');
 }
+/* Safari draws its own clear button on type=search; ours is the one that
+   behaves, so hide the native one. */
+.search-field input[type='search']::-webkit-search-cancel-button,
+.search-field input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Holds the song results at a constant height (six rows plus the pager) so the
+   bottom-anchored sheet never grows or shrinks as the match count changes. */
+.picker-results {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  /* Six 56px rows + the pager + the hint line. Song titles truncate rather than
+     wrap, so rows never exceed that and this is a true maximum, which makes it
+     a constant height in every state: full list, one match, or none. */
+  min-height: 410px;
+}
+
+/* A real hit target, full field height and pulled into the field's own padding,
+   so a low tap lands here rather than on the first row of results below. */
+.sf-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 40px;
+  margin-right: -8px;
+  color: theme('colors.ink.muted');
+  touch-action: manipulation;
+  transition: opacity 0.15s ease;
+}
+.sf-clear:active { color: theme('colors.ink.DEFAULT'); }
+/* Hidden, never unmounted — an element that disappears between pointerdown and
+   click hands the tap to whatever sits underneath. */
+.sf-clear.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 .spinner {
   height: 20px;
   width: 20px;
