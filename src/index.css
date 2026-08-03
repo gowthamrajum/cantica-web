@@ -735,6 +735,46 @@
   -webkit-appearance: none;
   appearance: none;
 }
+/* ---- disclosure sections ---- */
+.collapsible-head {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 8px;
+  padding: 18px var(--gutter) 7px;
+  text-align: left;
+}
+.collapsible-title {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: theme('colors.ink.muted');
+}
+.collapsible-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 13px;
+  color: theme('colors.ink.soft');
+}
+/* 0fr -> 1fr opens to the body's own height, whatever it is; a max-height
+   large enough for the tallest case makes every shorter one animate wrong. */
+.collapsible-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapsible-body.is-open { grid-template-rows: 1fr; }
+.collapsible-body > div { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-body { transition: none; }
+}
+
 /* Holds the song results at a constant height (six rows plus the pager) so the
    bottom-anchored sheet never grows or shrinks as the match count changes. */
 .picker-results {

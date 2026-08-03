@@ -8,12 +8,21 @@ import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
 import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
 import { ConfirmSheet } from '../components/app/ConfirmSheet'
+import { Collapsible } from '../components/app/Collapsible'
+import { useDisclosure } from '../components/app/useDisclosure'
 import { SongRoleSheet, type Role } from '../components/app/SongRoleSheet'
 import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
 import { createService, findService, getService, updateService } from '../lib/relay'
 import { fromBuilderState, readBuilderState, toBuilderState } from '../lib/builderState'
-import { daysPast, defaultSlot, isFirstSundayOfMonth, prettyDate, type ServiceSlot } from '../lib/serviceSlot'
+import {
+  daysPast,
+  defaultSlot,
+  isFirstSundayOfMonth,
+  prettyDate,
+  shortDate,
+  type ServiceSlot
+} from '../lib/serviceSlot'
 import { buildServicePdf } from '../lib/servicePdf'
 import { shareFiles } from '../lib/shareFiles'
 import {
@@ -86,6 +95,12 @@ export function Build(): JSX.Element {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [preview, setPreview] = useState<number | 'all' | null>(null)
   const [note, setNote] = useState('')
+  // Sections and items are closed by default; the setup opens on a fresh
+  // service because there is nothing else to look at yet.
+  // "Add to service" stays open — it is the primary action. "When" closes,
+  // because it has already been answered in the sheet and its summary says
+  // everything the card would.
+  const disc = useDisclosure(['add'])
 
   const openPicker = (s: PickSource): void => {
     setSource(s)
@@ -384,8 +399,23 @@ export function Build(): JSX.Element {
 
   return (
     <Screen title="Service Builder" subtitle="Say when the service is, pick its songs and readings, then save it.">
-      <Section>
-        <span className="list-label">When</span>
+      {/* The setup collapses once a service has items: by then it has been
+          answered, and on a phone it was pushing the actual service list — the
+          thing being worked on — most of a screen down. */}
+      <Collapsible
+        title="When"
+        open={disc.isOpen('when')}
+        onToggle={() => disc.toggle('when')}
+        summary={`${slot.day.slice(0, 3)} · ${shortDate(slot.date)} · ${
+          checking
+            ? 'checking…'
+            : editing
+              ? 'editing saved'
+              : savedId !== null
+                ? 'has a service'
+                : 'free'
+        }`}
+      >
         <button
           type="button"
           onClick={() => setSlotOpen(true)}
@@ -419,15 +449,19 @@ export function Build(): JSX.Element {
           </p>
         )}
 
-        <div className="mt-3">
+        <div className="mt-3 mb-1">
           <span className="list-label">Language for new items</span>
           <Segmented options={LANGS} value={lang} onChange={setLang} ariaLabel="Lyric language" />
         </div>
-      </Section>
+      </Collapsible>
 
-      <Section>
-        <span className="list-label">Add to service</span>
-        <div className="mt-1 grid grid-cols-2 gap-3 px-[var(--gutter)]">
+      <Collapsible
+        title="Add to service"
+        open={disc.isOpen('add')}
+        onToggle={() => disc.toggle('add')}
+        summary="Songs · Psalms"
+      >
+        <div className="mb-1 grid grid-cols-2 gap-3 px-[var(--gutter)]">
           <button type="button" className="tile" onClick={() => openPicker('songs')}>
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold-500 text-white">
               <Icon name="songs" size={20} strokeWidth={2} />
@@ -447,7 +481,7 @@ export function Build(): JSX.Element {
             </span>
           </button>
         </div>
-      </Section>
+      </Collapsible>
 
       <Section>
         <div className="flex items-baseline gap-2 px-[var(--gutter)]">
@@ -463,15 +497,37 @@ export function Build(): JSX.Element {
         ) : (
           <div className="list-group mt-2">
             {picks.map((p, i) => (
-              <div key={p.key} className="list-row flex-col !items-start gap-2 text-left">
-                <span className="min-w-0">
-                  <span className="list-title block">
-                    {i + 1}. {labelOf(p)}
+              <div key={p.key} className="list-row flex-col !items-start gap-0 text-left">
+                {/* Collapsed, an item is one line: enough to read the order and
+                    check a role. Eight items with their controls open ran most
+                    of a phone screen each. */}
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 py-0.5 text-left"
+                  onClick={() => disc.toggle(p.key)}
+                  aria-expanded={disc.isOpen(p.key)}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="list-title block truncate">
+                      {i + 1}. {labelOf(p)}
+                    </span>
+                    <span className="list-sub block">
+                      {p.type === 'song' ? 'Song' : 'Responsive reading'}
+                      {p.type === 'song' && p.role ? ` · ${ROLE_LABEL[p.role]}` : ''}
+                    </span>
                   </span>
-                  <span className="list-sub block">
-                    {p.type === 'song' ? 'Song' : 'Responsive reading'}
-                  </span>
-                </span>
+                  <Icon
+                    name="chevron"
+                    size={16}
+                    strokeWidth={2.4}
+                    className={`flex-none text-ink-muted transition-transform duration-200 ${
+                      disc.isOpen(p.key) ? 'rotate-90' : ''
+                    }`}
+                  />
+                </button>
+
+                <div className={`collapsible-body w-full${disc.isOpen(p.key) ? ' is-open' : ''}`}>
+                <div className="pt-2">
 
                 {/* Settings: variable width, and only a song has a role. */}
                 <div className="flex w-full min-w-0 items-center gap-1.5">
@@ -544,6 +600,9 @@ export function Build(): JSX.Element {
                   <button className="icon-btn" onClick={() => removeAt(i)} aria-label="Remove">
                     <Icon name="close" size={17} />
                   </button>
+                </div>
+
+                </div>
                 </div>
               </div>
             ))}
