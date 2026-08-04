@@ -17,6 +17,16 @@ import {
 import type { Song } from '../../lib/songs'
 
 /**
+ * Which slide a dropped line joins when it lands on the seam between two.
+ *
+ * 'above' is the end of the slide before the seam, 'below' the start of the one
+ * after. Both are the same position in the list, so the drop has to say which
+ * was meant — without it, a line can only ever be added to the end of a slide,
+ * and reaching the top of the next one means dropping it second and shuffling.
+ */
+type Join = 'above' | 'below'
+
+/**
  * Which stanzas play, in what order, and which one comes back between them.
  *
  * A song as written is rarely a song as sung: the Pallavi returns after each
@@ -55,8 +65,14 @@ export function SongStructureSheet({
   const [lineOrder, setLineOrder] = useState<Record<string, number[]>>({})
   /** which section's slides are open for editing */
   const [editing, setEditing] = useState<string | null>(null)
-  /** the line being held, and where it would land */
-  const [drag, setDrag] = useState<{ sec: string; from: number; to: number } | null>(null)
+  /**
+   * The line being held, and where it would land.
+   *
+   * `join` is which side of a slide heading the drop sits on — the difference
+   * between the last line of one slide and the first line of the next, which is
+   * the same insertion point and cannot be told apart by index alone.
+   */
+  const [drag, setDrag] = useState<{ sec: string; from: number; to: number; join: Join } | null>(null)
 
   // Re-seed whenever a different song (or language) opens the sheet. An
   // `initial` arrangement means we're reopening a song already in the service,
@@ -125,7 +141,8 @@ export function SongStructureSheet({
   }
 
   /**
-   * Move a line to sit before display position `to`.
+   * Move a line to sit before display position `to`, joining the slide on the
+   * `join` side of that seam.
    *
    * The line joins the slide it was dropped into and every other line stays
    * where it was — so dragging one line never shuffles its neighbours onto
@@ -133,23 +150,28 @@ export function SongStructureSheet({
    * re-counting afterwards, rather than keeping the slide sizes fixed and
    * letting the contents slide along underneath.
    */
-  const moveUnit = (id: string, from: number, to: number): void => {
+  const moveUnit = (id: string, from: number, to: number, join: Join): void => {
     const total = unitsOf(id).length
     const seats = slideOfUnit(id)
     if (seats.length !== total || from < 0 || from >= total) return
     const at = to > from ? to - 1 : to
-    if (at === from) return
 
     const current = lineOrder[id] ?? Array.from({ length: total }, (_, i) => i)
     const next = current.slice()
     const [moved] = next.splice(from, 1)
     next.splice(at, 0, moved)
 
-    // A line dropped between two slides joins the one above it; at the very top
-    // there is nothing above, so it joins the one below.
     const seated = seats.slice()
     seated.splice(from, 1)
-    seated.splice(at, 0, at > 0 ? seated[at - 1] : (seated[at] ?? 0))
+    // Which slide it joins is the whole question on a seam: dropped under a
+    // heading it takes the slide it now sits at the top of, dropped above one it
+    // takes the slide it now sits at the bottom of. Away from a seam both
+    // neighbours are the same slide, so the answer is the same either way.
+    seated.splice(
+      at,
+      0,
+      join === 'below' ? (seated[at] ?? seated[at - 1] ?? 0) : at > 0 ? seated[at - 1] : (seated[at] ?? 0)
+    )
 
     // Slides stay contiguous through both splices, so a run length per slide is
     // the whole grouping. An emptied slide simply has no run and disappears.
@@ -162,6 +184,18 @@ export function SongStructureSheet({
         run = 0
       }
     }
+
+    // Landing back in the same place can still be a real edit — a line dropped
+    // across the seam it was already beside keeps its position and changes
+    // slide — so this compares the outcome rather than the index.
+    const was = groupsOf(id)
+    if (
+      next.every((v, i) => v === current[i]) &&
+      counts.length === was.length &&
+      counts.every((c, i) => c === was[i])
+    )
+      return
+
     setLineOrder((prev) => ({ ...prev, [id]: next }))
     setGroups((prev) => ({ ...prev, [id]: counts }))
   }
@@ -203,13 +237,27 @@ export function SongStructureSheet({
     return () => el.removeEventListener('touchmove', hold)
   }, [editing])
 
-  const dropIndex = (clientY: number): number => {
+  /**
+   * Where a drop at this height would land, and which slide it would join.
+   *
+   * The "Slide 2" heading is the seam made visible, so it is what the drop reads
+   * against: above the heading is the end of slide 1, below it the start of
+   * slide 2. Aiming at a ~20px band is coarse for a finger, but it is the only
+   * thing on screen that marks the difference, and the alternative — one drop
+   * point that always means "end of the slide above" — leaves the top of a slide
+   * unreachable in a single move.
+   */
+  const dropTarget = (clientY: number): { to: number; join: Join } => {
     const rows = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-unit]') ?? [])]
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i].getBoundingClientRect()
-      if (clientY < r.top + r.height / 2) return i
+      const heading = rows[i].querySelector<HTMLElement>('[data-slide-head]')
+      const lyricTop = heading ? heading.getBoundingClientRect().bottom : r.top
+      // Over the heading itself: the seam above it.
+      if (heading && clientY < lyricTop) return { to: i, join: 'above' }
+      if (clientY < lyricTop + (r.bottom - lyricTop) / 2) return { to: i, join: heading ? 'below' : 'above' }
     }
-    return rows.length
+    return { to: rows.length, join: 'above' }
   }
 
   // A long stanza is taller than the sheet, so a line has to be able to travel
@@ -229,8 +277,8 @@ export function SongStructureSheet({
       const was = box.scrollTop
       box.scrollTop += step
       if (box.scrollTop !== was) {
-        const to = dropIndex(pointerY.current)
-        setDrag((d) => (d && d.to !== to ? { ...d, to } : d))
+        const t = dropTarget(pointerY.current)
+        setDrag((d) => (d && (d.to !== t.to || d.join !== t.join) ? { ...d, ...t } : d))
       }
     }
     frameRef.current = requestAnimationFrame(creep)
@@ -251,7 +299,7 @@ export function SongStructureSheet({
         /* a pointer that already went away */
       }
       navigator.vibrate?.(8)
-      setDrag({ sec, from: index, to: index })
+      setDrag({ sec, from: index, to: index, join: 'above' })
       frameRef.current = requestAnimationFrame(creep)
     }, 280)
   }
@@ -265,13 +313,13 @@ export function SongStructureSheet({
       if (Math.abs(e.clientY - h.y) > 8 || Math.abs(e.clientX - h.x) > 8) endHold()
       return
     }
-    const to = dropIndex(e.clientY)
-    setDrag((d) => (d && d.to !== to ? { ...d, to } : d))
+    const t = dropTarget(e.clientY)
+    setDrag((d) => (d && (d.to !== t.to || d.join !== t.join) ? { ...d, ...t } : d))
   }
 
   const onLinePointerUp = (): void => {
     const h = holdRef.current
-    if (draggingRef.current && drag && h) moveUnit(h.sec, drag.from, drag.to)
+    if (draggingRef.current && drag && h) moveUnit(h.sec, drag.from, drag.to, drag.join)
     endHold()
   }
 
@@ -400,7 +448,8 @@ export function SongStructureSheet({
             {editing === id && (
               <div ref={listRef} className="border-t border-black/5 bg-black/[0.02] px-3 py-2">
                 <p className="mb-2 text-[12px] text-ink-muted">
-                  Tap a line to start a new slide there, or hold and drag it somewhere else.
+                  Tap a line to start a new slide there, or hold and drag it somewhere else — drop it just under a{' '}
+                  <b>Slide</b> heading to make it that slide’s first line.
                   {bilingual && ' A Telugu line and its transliteration always stay together.'}
                 </p>
                 {units.map((u, ui) => {
@@ -408,8 +457,12 @@ export function SongStructureSheet({
                   const slideNo = [...breaks].filter((b) => b <= ui).length + 1
                   const held = drag?.sec === id && drag.from === ui
                   // The drop mark is a border on the row it would land above, so
-                  // nothing shifts under the finger while it is being aimed.
-                  const dropAbove = drag?.sec === id && drag.to === ui
+                  // nothing shifts under the finger while it is being aimed. On a
+                  // slide's first line the mark sits above OR below its heading,
+                  // which is what says which slide the line is about to join.
+                  const aiming = drag?.sec === id && drag.to === ui
+                  const dropAbove = aiming && drag.join === 'above'
+                  const dropUnderHead = aiming && drag.join === 'below'
                   const dropBelow = drag?.sec === id && drag.to === units.length && ui === units.length - 1
                   return (
                     <button
@@ -433,14 +486,17 @@ export function SongStructureSheet({
                       }}
                     >
                       {isBreak && (
-                        <span className="mt-1.5 block text-[10px] font-bold uppercase tracking-wider text-ink-muted first:mt-0">
+                        <span
+                          data-slide-head
+                          className="mt-1.5 block py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted first:mt-0"
+                        >
                           Slide {slideNo}
                         </span>
                       )}
                       <span
-                        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] leading-snug ${
-                          held ? 'bg-navy-700/10 ring-1 ring-navy-700/25' : isBreak && ui > 0 ? 'bg-gold-500/15' : ''
-                        }`}
+                        className={`flex items-center gap-1.5 rounded-md border-t-2 border-transparent px-2 py-1 text-[13px] leading-snug ${
+                          dropUnderHead ? '!border-t-gold-500' : ''
+                        } ${held ? 'bg-navy-700/10 ring-1 ring-navy-700/25' : isBreak && ui > 0 ? 'bg-gold-500/15' : ''}`}
                       >
                         <span className="min-w-0 flex-1">
                           {unitLines(u).map((l, li) => (
