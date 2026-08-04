@@ -34,6 +34,35 @@ const MIN_BODY_PX = 9
 const esc = (s: string): string =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 
+/** Any character from the Telugu Unicode block. */
+const TELUGU = /[ఀ-౿]/
+
+/**
+ * One block laid out as two columns: Telugu on the left, its English on the
+ * right, line against line.
+ *
+ * The pairing is positional, and it is safe to be: a bilingual slide is built as
+ * a run of Telugu lines followed by THEIR English lines in the same order (see
+ * chunkBilingualLines), so the nth of each side belong together. A block in one
+ * language only — a Telugu-only song, an English-only reading — spans the full
+ * width instead, rather than being squeezed into half a page beside nothing.
+ */
+function columns(lines: string[]): string {
+  const te = lines.filter((l) => TELUGU.test(l))
+  const en = lines.filter((l) => !TELUGU.test(l))
+  const row = (cells: string): string => `<div style="display:flex;gap:22px;margin:0 0 0.18em 0">${cells}</div>`
+  const cell = (t: string): string => `<div style="flex:1 1 0;min-width:0">${t ? esc(t) : '&nbsp;'}</div>`
+
+  if (!te.length || !en.length) {
+    return lines.map((l) => `<div style="margin:0 0 0.18em 0">${esc(l)}</div>`).join('')
+  }
+  const rows: string[] = []
+  for (let i = 0; i < Math.max(te.length, en.length); i++) {
+    rows.push(row(cell(te[i] ?? '') + cell(en[i] ?? '')))
+  }
+  return rows.join('')
+}
+
 /** One printed page. `blocks` are slide-sized groups of lines. */
 interface PdfPage {
   title: string
@@ -83,14 +112,7 @@ function toPages(items: ServiceItem[]): PdfPage[] {
 }
 
 function pageHtml(page: PdfPage, index: number, total: number, subtitle: string): string {
-  const body = page.blocks
-    .map(
-      (b) =>
-        `<div style="margin:0 0 0.72em 0">` +
-        b.map((l) => `<div style="margin:0 0 0.18em 0">${esc(l)}</div>`).join('') +
-        `</div>`
-    )
-    .join('')
+  const body = page.blocks.map((b) => `<div style="margin:0 0 0.72em 0">${columns(b)}</div>`).join('')
 
   const meta = [`${index + 1} / ${total}`, page.slot === 'offering' ? 'Offering' : '', page.slot === 'communion' ? 'Communion' : '', page.cont ? 'continued' : '']
     .filter(Boolean)
@@ -102,8 +124,9 @@ function pageHtml(page: PdfPage, index: number, total: number, subtitle: string)
         .join('<br>')}</div>`
     : ''
 
-  // Everything is centred: a stand sheet is read at a glance, and a centred
-  // column keeps the eye in one place between verses.
+  // Everything is centred — a stand sheet is read at a glance, and centred text
+  // keeps the eye in one place between verses — and centred within its own
+  // column, so the Telugu and the English each stay under their own heading.
   return `
   <div style="
       width:${PAGE_W}px;height:${PAGE_H}px;box-sizing:border-box;
