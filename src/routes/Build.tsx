@@ -42,9 +42,9 @@ import {
  * Service Builder — assemble Sunday's songs and psalms on a phone and hand the
  * result to Cantica as a `cantica-service` file.
  *
- * Everything it needs is already bundled in this app (1,596 songs and both
- * bibles), so it works with no network and no backend — which is the point of
- * moving it here from Worship Ready.
+ * Everything it needs is already bundled in this app (the whole songbook and
+ * both bibles), so it works with no network and no backend — which is the point
+ * of moving it here from Worship Ready.
  */
 
 /** Short forms for the role chip on a picked song. */

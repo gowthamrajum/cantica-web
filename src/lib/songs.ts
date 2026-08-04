@@ -26,6 +26,12 @@ function loadAll(): Promise<Song[]> {
   return all
 }
 
+/** How many songs the bundled library holds — the songbook grows, so nothing
+ *  that shows the number should carry its own copy of it. */
+export async function countSongs(): Promise<number> {
+  return (await loadAll()).length
+}
+
 /** Name-only list for the index, filtered by an optional search term. */
 export async function listSongs(search = ''): Promise<SongMeta[]> {
   const songs = await loadAll()

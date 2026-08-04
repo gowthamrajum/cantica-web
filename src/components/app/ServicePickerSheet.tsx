@@ -3,7 +3,7 @@ import { Sheet } from './Sheet'
 import { Segmented } from './Segmented'
 import { Icon } from './Icons'
 import { SearchField } from './SearchField'
-import { listSongs, type SongMeta } from '../../lib/songs'
+import { countSongs, listSongs, type SongMeta } from '../../lib/songs'
 import { PsalmFields } from './PsalmFields'
 
 export type PickSource = 'songs' | 'psalms'
@@ -14,7 +14,7 @@ const PAGE_SIZE = 6
 /**
  * Picking what goes into a service, as a modal rather than a panel wedged into
  * the page. The builder screen is then just the service you're assembling — the
- * 1,596-song list only exists while you're actually choosing from it.
+ * songbook only exists while you're actually choosing from it.
  *
  * Results are paged rather than dumped: rendering the whole match set made the
  * sheet grow to the height of the songbook, which is unusable on a phone and
@@ -47,14 +47,23 @@ export function ServicePickerSheet({
   const [debounced, setDebounced] = useState('')
   const [matches, setMatches] = useState<SongMeta[] | null>(null)
   const [page, setPage] = useState(0)
+  /** The whole library's size, for the placeholder — not the match count. */
+  const [library, setLibrary] = useState<number | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 200)
     return () => clearTimeout(t)
   }, [q])
 
-  // Only search while the sheet is actually up — no point filtering 1,596 songs
-  // for a list nobody is looking at.
+  // The songbook is already being loaded to search it, so asking its size costs
+  // nothing beyond the first open.
+  useEffect(() => {
+    if (!open) return
+    void countSongs().then(setLibrary)
+  }, [open])
+
+  // Only search while the sheet is actually up — no point filtering the whole
+  // songbook for a list nobody is looking at.
   useEffect(() => {
     let alive = true
     if (!open || source !== 'songs') return
@@ -99,7 +108,7 @@ export function ServicePickerSheet({
             <SearchField
               value={q}
               onChange={setQ}
-              placeholder="Search 1,596 songs"
+              placeholder={library ? `Search ${library.toLocaleString()} songs` : 'Search songs'}
               ariaLabel="Search songs"
             />
           </div>
