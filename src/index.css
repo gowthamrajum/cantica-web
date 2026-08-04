@@ -1327,9 +1327,10 @@ html.channel-open #root {
 .conf-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.4); font-size: 15px; background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%); }
 
 /* ---- broadcasting FROM this app: the presenter screen (routes/Live) ----
-       Deliberately upright in portrait, unlike the operator remote: this device
-       is being driven with the thumbs, not read from across a room, and the
-       transport has to stay under them. */
+       Sideways, like the operator remote: the two confidence cards are the
+       point of the screen, and a phone held upright gives them a tall narrow
+       box to sit in when what they want is width. Slides move by swiping the
+       whole surface, so there is no transport to keep under a thumb. */
 .lv-root {
   position: fixed;
   inset: 0;
@@ -1340,9 +1341,11 @@ html.channel-open #root {
   color: #fff;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: pan-y;
   padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 12px)
     calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 12px);
 }
+
 .lv-head { display: flex; align-items: center; gap: 10px; flex: none; }
 .lv-back { flex: none; display: inline-flex; padding: 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.7); }
 .lv-back:active { transform: scale(0.94); }
@@ -1368,27 +1371,28 @@ html.channel-open #root {
 .lv-card { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.12); background: #000; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
 .lv-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.4); font-size: 14px; background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%); }
 
-.lv-transport { display: flex; gap: 8px; flex: none; }
-.lv-move { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 15px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.09); color: #fff; font-size: 15px; font-weight: 700; }
-.lv-move:disabled { opacity: 0.32; }
-.lv-move:active:not(:disabled) { transform: scale(0.985); }
-/* Next is the button pressed a hundred times a service; Back is the correction. */
-.lv-move-primary { flex: 1.7; background: theme('colors.gold.500'); color: #1a1204; }
+/* Said once, over the empty slide: with no Next button the gesture has to be
+   discoverable somewhere. It goes as soon as the service starts. */
+.lv-hint { position: absolute; inset: auto 0 14px; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); pointer-events: none; }
+/* The chevron a swipe leaves behind — the only confirmation that a gesture
+   over a slide was read as one. */
+.lv-flash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.lv-flash span { font-size: 38vh; font-weight: 900; line-height: 1; color: rgba(255, 255, 255, 0.1); }
+@media (min-width: 640px) { .lv-flash span { font-size: 200px; } }
 
 .lv-tools { display: flex; gap: 8px; flex: none; }
 .lv-tool { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.72); font-size: 11px; font-weight: 600; }
 .lv-tool.is-on { background: rgba(224, 160, 56, 0.2); color: #f0c073; }
 .lv-tool:active { transform: scale(0.97); }
 
-.lv-foot { display: flex; align-items: center; gap: 8px; flex: none; font-size: 12px; color: rgba(255, 255, 255, 0.5); }
-/* Who is driving: its own line, because it changes what everything else means. */
-.lv-seat { display: flex; align-items: center; gap: 8px; flex: none; font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+/* Who is driving and the ways out, on one line. */
+.lv-bar { display: flex; align-items: center; gap: 8px; flex: none; font-size: 12px; color: rgba(255, 255, 255, 0.5); }
 .lv-seat-mine { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(52, 211, 153, 0.14); color: #6ee7b7; font-weight: 600; white-space: nowrap; }
 .lv-seat-open { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); white-space: nowrap; }
 .lv-seat-open b { color: #f0c073; font-size: 13px; letter-spacing: 0.16em; }
 .lv-seat-note { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-link { padding: 6px 11px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
-.lv-stop { margin-left: auto; padding: 6px 12px; border-radius: 999px; background: rgba(239, 68, 68, 0.16); color: #fca5a5; font-weight: 600; white-space: nowrap; }
+.lv-stop { padding: 6px 12px; border-radius: 999px; background: rgba(239, 68, 68, 0.16); color: #fca5a5; font-weight: 600; white-space: nowrap; }
 
 .lv-sheet { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; gap: 10px; background: rgba(8, 11, 18, 0.97); padding: calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 14px); }
 .lv-sheet-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; }
@@ -1405,3 +1409,37 @@ html.channel-open #root {
 
 .lv-toast { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); color: rgba(255, 255, 255, 0.92); padding: 8px 16px; border-radius: 999px; font-size: 13px; pointer-events: none; white-space: nowrap; }
 .lv-msg { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: #080b12; color: rgba(255, 255, 255, 0.7); font-size: 15px; }
+
+/* Force landscape on a portrait TOUCH device, even under a rotation lock — the
+   same treatment (and the same measured safe-area remap) the operator remote
+   gets; see .op2-root above for why --mvw/--mvh rather than viewport units. The
+   operator just turns the phone sideways.
+
+   This block sits AFTER every .lv-* rule it overrides on purpose: a media query
+   adds no specificity, so an identical selector earlier in the file loses to the
+   plain rule that follows it. */
+@media (orientation: portrait) and (pointer: coarse) {
+  .lv-root,
+  .lv-msg {
+    inset: auto;
+    top: 0;
+    /* Rotated 90°, so this box's width = screen HEIGHT and height = screen WIDTH. */
+    left: var(--mvw, 100dvw);
+    width: var(--mvh, 100dvh);
+    height: var(--mvw, 100dvw);
+    transform-origin: top left;
+    transform: rotate(90deg);
+    /* The insets rotate with the content: top→right, right→bottom, bottom→left,
+       and LEFT lands on the screen's top, where the status bar is. */
+    padding: calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 12px)
+      calc(env(safe-area-inset-left) + 10px) calc(env(safe-area-inset-top) + 12px);
+  }
+  /* Wide and short now: the cards sit side by side, and the gaps give back the
+     height they were taking from the slides. */
+  .lv-root { gap: 7px; }
+  .lv-body { flex-direction: row; gap: 10px; }
+  .lv-current { flex: 3; }
+  .lv-next { flex: 2; }
+  .lv-tool { padding: 7px 4px; }
+  .lv-flash span { font-size: 42vw; }
+}

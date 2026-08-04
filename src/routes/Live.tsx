@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ConfidenceCard } from '../components/ConfidenceCard'
 import { Icon } from '../components/app/Icons'
@@ -27,6 +27,9 @@ import {
   type BroadcastFrame
 } from '../lib/livecast'
 import type { ServiceEnvelope } from '../lib/buildService'
+
+/** px; below this a gesture is a tap meant for a control, not a swipe. */
+const SWIPE_MIN = 45
 
 /**
  * Broadcast a saved service from this device.
@@ -226,6 +229,32 @@ export function Live(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [goNext, goPrev])
 
+  // Slides move by swiping the screen, the way the Operator remote does — the
+  // gesture is the whole surface, so it can be made without looking down for a
+  // button. A short drag is a tap meant for one of the controls, not a swipe.
+  const swipeFrom = useRef<{ x: number; y: number } | null>(null)
+  const [swiped, setSwiped] = useState<'next' | 'prev' | null>(null)
+  const onTouchStart = (e: ReactTouchEvent): void => {
+    if (orderOpen) return
+    const t = e.touches[0]
+    swipeFrom.current = { x: t.clientX, y: t.clientY }
+  }
+  const onTouchEnd = (e: ReactTouchEvent): void => {
+    const from = swipeFrom.current
+    swipeFrom.current = null
+    if (!from) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - from.x
+    const dy = t.clientY - from.y
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN) return
+    // Forward = swipe left OR up; back = swipe right OR down.
+    const forward = Math.abs(dx) >= Math.abs(dy) ? dx < 0 : dy < 0
+    if (forward) goNext()
+    else goPrev()
+    setSwiped(forward ? 'next' : 'prev')
+    setTimeout(() => setSwiped(null), 420)
+  }
+
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 2200)
@@ -334,7 +363,7 @@ export function Live(): JSX.Element {
       : { label: 'CONNECTING', cls: 'bg-white/10 text-white/45' }
 
   return (
-    <div className="lv-root">
+    <div className="lv-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="lv-head">
         <button className="lv-back" onClick={() => navigate('/build')} aria-label="Leave and stop broadcasting">
           <Icon name="back" size={18} strokeWidth={2.2} />
@@ -360,6 +389,9 @@ export function Live(): JSX.Element {
           <div className="lv-label">On screen</div>
           <div className="lv-card">
             <ConfidenceCard state={mirror} />
+            {/* Nothing has been shown yet, and there is no button to press —
+                say what the gesture is once, where the slide will appear. */}
+            {cursor < 0 && <div className="lv-hint">Swipe to begin the service</div>}
           </div>
         </section>
         <section className="lv-section lv-next">
@@ -368,22 +400,6 @@ export function Live(): JSX.Element {
             {nextMirror ? <ConfidenceCard state={nextMirror} /> : <div className="lv-end">End of service</div>}
           </div>
         </section>
-      </div>
-
-      <div className="lv-transport">
-        <button className="lv-move" onClick={goPrev} disabled={cursor <= 0} aria-label="Previous slide">
-          <Icon name="chevron" size={19} strokeWidth={2.4} className="rotate-180" />
-          Back
-        </button>
-        <button
-          className="lv-move lv-move-primary"
-          onClick={goNext}
-          disabled={cursor >= deck.length - 1}
-          aria-label={cursor < 0 ? 'Show the first slide' : 'Next slide'}
-        >
-          {cursor < 0 ? 'Start the service' : 'Next'}
-          <Icon name="chevron" size={19} strokeWidth={2.4} />
-        </button>
       </div>
 
       <div className="lv-tools">
@@ -417,10 +433,12 @@ export function Live(): JSX.Element {
         </button>
       </div>
 
-      {/* Who is driving. Whoever pressed Broadcast is operating it, and holds the
-          service's one operator seat until they pass it on — so the PIN is only
-          worth showing once there is a seat for it to open. */}
-      <div className="lv-seat">
+      {/* One bar: who is driving, and the two ways out. Sideways there is far
+          more width than height, so these share a line rather than each taking
+          one away from the slides. Whoever pressed Broadcast is operating it and
+          holds the service's one operator seat until they pass it on — so the
+          PIN is only worth showing once there is a seat for it to open. */}
+      <div className="lv-bar">
         {handedOver ? (
           <>
             <span className="lv-seat-open">
@@ -433,22 +451,26 @@ export function Live(): JSX.Element {
           </>
         ) : (
           <>
-            <span className="lv-seat-mine">You’re operating this service</span>
+            <span className="lv-seat-mine">You’re operating</span>
+            <span className="lv-seat-note" />
             <button className="lv-link" onClick={() => setHandedOver(true)}>
               Hand to a phone
             </button>
           </>
         )}
-      </div>
-
-      <footer className="lv-foot">
         <button className="lv-link" onClick={() => void shareViewer()}>
           Viewer link
         </button>
         <button className="lv-stop" onClick={() => (confirmStop ? navigate('/build') : setConfirmStop(true))}>
           {confirmStop ? 'Tap again to stop' : 'Stop'}
         </button>
-      </footer>
+      </div>
+
+      {swiped && (
+        <div className="lv-flash">
+          <span>{swiped === 'next' ? '›' : '‹'}</span>
+        </div>
+      )}
 
       {orderOpen && (
         <div className="lv-sheet" role="dialog" aria-label="Order of service">
