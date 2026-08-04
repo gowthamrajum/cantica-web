@@ -49,10 +49,15 @@ export function Songs(): JSX.Element {
   }, [scrollEl, songs, shown])
 
   const visible = useMemo(() => songs?.slice(0, shown) ?? [], [songs, shown])
+  const searching = debounced.trim().length > 0
 
   // Group into A/B/C-style sections by first character — the songbook is Telugu,
   // so the index letters are Telugu too, which is what a reader scans for.
+  //
+  // Results are ranked by how well they match, so while searching the letters
+  // would be meaningless headings over an order that isn't alphabetical.
   const sections = useMemo(() => {
+    if (searching) return [{ key: '', items: visible }]
     const out: { key: string; items: SongMeta[] }[] = []
     for (const s of visible) {
       const key = (s.song_name.trim()[0] ?? '·').toUpperCase()
@@ -61,15 +66,21 @@ export function Songs(): JSX.Element {
       else out.push({ key, items: [s] })
     }
     return out
-  }, [visible])
+  }, [visible, searching])
 
   return (
     <Screen
       title="Songs"
       eyebrow="Worship songbook · కీర్తనలు"
-      subtitle={songs ? `${songs.length.toLocaleString()} songs, available offline` : 'Our worship songbook'}
+      subtitle={
+        !songs
+          ? 'Our worship songbook'
+          : searching
+            ? `${songs.length.toLocaleString()} match${songs.length === 1 ? '' : 'es'} in titles and lyrics`
+            : `${songs.length.toLocaleString()} songs, available offline`
+      }
       affix={
-        <SearchField value={q} onChange={setQ} placeholder="Search songs…" ariaLabel="Search songs" />
+        <SearchField value={q} onChange={setQ} placeholder="Search titles and lyrics…" ariaLabel="Search songs" />
       }
     >
       {songs === null && !error && (
@@ -84,13 +95,16 @@ export function Songs(): JSX.Element {
 
       {sections.map((sec) => (
         <div key={sec.key} className="mt-1">
-          <div className="index-head">{sec.key}</div>
+          {sec.key && <div className="index-head">{sec.key}</div>}
           <div className="list-group mt-2">
             {sec.items.map((s) => (
               <Link key={s.song_id} to={`/songs/${s.song_id}`} className="list-row has-ico">
                 <span className="list-ico bg-gold-500 font-serif text-[15px] font-bold">♪</span>
                 <span className="min-w-0 flex-1">
                   <span className="list-title block truncate">{s.song_name}</span>
+                  {/* Matched on a line rather than the title — show which, or the
+                      result looks like it has nothing to do with the search. */}
+                  {s.snippet && <span className="list-sub block truncate">{s.snippet}</span>}
                 </span>
                 <Icon name="chevron" size={17} className="list-chev" />
               </Link>

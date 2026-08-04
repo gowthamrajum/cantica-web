@@ -132,6 +132,9 @@ export function ServicePickerSheet({
                   <button key={s.song_id} className="list-row w-full text-left" onClick={() => onPickSong(s)}>
                     <span className="min-w-0 flex-1">
                       <span className="list-title block truncate">{s.song_name}</span>
+                      {/* Matched on a lyric, so show the line — otherwise the row
+                          looks unrelated to what was typed. */}
+                      {s.snippet && <span className="list-sub block truncate">{s.snippet}</span>}
                     </span>
                     <Icon name="plus" size={18} className="list-chev" />
                   </button>

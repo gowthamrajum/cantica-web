@@ -781,10 +781,13 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  /* Six 56px rows + the pager + the hint line. Song titles truncate rather than
-     wrap, so rows never exceed that and this is a true maximum, which makes it
-     a constant height in every state: full list, one match, or none. */
-  min-height: 410px;
+  /* Six 64px rows + the pager + the hint line. A row carries a title and, when
+     the match came from the lyrics, the line it matched on; both truncate rather
+     than wrap, so 64px is a true maximum. Sized for the TALLEST row rather than
+     the common one on purpose — at 410px a search that returned six lyric
+     matches grew the box, and with the sheet anchored to the bottom of the
+     screen that slid every control 45px up under the user's finger mid-type. */
+  min-height: 456px;
 }
 
 /* A real hit target, full field height and pulled into the field's own padding,
