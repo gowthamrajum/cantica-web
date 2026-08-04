@@ -14,6 +14,7 @@ import { Visit } from './routes/Visit'
 import { About } from './routes/About'
 import { Channel } from './routes/Channel'
 import { Remote } from './routes/Remote'
+import { Live } from './routes/Live'
 
 /**
  * Two route families:
@@ -21,9 +22,10 @@ import { Remote } from './routes/Remote'
  *  - Inside <AppShell/>: the tabbed app (Home · Watch · Bible · Songs · More)
  *    plus the screens pushed on top of a tab. The shell — and so the tab bar —
  *    never unmounts as you move between them.
- *  - Outside it: the full-screen live surfaces. The audience mirror and the
- *    operator remote take over the whole device (rotating on a portrait phone),
- *    so they must not sit inside a shell that reserves space for chrome.
+ *  - Outside it: the full-screen live surfaces. The audience mirror, the
+ *    operator remote and the presenter (which broadcasts a saved service from
+ *    this device) take over the whole device, so they must not sit inside a
+ *    shell that reserves space for chrome.
  */
 export default function App(): JSX.Element {
   return (
@@ -45,6 +47,7 @@ export default function App(): JSX.Element {
 
       <Route path="/c/:room" element={<Channel />} />
       <Route path="/remote" element={<Remote />} />
+      <Route path="/live/:id" element={<Live />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

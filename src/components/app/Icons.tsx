@@ -36,6 +36,7 @@ export type IconName =
   | 'gear'
   | 'offering'
   | 'communion'
+  | 'broadcast'
   | 'grip'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
@@ -197,6 +198,15 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <path d="M13.95 3.1h-3.9l-.42 2.05a6.9 6.9 0 0 0-1.62.94L6.05 5.4 4.1 8.78l1.55 1.4a7 7 0 0 0 0 1.87l-1.55 1.4 1.95 3.38 1.96-.69c.5.4 1.04.71 1.62.94l.42 2.05h3.9l.42-2.05a6.9 6.9 0 0 0 1.62-.94l1.96.69 1.95-3.38-1.55-1.4a7 7 0 0 0 0-1.87l1.55-1.4-1.95-3.38-1.96.69a6.9 6.9 0 0 0-1.62-.94z" />
       <circle cx="12" cy="12" r="2.9" />
+    </>
+  ),
+  // Signal radiating from a point. Two arcs a side rather than three: the outer
+  // pair carries the "going out" and a third only thickens the silhouette.
+  broadcast: (
+    <>
+      <circle cx="12" cy="12" r="2.1" />
+      <path d="M8.3 15.7a5.2 5.2 0 0 1 0-7.4M15.7 8.3a5.2 5.2 0 0 1 0 7.4" />
+      <path d="M5.4 18.6a9.3 9.3 0 0 1 0-13.2M18.6 5.4a9.3 9.3 0 0 1 0 13.2" />
     </>
   ),
   grip: <path d="M6 9.5h12M6 14.5h12" />

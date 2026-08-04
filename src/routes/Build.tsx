@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Screen, Section } from '../components/app/Screen'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
@@ -62,6 +63,7 @@ const LANGS: { id: ServiceLang; label: string }[] = [
 ]
 
 export function Build(): JSX.Element {
+  const navigate = useNavigate()
   // The slot comes first: the builder opens on this sheet, and everything picked
   // afterwards is filed under the day and date it settles.
   const [slot, setSlot] = useState<ServiceSlot>(defaultSlot)
@@ -291,6 +293,15 @@ export function Build(): JSX.Element {
   const stateKey = useMemo(() => JSON.stringify(builderState), [builderState])
   const [savedKey, setSavedKey] = useState<string | null>(null)
   const dirty = savedKey === null || stateKey !== savedKey
+  /**
+   * Whether the service on screen is exactly the one in the store.
+   *
+   * Sharing and broadcasting both hand this service to other people — a PDF that
+   * gets printed and read from a stand, a room the church watches — so both work
+   * from what was SAVED. Letting them run on unsaved edits produces a sheet, or
+   * a live service, that no longer matches anything anyone can reopen.
+   */
+  const committed = picks.length > 0 && savedId !== null && !dirty
   const slides = countSlides(envelope)
   const labelOf = (p: Pick): string =>
     p.type === 'song' ? p.song.song_name : `Psalm ${p.chapter}`
@@ -302,7 +313,7 @@ export function Build(): JSX.Element {
    */
   const [sharing, setSharing] = useState(false)
   const shareService = async (): Promise<void> => {
-    if (!picks.length || sharing) return
+    if (!committed || sharing) return
     setSharing(true)
     setNote('Building the PDF…')
     try {
@@ -681,11 +692,22 @@ export function Build(): JSX.Element {
             </p>
           )}
         </div>
+        {/* Going live reopens the SAVED service by id on the presenter screen,
+            so there is nothing to broadcast until it has been saved. */}
+        <div className="mt-2 px-[var(--gutter)]">
+          <button
+            className="btn-app btn-app-gold btn-block"
+            onClick={() => savedId !== null && navigate(`/live/${savedId}`)}
+            disabled={!committed}
+          >
+            <Icon name="broadcast" size={18} strokeWidth={2.1} /> Broadcast live
+          </button>
+        </div>
         <div className="mt-2 flex gap-2 px-[var(--gutter)]">
           <button
             className="btn-app btn-app-quiet flex-1 text-[15px]"
             onClick={() => void shareService()}
-            disabled={!picks.length || sharing}
+            disabled={!committed || sharing}
           >
             {sharing ? 'Preparing…' : 'Share'}
           </button>
@@ -693,6 +715,13 @@ export function Build(): JSX.Element {
             Preview
           </button>
         </div>
+        <p className="mt-2 px-[var(--gutter)] text-[13px] leading-relaxed text-ink-muted">
+          {!picks.length
+            ? 'Add some songs, then save the service to share or broadcast it.'
+            : !committed
+              ? 'Save the service to share or broadcast it — both work from the saved copy, never from unsaved edits.'
+              : 'Broadcast puts this service on air from this device — no computer, no OBS. The church follows it under Watch, and a volunteer can move the slides from Operator.'}
+        </p>
 
         {note && <p className="mt-2 px-[var(--gutter)] text-[13px] text-ink-muted">{note}</p>}
 

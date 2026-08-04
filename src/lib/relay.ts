@@ -79,37 +79,115 @@ export const streamUrl = (room: string, view: LiveView = 'users'): string =>
 // The remote drives the same live deck the desktop presenter owns: it POSTs a
 // command with the room's control PIN; the relay forwards it to the presenter,
 // which runs it and republishes state (which the remote sees on the normal feed).
-export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo'
+// `end` takes the room off air: the presenter stops publishing and blacks it
+// out. The relay only carries it, so a presenter too old to know the command
+// simply ignores it and the broadcast stays up.
+export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end'
 
 export interface ControlStatus {
-  /** a desktop presenter is currently listening for commands */
+  /** a presenter is currently listening for commands */
   online: boolean
   /** the room has a control PIN set */
   hasPin: boolean
   /** the supplied PIN matches */
   pinOk: boolean
+  /** somebody is already operating this service */
+  operatorHeld?: boolean
+  /** …and it is this device */
+  operatorMine?: boolean
+  /** who has it: the device that started the broadcast, or a phone that joined */
+  operatorRole?: OperatorRole | null
 }
 
-/** Check whether a room is controllable and whether the given PIN is valid. */
-export async function getControlStatus(room: string, pin: string): Promise<ControlStatus> {
-  const q = pin ? `?pin=${encodeURIComponent(pin)}` : ''
-  const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/status${q}`, { cache: 'no-store' })
+/** 'presenter' is the device the broadcast was started from. */
+export type OperatorRole = 'presenter' | 'remote'
+
+/**
+ * Check whether a room is controllable, whether the given PIN is valid, and
+ * whether its single operator seat is free. Pass `operatorId` to be told that
+ * the seat is already yours rather than merely taken.
+ */
+export async function getControlStatus(room: string, pin: string, operatorId = ''): Promise<ControlStatus> {
+  const q = new URLSearchParams()
+  if (pin) q.set('pin', pin)
+  if (operatorId) q.set('operatorId', operatorId)
+  const r = await fetch(
+    `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/status${q.size ? `?${q}` : ''}`,
+    { cache: 'no-store' }
+  )
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return (await r.json()) as ControlStatus
 }
 
+/**
+ * Take the room's operator seat, or renew a lease already held.
+ *
+ * One phone drives at a time — two fight over the same deck — so this answers
+ * 409 `operator-taken` when somebody else has it. The lease lapses on its own if
+ * a phone stops asking, which is what a flat battery looks like from here.
+ */
+export async function claimOperator(
+  room: string,
+  pin: string,
+  operatorId: string,
+  opts: { role?: OperatorRole; force?: boolean } = {}
+): Promise<{ ok: boolean; status: number; error?: string; role?: OperatorRole; freeInMs?: number }> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, operatorId, role: opts.role ?? 'remote', force: !!opts.force })
+    })
+    const j = (await r.json().catch(() => ({}))) as { error?: string; role?: OperatorRole; freeInMs?: number }
+    return { ok: r.ok, status: r.status, error: j.error, role: j.role, freeInMs: j.freeInMs }
+  } catch {
+    return { ok: false, status: 0, error: 'offline' }
+  }
+}
+
+/** Give the seat back, so the next phone doesn't have to wait out the lease. */
+export function releaseOperator(room: string, operatorId: string): void {
+  const url = `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/release`
+  const body = JSON.stringify({ operatorId })
+  // This usually runs as the page is going away, where a normal fetch is
+  // cancelled — keepalive (and sendBeacon on pagehide) is what survives it.
+  try {
+    void fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true
+    }).catch(() => {})
+  } catch {
+    /* best effort — the lease expires on its own anyway */
+  }
+}
+
+/** The same release, for `pagehide`, where only a beacon is guaranteed to go. */
+export function beaconRelease(room: string, operatorId: string): void {
+  try {
+    navigator.sendBeacon?.(
+      `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/release`,
+      new Blob([JSON.stringify({ operatorId })], { type: 'application/json' })
+    )
+  } catch {
+    /* best effort */
+  }
+}
+
 /** Send one command. Returns ok + the HTTP status so callers can react to
- *  401 (bad PIN) / 409 (presenter offline). */
+ *  401 (bad PIN) / 409 (presenter offline, or another phone is operating). */
 export async function sendControl(
   room: string,
   pin: string,
   cmd: ControlCmd,
-  arg?: number
+  arg?: number,
+  operatorId?: string
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin, cmd, arg })
+    body: JSON.stringify({ pin, cmd, arg, operatorId })
   })
   const j = (await r.json().catch(() => ({}))) as { error?: string }
   return { ok: r.ok, status: r.status, error: j.error }

@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { getControlStatus, getSessions, sendControl, type ControlCmd, type SessionSummary } from '../lib/relay'
+import {
+  beaconRelease,
+  claimOperator,
+  getControlStatus,
+  getSessions,
+  releaseOperator,
+  sendControl,
+  type ControlCmd,
+  type OperatorRole,
+  type SessionSummary
+} from '../lib/relay'
+import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
 import { ConfidenceCard } from '../components/ConfidenceCard'
 import { LogoBadge } from '../components/Logo'
@@ -8,6 +19,9 @@ import { prettyServiceName } from '../lib/format'
 import { useScreenVars } from '../lib/screenVars'
 
 const STORE_KEY = 'tcc-remote'
+/** Well inside the relay's 40s lease, so one dropped renewal isn't a lost seat. */
+const RENEW_MS = 12_000
+
 type Saved = { room: string; pin: string; label?: string }
 
 function loadSaved(): Saved | null {
@@ -22,6 +36,7 @@ function loadSaved(): Saved | null {
 export function Remote(): JSX.Element {
   const [params] = useSearchParams()
   const [conn, setConn] = useState<Saved | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
   // Deep link from the desktop (?room=&pin=) connects straight away; otherwise
   // fall back to a previously saved session so a PWA refresh stays connected.
@@ -29,10 +44,12 @@ export function Remote(): JSX.Element {
     const room = params.get('room') || ''
     const pin = params.get('pin') || ''
     if (room && pin) {
-      void tryConnect(room, pin).then((ok) => ok && setConn({ room, pin }))
+      void tryConnect(room, pin).then((r) => (r.ok ? setConn({ room, pin }) : setBusy(r.error ?? null)))
     } else {
       const s = loadSaved()
-      if (s) setConn(s)
+      // A saved session is only worth resuming if this phone can still drive it:
+      // someone else may have taken the seat while this one was closed.
+      if (s) void tryConnect(s.room, s.pin).then((r) => (r.ok ? setConn(s) : setBusy(r.error ?? null)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -50,17 +67,47 @@ export function Remote(): JSX.Element {
   return conn ? (
     <OperatorMirror conn={conn} onDisconnect={disconnect} onBadPin={disconnect} />
   ) : (
-    <Connect initialRoom={params.get('room') || ''} initialPin={params.get('pin') || ''} onConnect={connect} />
+    <Connect
+      initialRoom={params.get('room') || ''}
+      initialPin={params.get('pin') || ''}
+      initialError={busy}
+      onConnect={connect}
+    />
   )
 }
 
-/** Validate a room + PIN against the relay. */
-async function tryConnect(room: string, pin: string): Promise<boolean> {
+/** How long to tell someone to wait for a lapsed lease, in plain words. */
+const waitHint = (freeInMs?: number): string => {
+  const s = Math.ceil((freeInMs ?? 40_000) / 1000)
+  return s > 45 ? 'a minute or so' : s > 20 ? 'about half a minute' : 'a few seconds'
+}
+
+/** Being turned away is only useful if it says who to go and ask. */
+const takenMessage = (claim: { role?: OperatorRole; freeInMs?: number }): string =>
+  claim.role === 'presenter'
+    ? 'The device that started this broadcast is operating it. Whoever has it can tap “Hand to a phone” on their live screen to pass the slides over.'
+    : `Another phone is already operating this service — only one can drive the slides at a time. If theirs has gone to sleep, try again in ${waitHint(claim.freeInMs)}.`
+
+/**
+ * Validate a room + PIN, then claim the operator seat.
+ *
+ * The claim is part of connecting, not of the first tap: a volunteer who is
+ * about to be refused should learn it here, not by pressing Next during a song
+ * and finding nothing moves.
+ */
+async function tryConnect(room: string, pin: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const st = await getControlStatus(room, pin)
-    return st.online && st.pinOk
+    const st = await getControlStatus(room, pin, operatorId())
+    if (!st.online)
+      return { ok: false, error: 'No presenter is connected to this service yet. Start broadcasting first.' }
+    if (!st.pinOk) return { ok: false, error: 'That PIN didn’t match.' }
+    const claim = await claimOperator(room, pin, operatorId(), { role: 'remote' })
+    if (claim.status === 409 && claim.error === 'operator-taken')
+      return { ok: false, error: takenMessage(claim) }
+    if (!claim.ok) return { ok: false, error: 'Could not reach the service. Check your connection.' }
+    return { ok: true }
   } catch {
-    return false
+    return { ok: false, error: 'Could not reach the service. Check your connection.' }
   }
 }
 
@@ -68,10 +115,13 @@ async function tryConnect(room: string, pin: string): Promise<boolean> {
 function Connect({
   initialRoom,
   initialPin,
+  initialError,
   onConnect
 }: {
   initialRoom: string
   initialPin: string
+  /** Why an automatic reconnect was refused, e.g. the seat is taken. */
+  initialError: string | null
   onConnect: (s: Saved) => void
 }): JSX.Element {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null)
@@ -79,7 +129,9 @@ function Connect({
   const [label, setLabel] = useState<string | undefined>(undefined)
   const [pin, setPin] = useState(initialPin)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
+
+  useEffect(() => setError(initialError), [initialError])
 
   useEffect(() => {
     let alive = true
@@ -98,16 +150,10 @@ function Connect({
     }
     setBusy(true)
     setError(null)
-    try {
-      const st = await getControlStatus(room, pin)
-      if (!st.online) setError('No presenter is connected to this service yet. Start broadcasting on the computer first.')
-      else if (!st.pinOk) setError('That PIN didn’t match. Check the Broadcast panel on the presenter computer.')
-      else onConnect({ room, pin, label })
-    } catch {
-      setError('Could not reach the service. Check your connection.')
-    } finally {
-      setBusy(false)
-    }
+    const r = await tryConnect(room, pin)
+    if (r.ok) onConnect({ room, pin, label })
+    else setError(r.error ?? 'Could not connect.')
+    setBusy(false)
   }
 
   return (
@@ -117,7 +163,7 @@ function Connect({
           <LogoBadge className="h-11 w-11" />
           <div>
             <div className="font-serif text-lg font-semibold">Operator</div>
-            <div className="text-[13px] text-white/55">Move the live slides from your phone</div>
+            <div className="text-[13px] text-white/55">Move the live slides from your phone — one phone at a time</div>
           </div>
         </div>
 
@@ -215,7 +261,15 @@ function OperatorMirror({
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
+  // Ending affects everyone watching, so it is asked rather than done on a tap
+  // that could just as easily have been a mis-hit going for Exit.
+  const [confirmEnd, setConfirmEnd] = useState(false)
+  const [ending, setEnding] = useState(false)
+  const [ended, setEnded] = useState(false)
+  /** Set if the seat went to another phone while this one was away. */
+  const [lostSeat, setLostSeat] = useState(false)
   const startRef = useRef<{ x: number; y: number } | null>(null)
+  const me = useRef(operatorId()).current
 
   // The rotated root is sized from the JS-measured screen (--mvw/--mvh), not
   // from vw/vh — see useScreenVars for why iOS needs that.
@@ -228,15 +282,50 @@ function OperatorMirror({
     return () => document.documentElement.classList.remove('channel-open')
   }, [])
 
+  /**
+   * Hold the operator seat for as long as this screen is open.
+   *
+   * The relay's lease lapses if nobody renews it, so this heartbeat is what says
+   * the phone is still here — and its refusal is how we find out somebody else
+   * has taken over, which can happen after a lock screen or a dead spot has kept
+   * this phone quiet long enough for the lease to run out.
+   */
+  useEffect(() => {
+    // Once the seat has gone, stop reaching for it. Left running, this would
+    // quietly take it back the moment it fell free — from the phone that now
+    // holds it, or from whoever is operating the NEXT service in this room —
+    // while this screen still says the turn was lost.
+    if (ended || lostSeat) return
+    let alive = true
+    const renew = async (): Promise<void> => {
+      const r = await claimOperator(conn.room, conn.pin, me, { role: 'remote' })
+      if (!alive) return
+      if (r.status === 409 && r.error === 'operator-taken') setLostSeat(true)
+    }
+    void renew()
+    const id = setInterval(() => void renew(), RENEW_MS)
+    // A phone that has been put away is not operating: hand the seat straight
+    // back rather than making the next volunteer wait out the lease.
+    const onHide = (): void => beaconRelease(conn.room, me)
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      alive = false
+      clearInterval(id)
+      window.removeEventListener('pagehide', onHide)
+    }
+  }, [conn.room, conn.pin, me, ended, lostSeat])
+
   const run = useCallback(
     async (cmd: ControlCmd): Promise<void> => {
       setFeedback(cmd)
       setTimeout(() => setFeedback(null), 450)
       try {
-        const r = await sendControl(conn.room, conn.pin, cmd)
+        const r = await sendControl(conn.room, conn.pin, cmd, undefined, me)
         if (r.status === 401) {
           setFlash('PIN no longer valid')
           setTimeout(onBadPin, 900)
+        } else if (r.error === 'not-operator') {
+          setLostSeat(true)
         } else if (r.status === 409 || r.error === 'presenter-offline') {
           setFlash('Presenter is offline')
         } else if (!r.ok) {
@@ -246,10 +335,73 @@ function OperatorMirror({
         setFlash('No connection')
       }
     },
-    [conn.room, conn.pin, onBadPin]
+    [conn.room, conn.pin, me, onBadPin]
   )
 
+  const exit = useCallback((): void => {
+    releaseOperator(conn.room, me)
+    onDisconnect()
+    navigate('/watch')
+  }, [conn.room, me, onDisconnect, navigate])
+
+  /**
+   * Take the whole service off air.
+   *
+   * The command travels the same path as Next: the relay carries it and the
+   * presenter — the computer, or the phone that started this from Service
+   * Builder — is what actually stops publishing. So a presenter that doesn't
+   * know the command leaves the broadcast up, and we say so rather than
+   * claiming it ended.
+   */
+  const endBroadcast = useCallback(async (): Promise<void> => {
+    setConfirmEnd(false)
+    setEnding(true)
+    try {
+      const r = await sendControl(conn.room, conn.pin, 'end', undefined, me)
+      if (r.status === 401) {
+        setFlash('PIN no longer valid')
+        return
+      }
+      if (r.error === 'not-operator') {
+        setLostSeat(true)
+        return
+      }
+      if (r.status === 409 || r.error === 'presenter-offline') {
+        setFlash('Nothing is presenting — it’s already off air')
+        return
+      }
+      if (r.status === 400) {
+        setFlash('This service can’t be ended from the phone')
+        return
+      }
+      if (!r.ok) {
+        setFlash('Couldn’t end the broadcast')
+        return
+      }
+      // Delivered is not the same as done. A presenter that ends stops listening
+      // for commands, so the room reporting nobody online is the proof — and
+      // without it we would tell the operator a service was off air while it
+      // carried on in the hall.
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 500))
+        const st = await getControlStatus(conn.room, conn.pin).catch(() => null)
+        if (st && !st.online) {
+          setEnded(true)
+          setTimeout(exit, 1400)
+          return
+        }
+      }
+      setFlash('The presenter didn’t stop — it may still be on air')
+    } catch {
+      setFlash('No connection')
+    } finally {
+      setEnding(false)
+    }
+  }, [conn.room, conn.pin, me, exit])
+
   const onTouchStart = (e: TouchEvent): void => {
+    // A swipe must not move slides from under the confirmation.
+    if (confirmEnd || ending || ended || lostSeat) return
     const t = e.touches[0]
     startRef.current = { x: t.clientX, y: t.clientY }
   }
@@ -268,6 +420,7 @@ function OperatorMirror({
 
   // Desktop: arrow / page keys and space drive the deck.
   useEffect(() => {
+    if (confirmEnd || ending || ended || lostSeat) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault()
@@ -279,18 +432,13 @@ function OperatorMirror({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [run])
+  }, [run, confirmEnd, ending, ended, lostSeat])
 
   useEffect(() => {
     if (!flash) return
     const t = setTimeout(() => setFlash(null), 2200)
     return () => clearTimeout(t)
   }, [flash])
-
-  const exit = (): void => {
-    onDisconnect()
-    navigate('/watch')
-  }
 
   const status = liveShowing
     ? { label: 'LIVE', cls: 'bg-red-500 text-white' }
@@ -317,6 +465,11 @@ function OperatorMirror({
             </span>
           )}
           <span className={`op2-status ${status.cls}`}>{status.label}</span>
+          {/* Ending is the operator's, not just the presenter's: they are the one
+              who knows the service is over. */}
+          <button onClick={() => setConfirmEnd(true)} className="op2-stop">
+            End
+          </button>
           <button onClick={exit} aria-label="Exit operator" className="op2-exit">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -346,6 +499,56 @@ function OperatorMirror({
         </div>
       )}
       {flash && <div className="op2-toast">{flash}</div>}
+
+      {/* The seat went elsewhere: stop pretending this phone still drives the
+          service, and get off the deck rather than leave a dead remote in
+          somebody's hand. */}
+      {lostSeat && !ended && (
+        <div className="op2-ask" role="dialog" aria-label="Another phone is operating">
+          <p className="op2-ask-title">Another device has taken over</p>
+          <p className="op2-ask-body">
+            Only one device operates a service at a time, and this one lost its turn — either it was asleep or out of
+            signal long enough to give the seat up, or whoever started the broadcast took it back.
+          </p>
+          <div className="op2-ask-row">
+            <button className="op2-ask-no" onClick={exit}>
+              Leave operator
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(confirmEnd || ending || ended) && (
+        <div className="op2-ask" role="dialog" aria-label="End the broadcast">
+          {ended ? (
+            <p className="op2-ask-title">The broadcast has ended.</p>
+          ) : ending ? (
+            <>
+              <p className="op2-ask-title">Ending…</p>
+              <p className="op2-ask-body">Waiting for the presenter to go off air.</p>
+            </>
+          ) : (
+            <>
+              <p className="op2-ask-title">End the broadcast?</p>
+              <p className="op2-ask-body">
+                The service goes off air for everyone watching
+                {typeof viewers === 'number' && viewers > 0
+                  ? ` — ${viewers} ${viewers === 1 ? 'person is' : 'people are'} following right now`
+                  : ''}
+                . Starting it again means going back to the device that began it.
+              </p>
+              <div className="op2-ask-row">
+                <button className="op2-ask-no" onClick={() => setConfirmEnd(false)}>
+                  Keep going
+                </button>
+                <button className="op2-ask-yes" onClick={() => void endBroadcast()}>
+                  End broadcast
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

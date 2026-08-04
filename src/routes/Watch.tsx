@@ -122,7 +122,8 @@ export function Watch(): JSX.Element {
               </button>
             </div>
             <p className="px-[calc(var(--gutter)+4px)] pt-3 text-[13px] leading-relaxed text-ink-muted">
-              Operator needs the control PIN shown in the Broadcast panel on the presenter computer.
+              Operator needs the control PIN, shown on whatever is broadcasting — the live screen in Service Builder,
+              or the Broadcast panel on the presenter computer. One phone operates a service at a time.
             </p>
           </>
         )}
