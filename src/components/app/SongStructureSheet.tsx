@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Sheet } from './Sheet'
+import { useRowDrag } from './useRowDrag'
 import { Icon } from './Icons'
 import {
   applyOrder,
@@ -56,7 +57,15 @@ export function SongStructureSheet({
   onAdd: (structure: SongStructure) => void
 }): JSX.Element | null {
   const sections = useMemo(() => (song ? songSections(song, lang) : []), [song, lang])
-  const [order, setOrder] = useState<string[]>([])
+  /**
+   * The running order as OCCURRENCES, not sections.
+   *
+   * A section may appear more than once — the refrain placed by hand where it
+   * is wanted, a stanza sung twice — so a row is identified by its own key
+   * rather than by the section it shows. Anything that used to key off the
+   * section id would otherwise move, tick or delete every copy at once.
+   */
+  const [order, setOrder] = useState<{ key: string; id: string }[]>([])
   const [included, setIncluded] = useState<Set<string>>(new Set())
   const [recurring, setRecurring] = useState<string | null>(null)
   /** section id -> units per slide. Absent = however the automatic split falls. */
@@ -65,6 +74,10 @@ export function SongStructureSheet({
   const [lineOrder, setLineOrder] = useState<Record<string, number[]>>({})
   /** which section's slides are open for editing */
   const [editing, setEditing] = useState<string | null>(null)
+  /** Distinguishes one copy of a section from the next; never reused. */
+  const nextKey = useRef(0)
+  /** Armed once, so a tap that would throw the arrangement away asks first. */
+  const [confirmReset, setConfirmReset] = useState(false)
   /**
    * Which units of the refrain come BACK between the stanzas. Empty means all of
    * it, which is what every arrangement did before this existed.
@@ -89,9 +102,6 @@ export function SongStructureSheet({
     if (!song) return
     const all = sections.map((s) => s.id)
     const kept = initial?.includedIds?.filter((id) => all.includes(id))
-    // includedIds is the arrangement WITH the repeat woven in; the sheet works
-    // in distinct sections, so take each id once, in first-seen order.
-    const distinct = kept ? [...new Set(kept)] : null
     /**
      * Rebuild the running order with the LEFT-OUT sections back where they
      * belong.
@@ -106,13 +116,31 @@ export function SongStructureSheet({
      * take the saved order among themselves. A song nobody reordered comes back
      * exactly as it is written; one that WAS reordered keeps it.
      */
-    const rebuilt = (): string[] => {
-      if (!distinct?.length) return all
-      const queue = [...distinct]
-      return all.map((id) => (distinct.includes(id) ? queue.shift() ?? id : id))
+    nextKey.current = 0
+    const mint = (id: string): { key: string; id: string } => ({ key: `${id}#${nextKey.current++}`, id })
+
+    /**
+     * Rebuild the rows from the saved arrangement, keeping every appearance.
+     *
+     * `kept` is the play order and may name a section more than once — a refrain
+     * placed by hand, a stanza sung twice — so it is walked as it stands rather
+     * than reduced to a set. Sections it never mentions were left out, and each
+     * goes back at its natural position, unticked: it was not moved, it was
+     * simply not playing.
+     */
+    const rows = kept?.length ? kept.map(mint) : all.map(mint)
+    const on = new Set(rows.map((r) => r.key))
+    if (kept?.length) {
+      for (const [i, id] of all.entries()) {
+        if (kept.includes(id)) continue
+        // Its natural neighbour is the section before it that IS in the order.
+        const before = all.slice(0, i).filter((x) => kept.includes(x)).pop()
+        const at = before ? rows.findIndex((r) => r.id === before) + 1 : 0
+        rows.splice(at, 0, mint(id))
+      }
     }
-    setOrder(rebuilt())
-    setIncluded(new Set(distinct?.length ? distinct : all))
+    setOrder(rows)
+    setIncluded(on)
     const rec = initial ? (initial.recurringId ?? null) : detectRecurringSection(sections)
     setRecurring(rec)
     setGroups(initial?.groups ?? {})
@@ -361,24 +389,81 @@ export function SongStructureSheet({
     endHold()
   }
 
-  const includedInOrder = order.filter((id) => included.has(id))
+  const includedInOrder = order.filter((o) => included.has(o.key)).map((o) => o.id)
 
-  const toggle = (id: string): void =>
+  const toggle = (key: string): void => (
+    setConfirmReset(false),
     setIncluded((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  )
+
+  /**
+   * Back to the song as it is written: every section, in order, nothing
+   * duplicated, the refrain guessed afresh.
+   *
+   * An arrangement can be got into a state nobody wants — everything unticked,
+   * copies made and moved until it no longer resembles the song — and until now
+   * the only way out was to leave without saving and start the pick again. This
+   * is the way back.
+   */
+  const resetToWritten = (): void => {
+    nextKey.current = 0
+    const rows = sections.map((sec) => ({ key: `${sec.id}#${nextKey.current++}`, id: sec.id }))
+    setOrder(rows)
+    setIncluded(new Set(rows.map((r) => r.key)))
+    const rec = detectRecurringSection(sections)
+    setRecurring(rec)
+    const recSec = rec ? sections.find((x) => x.id === rec) : null
+    setRepeatUnits(
+      recSec
+        ? sectionUnits(recSec.lines.filter((l) => l && l.trim()), lang === 'both').map((_, k) => k)
+        : []
+    )
+    setFullAtEnd(true)
+    setGroups({})
+    setLineOrder({})
+    setEditing(null)
+    setConfirmReset(false)
+  }
+
+  const rowDrag = useRowDrag((from, to) =>
+    setOrder((prev) => {
+      const next = prev.slice()
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+  )
+
+  /** Another go at the same section, dropped in right below this one and ready
+   *  to be moved wherever it is actually wanted. */
+  const duplicate = (key: string): void =>
+    setOrder((prev) => {
+      const i = prev.findIndex((o) => o.key === key)
+      if (i < 0) return prev
+      const copy = { key: `${prev[i].id}#${nextKey.current++}`, id: prev[i].id }
+      setIncluded((inc) => new Set(inc).add(copy.key))
+      const next = prev.slice()
+      next.splice(i + 1, 0, copy)
       return next
     })
 
-  const move = (id: string, dir: -1 | 1): void =>
+  /** Take a copy away. The first appearance of a section is not a copy — that
+   *  one is unticked instead, which is what leaving it out has always meant. */
+  const removeCopy = (key: string): void =>
     setOrder((prev) => {
-      const i = prev.indexOf(id)
-      const j = i + dir
-      if (i < 0 || j < 0 || j >= prev.length) return prev
-      const next = prev.slice()
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
+      const i = prev.findIndex((o) => o.key === key)
+      if (i < 0) return prev
+      setIncluded((inc) => {
+        const n = new Set(inc)
+        n.delete(key)
+        return n
+      })
+      return prev.filter((_, k) => k !== i)
     })
 
   // The real arrangement and the real slide count, from the same functions the
@@ -392,6 +477,8 @@ export function SongStructureSheet({
     repeatFullAtEnd: fullAtEnd
   }
   const playOrder = buildSongArrangement(sections, includedInOrder, recurring)
+  /** Sections of the song that no longer appear anywhere in the running order. */
+  const missing = sections.filter((sec) => !includedInOrder.includes(sec.id))
   const slideCount = song ? (songToItem(song, lang, structure)?.slides.length ?? 0) : 0
 
   return (
@@ -433,22 +520,39 @@ export function SongStructureSheet({
       </div>
 
       <div className="list-group mt-3">
-        {order.map((id, idx) => {
+        {order.map(({ key, id }, idx) => {
           const sec = byId.get(id)
           if (!sec) return null
-          const on = included.has(id)
+          const on = included.has(key)
           const first = sec.lines.find((l) => l.trim()) ?? '—'
           const slides = groupsOf(id).length
           const units = unitsOf(id)
           const breaks = breaksOf(id)
+          // Which go this is, so two copies of one stanza can be told apart.
+          const copies = order.filter((o) => o.id === id)
+          const nth = copies.findIndex((o) => o.key === key) + 1
+          const isCopy = copies.length > 1
+          // The drop mark is a border on the row it would land above, so nothing
+          // shifts under the finger while it is being aimed.
+          const dragging = rowDrag.carrying(key)
+          const aiming = rowDrag.aimingAt(idx)
           return (
-            <div key={id}>
+            <div
+              key={key}
+              data-row-index={idx}
+              className={`border-y-2 border-transparent ${aiming ? '!border-t-gold-500' : ''} ${
+                dragging ? 'opacity-40' : ''
+              }`}
+            >
             <div className={`list-row gap-2 ${on ? '' : 'opacity-45'}`}>
-              <button className="icon-btn flex-none" onClick={() => toggle(id)} aria-label={on ? 'Leave out' : 'Include'}>
+              <button className="icon-btn flex-none" onClick={() => toggle(key)} aria-label={on ? 'Leave out' : 'Include'}>
                 <Icon name={on ? 'check' : 'plus'} size={17} />
               </button>
               <span className="min-w-0 flex-1">
-                <span className="list-title block">{sec.label}</span>
+                <span className="list-title block">
+                  {sec.label}
+                  {isCopy && <span className="ml-1.5 text-[11px] font-semibold text-ink-muted">#{nth}</span>}
+                </span>
                 <span className="list-sub block truncate">{first}</span>
               </span>
               {/* A checkbox, not a one-way switch: tapping the marked one
@@ -465,6 +569,7 @@ export function SongStructureSheet({
                 title={recurring === id ? 'Stop this one repeating' : 'Play this one between the others'}
                 onClick={() => {
                   const next = recurring === id ? null : id
+                  void 0
                   setRecurring(next)
                   // A selection is a set of positions INSIDE one section; it
                   // means nothing against a different one.
@@ -488,19 +593,29 @@ export function SongStructureSheet({
               >
                 {slides} slide{slides === 1 ? '' : 's'}
               </button>
-              <span className="flex flex-none flex-col">
-                <button className="icon-btn h-5" onClick={() => move(id, -1)} disabled={idx === 0} aria-label="Move up">
-                  <Icon name="chevron" size={14} className="-rotate-90" />
-                </button>
-                <button
-                  className="icon-btn h-5"
-                  onClick={() => move(id, 1)}
-                  disabled={idx === order.length - 1}
-                  aria-label="Move down"
-                >
-                  <Icon name="chevron" size={14} className="rotate-90" />
-                </button>
-              </span>
+              {/* Another go at this section, to be dragged where it is wanted —
+                  a refrain placed by hand, a stanza sung twice. A copy can be
+                  taken away again; the first appearance is unticked instead,
+                  which is what leaving a section out has always meant. */}
+              <button
+                className="icon-btn flex-none"
+                onClick={() => (isCopy && nth > 1 ? removeCopy(key) : duplicate(key))}
+                aria-label={isCopy && nth > 1 ? `Remove this copy of ${sec.label}` : `Add another ${sec.label}`}
+                title={isCopy && nth > 1 ? 'Remove this copy' : 'Sing it again — then move it where you want'}
+              >
+                <Icon name={isCopy && nth > 1 ? 'minus' : 'plus'} size={16} />
+              </button>
+              {/* Drag it where it goes. The buttons it replaces walked a
+                  section one step per tap, which for a song of eight sections
+                  is eight taps to move something to the top. */}
+              <button
+                className="icon-btn flex-none cursor-grab touch-none active:cursor-grabbing"
+                {...rowDrag.handleProps(key, idx)}
+                aria-label={`Move ${sec.label}`}
+                title="Drag to move"
+              >
+                <Icon name="grip" size={17} />
+              </button>
             </div>
 
             {/* The refrain's lines, ticked. Shown as soon as a section is
@@ -649,6 +764,31 @@ export function SongStructureSheet({
           )
         })}
       </div>
+
+      {/* Only when something of the song is actually missing from the order —
+          left out, or a copy removed until none is playing. Offering a reset
+          against an arrangement that has lost nothing is offering to undo work
+          for no reason. */}
+      {missing.length > 0 && (
+        <div className="mt-3 rounded-xl bg-amber-50 px-3.5 py-3">
+          <p className="text-[13px] leading-relaxed text-amber-800">
+            {missing.length === sections.length ? (
+              <>Nothing from this song is playing.</>
+            ) : (
+              <>
+                Not playing: <b>{missing.map((sec) => sec.label).join(', ')}</b>.
+              </>
+            )}{' '}
+            {confirmReset ? 'This throws away the arrangement — tap again to go back to the song as written.' : ''}
+          </p>
+          <button
+            className={`mt-2 text-[12.5px] font-semibold ${confirmReset ? 'text-red-600' : 'text-amber-800 underline'}`}
+            onClick={() => (confirmReset ? resetToWritten() : setConfirmReset(true))}
+          >
+            {confirmReset ? 'Yes — reload the song' : 'Reload the song'}
+          </button>
+        </div>
+      )}
 
       <p className="mt-3 text-[13px] text-ink-muted">
         <b>Plays as:</b>{' '}

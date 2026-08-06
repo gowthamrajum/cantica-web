@@ -17,6 +17,7 @@ import { Sheet } from '../components/app/Sheet'
 import { PsalmFields } from '../components/app/PsalmFields'
 import { Collapsible } from '../components/app/Collapsible'
 import { useDisclosure } from '../components/app/useDisclosure'
+import { useRowDrag } from '../components/app/useRowDrag'
 import { SongRoleSheet, type Role } from '../components/app/SongRoleSheet'
 import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
@@ -342,14 +343,16 @@ export function Build(): JSX.Element {
 
   // ----- the picked list -----
   const removeAt = (i: number): void => setPicks((p) => p.filter((_, j) => j !== i))
-  const moveAt = (i: number, dir: -1 | 1): void =>
+  // Drag a song where it goes. The arrows it replaces moved one step per tap,
+  // so putting the last song first in an eight-song service took seven.
+  const pickDrag = useRowDrag((from, to) =>
     setPicks((p) => {
-      const j = i + dir
-      if (j < 0 || j >= p.length) return p
       const next = p.slice()
-      ;[next[i], next[j]] = [next[j], next[i]]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
       return next
     })
+  )
   const setLangAt = (i: number, l: ServiceLang): void =>
     setPicks((p) => p.map((x, j) => (j === i ? { ...x, lang: l } : x)))
 
@@ -1179,7 +1182,13 @@ export function Build(): JSX.Element {
         ) : (
           <div className="list-group mt-2">
             {picks.map((p, i) => (
-              <div key={p.key} className="list-row flex-col !items-start gap-0 text-left">
+              <div
+                key={p.key}
+                data-row-index={i}
+                className={`list-row flex-col !items-start gap-0 border-y-2 border-transparent text-left ${
+                  pickDrag.aimingAt(i) ? '!border-t-gold-500' : ''
+                } ${pickDrag.carrying(p.key) ? 'opacity-40' : ''}`}
+              >
                 {/* Collapsed, an item is one line: enough to read the order and
                     check a role. Eight items with their controls open ran most
                     of a phone screen each. */}
@@ -1206,6 +1215,17 @@ export function Build(): JSX.Element {
                       disc.isOpen(p.key) ? 'rotate-90' : ''
                     }`}
                   />
+                </button>
+                {/* On the header, not in the body: the body is collapsed until
+                    the row is opened, and a handle you must first expand a song
+                    to reach is not a way to reorder a service. */}
+                <button
+                  className="icon-btn absolute right-[calc(var(--gutter)+22px)] top-2 cursor-grab touch-none active:cursor-grabbing"
+                  {...pickDrag.handleProps(p.key, i)}
+                  aria-label={`Move ${labelOf(p)}`}
+                  title="Drag to move"
+                >
+                  <Icon name="grip" size={17} />
                 </button>
 
                 <div className={`collapsible-body w-full${disc.isOpen(p.key) ? ' is-open' : ''}`}>
@@ -1264,17 +1284,6 @@ export function Build(): JSX.Element {
                   </button>
                   <button className="icon-btn" onClick={() => setPreview(i)} aria-label="Preview">
                     <Icon name="eye" size={17} />
-                  </button>
-                  <button className="icon-btn" onClick={() => moveAt(i, -1)} disabled={i === 0} aria-label="Move up">
-                    <Icon name="chevron" size={17} className="-rotate-90" />
-                  </button>
-                  <button
-                    className="icon-btn"
-                    onClick={() => moveAt(i, 1)}
-                    disabled={i === picks.length - 1}
-                    aria-label="Move down"
-                  >
-                    <Icon name="chevron" size={17} className="rotate-90" />
                   </button>
                   <button className="icon-btn" onClick={() => removeAt(i)} aria-label="Remove">
                     <Icon name="close" size={17} />
