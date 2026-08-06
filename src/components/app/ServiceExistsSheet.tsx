@@ -20,6 +20,7 @@ export function ServiceExistsSheet({
   busy,
   canLoad,
   canView,
+  rebuilds,
   onLoad,
   onView,
   onNewSlot,
@@ -34,15 +35,14 @@ export function ServiceExistsSheet({
   canLoad: boolean
   /** True when the deck can at least be read — anything this app understands. */
   canView?: boolean
+  /** Editing this one means rebuilding it from its slides, not reopening it. */
+  rebuilds?: boolean
   onLoad: () => void
   onView?: () => void
   onNewSlot: () => void
   onDismiss: () => void
 }): JSX.Element {
-  // Only when it can't be edited: for one that can, reading is what opening it
-  // already gives you, and a second door to the same room is a decision nobody
-  // needed to make.
-  const readOnly = !canLoad && !!canView && !!onView
+  const readOnly = !!canView && !!onView
   return (
     <Sheet open={open} title="A service already exists" onClose={onDismiss}>
       <div className="px-[var(--gutter)]">
@@ -64,11 +64,11 @@ export function ServiceExistsSheet({
             <span className="min-w-0 flex-1">
               <span className="list-title block">{busy ? 'Loading…' : 'Load it and make edits'}</span>
               <span className="list-sub block">
-                {canLoad
-                  ? 'Open the saved service here, change it, and save it back'
-                  : readOnly
-                    ? 'This one wasn’t assembled here, so its songs can’t be rearranged'
-                    : 'This one was saved before editing was supported, so it can’t be reopened'}
+                {!canLoad
+                  ? 'This one was saved before editing was supported, so it can’t be reopened'
+                  : rebuilds
+                    ? 'Find its songs in the songbook and edit them here — it says what it can’t rebuild first'
+                    : 'Open the saved service here, change it, and save it back'}
               </span>
             </span>
             {canLoad && <Icon name="chevron" size={17} className="list-chev" />}

@@ -24,10 +24,12 @@ export function SavedServiceView({
   date,
   origin,
   sharing,
+  rebuilding,
   onPreviewAll,
   onPreviewItem,
   onShare,
   onBroadcast,
+  onRebuild,
   onClose
 }: {
   envelope: ServiceEnvelope
@@ -36,10 +38,13 @@ export function SavedServiceView({
   /** Where it came from, when the deck says. */
   origin: 'presenter' | 'unknown'
   sharing: boolean
+  rebuilding?: boolean
   onPreviewAll: () => void
   onPreviewItem: (index: number) => void
   onShare: () => void
   onBroadcast: () => void
+  /** Work the deck back into editable picks — it reports what it can't first. */
+  onRebuild?: () => void
   onClose: () => void
 }): JSX.Element {
   const items = envelope.service.items ?? []
@@ -74,9 +79,18 @@ export function SavedServiceView({
         </div>
         <p className="mt-3 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-muted">
           {origin === 'presenter'
-            ? 'This order was put together on the presenter computer, so its songs can’t be rearranged here. You can read it, share it, and broadcast it.'
-            : 'This service was saved before the builder kept a record of how it was assembled, so it can’t be reopened for editing. You can still read, share and broadcast it.'}
+            ? 'This order was put together on the presenter computer. Read it, share it and broadcast it as it is — or rebuild its songs to edit them here.'
+            : 'This service was saved before the builder kept a record of how it was assembled. Read it, share it and broadcast it as it is — or rebuild its songs to edit them here.'}
         </p>
+        {onRebuild && (
+          <button
+            className="btn-app btn-app-quiet btn-block mt-3 text-[15px]"
+            onClick={onRebuild}
+            disabled={rebuilding}
+          >
+            {rebuilding ? 'Looking…' : 'Rebuild its songs to edit'}
+          </button>
+        )}
       </div>
 
       {links.length > 0 && (

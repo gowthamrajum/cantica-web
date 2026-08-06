@@ -11,7 +11,7 @@ import { ServicePickerSheet, type PickSource } from '../components/app/ServicePi
 import { SavedServicesSheet } from '../components/app/SavedServicesSheet'
 import { SavedServiceView } from '../components/app/SavedServiceView'
 import { ServiceLinksEditor } from '../components/app/ServiceLinksEditor'
-import type { ServiceLink } from '../lib/links'
+import { usableLinks, type ServiceLink } from '../lib/links'
 import { ConfirmSheet } from '../components/app/ConfirmSheet'
 import { Sheet } from '../components/app/Sheet'
 import { PsalmFields } from '../components/app/PsalmFields'
@@ -22,6 +22,7 @@ import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
 import { createService, findService, getService, updateService } from '../lib/relay'
 import { readEnvelope } from '../lib/livecast'
+import { picksFromDeck } from '../lib/deckToPicks'
 import { fromBuilderState, isFromPresenter, readBuilderState, toBuilderState } from '../lib/builderState'
 import {
   DAYS,
@@ -121,6 +122,23 @@ export function Build(): JSX.Element {
   } | null>(null)
   /** Which of the read-only service's items is being previewed. */
   const [viewPreview, setViewPreview] = useState<number | 'all' | null>(null)
+  /**
+   * A recovered deck waiting on "yes, edit it here".
+   *
+   * Held rather than applied because the answer costs something: the songs come
+   * back without their arrangement and everything that isn't a song doesn't come
+   * back at all, so saving afterwards replaces the presenter's order with this.
+   * That is a decision, and it is made against the actual list of what leaves.
+   */
+  const [rebuild, setRebuild] = useState<{
+    id: number
+    day: string
+    date: string
+    picks: Pick[]
+    dropped: { title: string; reason: string }[]
+    links: ServiceLink[]
+  } | null>(null)
+  const [rebuilding, setRebuilding] = useState(false)
 
   const [lang, setLang] = useState<ServiceLang>('both')
   const [picks, setPicks] = useState<Pick[]>([])
@@ -551,6 +569,76 @@ export function Build(): JSX.Element {
   }
 
   /**
+   * Work a finished deck back into picks, and ask before adopting them.
+   *
+   * This is the answer to "Load it and make edits" on a service that wasn't
+   * assembled here. It can find the songs — a deck still names them — but not
+   * how they were arranged, and not the welcome cards, countdown or sermon
+   * around them. So it reports before it replaces.
+   */
+  const offerRebuild = async (s: { id: number; serviceDay: string; serviceDate: string }): Promise<void> => {
+    setRebuilding(true)
+    try {
+      const full = await getService(s.id)
+      const env = full ? readEnvelope(full.serviceData) : null
+      if (!env) {
+        setNote('That service couldn’t be read.')
+        return
+      }
+      const { picks: found, dropped } = await picksFromDeck(env)
+      if (!found.length) {
+        setNote(
+          `None of the ${env.service.items.length} items in that service matched a song or psalm here, so there is nothing to edit.`
+        )
+        return
+      }
+      setExists(null)
+      setRebuild({
+        id: s.id,
+        day: s.serviceDay,
+        date: s.serviceDate,
+        picks: found,
+        dropped,
+        // A deck may carry links even when it carries no picks; they survive
+        // verbatim, being the one part of it this builder can hold unchanged.
+        links: usableLinks(env.service.links)
+      })
+    } finally {
+      setRebuilding(false)
+    }
+  }
+
+  /** Adopt the recovered picks — the builder now edits that service. */
+  const adoptRebuild = (): void => {
+    if (!rebuild) return
+    const day = (DAYS as readonly string[]).includes(rebuild.day)
+      ? (rebuild.day as ServiceSlot['day'])
+      : dayOf(rebuild.date) ?? slot.day
+    const next = { day, date: rebuild.date }
+    checkToken.current++
+    setViewing(null)
+    setSlot(next)
+    setPicks(rebuild.picks)
+    setLinks(rebuild.links)
+    setSavedId(rebuild.id)
+    setEditing(true)
+    // Deliberately NOT marking this as saved: what is on screen is a rebuild,
+    // and it differs from the deck in the store. Leaving it dirty is what makes
+    // "Save changes" live, and stops Share or Broadcast handing anyone a service
+    // that matches nothing anybody can reopen.
+    setSavedKey(null)
+    setSavedOpen(false)
+    const n = rebuild.dropped.length
+    setNote(
+      `Rebuilt ${rebuild.picks.length} item${rebuild.picks.length === 1 ? '' : 's'} from ${rebuild.day} · ${prettyDate(
+        rebuild.date
+      )}. Songs are in written order — set their arrangements, then save.` +
+        (n ? ` ${n} item${n === 1 ? '' : 's'} couldn’t be rebuilt and will not survive the save.` : '')
+    )
+    setRebuild(null)
+  }
+
+  /**
    * Save the deck under this slot.
    *
    * Editing a service that was loaded here is an update, no questions asked —
@@ -591,6 +679,65 @@ export function Build(): JSX.Element {
   // The relay purges a service once its date is more than a week past.
   const stale = daysPast(slot.date) > 7
 
+  // What a rebuild found, and what it didn't — before anything replaces the
+  // order somebody put together on the presenter.
+  //
+  // Rendered from BOTH branches below: a rebuild is offered from the read-only
+  // view, which returns early, so a sheet living only in the builder's tree
+  // would never appear for the one case that raises it.
+  const rebuildSheet = (
+      <Sheet open={rebuild !== null} title="Edit this service here?" onClose={() => setRebuild(null)}>
+        {rebuild && (
+          <div className="px-[var(--gutter)]">
+            <p className="-mt-1 mb-3 font-serif text-[17px] font-semibold text-ink">
+              {rebuild.day} · {prettyDate(rebuild.date)}
+            </p>
+            <p className="mb-3 text-[14.5px] leading-relaxed text-ink-soft">
+              Found <b className="text-ink">{rebuild.picks.length}</b> item
+              {rebuild.picks.length === 1 ? '' : 's'} in the songbook. They come back as whole songs in written
+              order — the deck doesn’t record which stanzas played or how lines were grouped, so those choices are
+              yours to make again.
+            </p>
+            {rebuild.dropped.length > 0 ? (
+              <>
+                <p className="mb-2 text-[14.5px] leading-relaxed text-amber-700">
+                  <b>{rebuild.dropped.length} item{rebuild.dropped.length === 1 ? '' : 's'} can’t be rebuilt.</b>{' '}
+                  They stay on the presenter’s copy, but they will not be in this one — and saving replaces that
+                  copy.
+                </p>
+                <div className="list-group mb-3">
+                  {rebuild.dropped.map((d, i) => (
+                    <div key={`${d.title}-${i}`} className="list-row">
+                      <span className="min-w-0 flex-1">
+                        <span className="list-title block truncate">{d.title}</span>
+                        <span className="list-sub block">{d.reason}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="mb-3 text-[14.5px] leading-relaxed text-ink-muted">
+                Everything in it was recognised — nothing would be lost.
+              </p>
+            )}
+            <button className="btn-app btn-app-primary btn-block" onClick={adoptRebuild}>
+              Edit it here
+            </button>
+            <button
+              className="btn-app btn-app-quiet btn-block mt-2 text-[15px]"
+              onClick={() => setRebuild(null)}
+            >
+              Leave it alone
+            </button>
+            <p className="mt-2 pb-1 text-[13px] leading-relaxed text-ink-muted">
+              Nothing is written until you save, and the presenter’s copy is untouched until then.
+            </p>
+          </div>
+        )}
+    </Sheet>
+  )
+
   // A service opened for reading takes the whole screen: the builder's controls
   // all write, and showing them beside a deck they cannot change would offer an
   // edit that silently applies to something else.
@@ -611,6 +758,10 @@ export function Build(): JSX.Element {
             onPreviewItem={(i) => setViewPreview(i)}
             onShare={() => void shareEnvelope(viewing.envelope, `${viewing.day} Service · ${prettyDate(viewing.date)}`)}
             onBroadcast={() => navigate(`/live/${viewing.id}`)}
+            rebuilding={rebuilding}
+            onRebuild={() =>
+              void offerRebuild({ id: viewing.id, serviceDay: viewing.day, serviceDate: viewing.date })
+            }
             onClose={() => {
               setViewing(null)
               setNote('')
@@ -632,6 +783,8 @@ export function Build(): JSX.Element {
           currentDay={viewing.day}
           busyId={openingId}
         />
+
+        {rebuildSheet}
 
         {/* One item or the whole deck, from the SAME envelope — a slice keeps
             the service's own theme and background rather than the defaults a
@@ -1026,10 +1179,17 @@ export function Build(): JSX.Element {
         open={exists !== null}
         slotLabel={`${slot.day} · ${prettyDate(slot.date)}`}
         detail={exists?.detail}
-        canLoad={exists?.canLoad ?? false}
+        // A deck that can be read can be worked back into picks, so "make edits"
+        // is offered for it too — it just goes the long way round.
+        canLoad={(exists?.canLoad ?? false) || (exists?.canView ?? false)}
         canView={exists?.canView ?? false}
-        busy={loadingExisting || openingId !== null}
-        onLoad={() => void loadExisting()}
+        rebuilds={!exists?.canLoad && (exists?.canView ?? false)}
+        busy={loadingExisting || openingId !== null || rebuilding}
+        onLoad={() => {
+          if (!exists) return
+          if (exists.canLoad) void loadExisting()
+          else void offerRebuild({ id: exists.id, serviceDay: slot.day, serviceDate: slot.date })
+        }}
         onView={() => {
           if (exists) void openSaved({ id: exists.id, serviceDay: slot.day, serviceDate: slot.date })
           setExists(null)
@@ -1040,6 +1200,8 @@ export function Build(): JSX.Element {
         }}
         onDismiss={() => setExists(null)}
       />
+
+      {rebuildSheet}
 
       <ServiceSlotSheet
         open={slotOpen}
