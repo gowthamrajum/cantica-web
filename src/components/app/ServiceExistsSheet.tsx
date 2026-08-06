@@ -21,6 +21,7 @@ export function ServiceExistsSheet({
   canLoad,
   canView,
   rebuilds,
+  note,
   onLoad,
   onView,
   onNewSlot,
@@ -37,6 +38,8 @@ export function ServiceExistsSheet({
   canView?: boolean
   /** Editing this one means rebuilding it from its slides, not reopening it. */
   rebuilds?: boolean
+  /** What just happened, when an action here had something to answer. */
+  note?: string
   onLoad: () => void
   onView?: () => void
   onNewSlot: () => void
@@ -50,6 +53,15 @@ export function ServiceExistsSheet({
         <p className="mb-4 text-[14.5px] leading-relaxed text-ink-muted">
           {detail ?? 'This day and date already has a service saved.'}
         </p>
+
+        {/* An answer from one of the rows below. It has to live inside the
+            sheet: the sheet covers the page, so an explanation printed behind
+            it reads as the button having done nothing at all. */}
+        {note && (
+          <p className="mb-4 rounded-xl bg-amber-50 px-3.5 py-3 text-[14px] leading-relaxed text-amber-800">
+            {note}
+          </p>
+        )}
 
         <div className="list-group">
           <button

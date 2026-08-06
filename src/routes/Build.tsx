@@ -104,6 +104,9 @@ export function Build(): JSX.Element {
     canView: boolean
   } | null>(null)
   const [loadingExisting, setLoadingExisting] = useState(false)
+  /** What the sheet has to say back — it covers the page, so a message left
+   *  underneath it reads to the operator as nothing happening at all. */
+  const [existsNote, setExistsNote] = useState('')
   // Guards against a stale slot check landing after a newer one.
   const checkToken = useRef(0)
 
@@ -447,6 +450,7 @@ export function Build(): JSX.Element {
     setEditing(false)
     setSavedKey(null)
     setExists(null)
+    setExistsNote('')
     setChecking(true)
     try {
       const found = await findService(s.day, s.date)
@@ -578,17 +582,31 @@ export function Build(): JSX.Element {
    */
   const offerRebuild = async (s: { id: number; serviceDay: string; serviceDate: string }): Promise<void> => {
     setRebuilding(true)
+    // Anything to say goes BOTH places: this can be reached from the read-only
+    // view, where the page's note is visible, and from the slot sheet, where it
+    // is behind the sheet and might as well not exist.
+    const say = (m: string): void => {
+      setNote(m)
+      setExistsNote(m)
+    }
+    say('')
     try {
       const full = await getService(s.id)
       const env = full ? readEnvelope(full.serviceData) : null
       if (!env) {
-        setNote('That service couldn’t be read.')
+        say('That service couldn’t be read.')
         return
       }
       const { picks: found, dropped } = await picksFromDeck(env)
       if (!found.length) {
-        setNote(
-          `None of the ${env.service.items.length} items in that service matched a song or psalm here, so there is nothing to edit.`
+        // Not a failure — an order with no music in it yet. Naming what IS
+        // there is the difference between "this is broken" and "there is
+        // nothing here for the builder to hold".
+        const n = env.service.items.length
+        say(
+          `There are no songs or psalms in this service. Its ${n} item${n === 1 ? '' : 's'} — the videos, cards ` +
+            `and announcements around the music — have no equivalent the builder can edit. Open it for reading ` +
+            `instead, or add the songs on the presenter and publish it again.`
         )
         return
       }
@@ -1183,6 +1201,7 @@ export function Build(): JSX.Element {
         // is offered for it too — it just goes the long way round.
         canLoad={(exists?.canLoad ?? false) || (exists?.canView ?? false)}
         canView={exists?.canView ?? false}
+        note={existsNote}
         rebuilds={!exists?.canLoad && (exists?.canView ?? false)}
         busy={loadingExisting || openingId !== null || rebuilding}
         onLoad={() => {
@@ -1198,7 +1217,10 @@ export function Build(): JSX.Element {
           setExists(null)
           setSlotOpen(true)
         }}
-        onDismiss={() => setExists(null)}
+        onDismiss={() => {
+          setExists(null)
+          setExistsNote('')
+        }}
       />
 
       {rebuildSheet}
