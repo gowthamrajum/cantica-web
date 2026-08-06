@@ -33,13 +33,18 @@ export default defineConfig({
       workbox: {
         // Precache the app shell only; the large data-*.js chunks are runtime-cached.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/data-*.js'],
+        globIgnores: ['**/data-*.js', '**/songs.worker-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
-            // Vendored Bible + Songs ship as lazy data-*.js chunks (too big for the
-            // precache) — cache them on first use so they're available offline.
-            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.includes('/assets/data-'),
+            // Vendored Bible + Songs ship as lazy chunks, too big for the
+            // precache — cached on first use so they are there offline. The
+            // search worker carries the songbook inside it and is the same kind
+            // of thing: without it here, the songs would be missing offline
+            // exactly on the screen that exists to search them.
+            urlPattern: ({ url, sameOrigin }) =>
+              sameOrigin &&
+              (url.pathname.includes('/assets/data-') || url.pathname.includes('/assets/songs.worker-')),
             handler: 'CacheFirst',
             options: {
               cacheName: 'tcc-data',

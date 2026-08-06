@@ -20,7 +20,7 @@
  * Both, because that is how the search gets used: by name for a song you can
  * name, by a remembered line for one you cannot. Run it whenever songs are
  * added or the
- * matching in src/lib/songs.ts is touched: a new batch of songs can crowd a
+ * matching in src/lib/songSearch.ts is touched: a new batch of songs can crowd a
  * spelling that used to be unambiguous, and that shows up here as a category
  * slipping rather than as a complaint on a Sunday.
  *
@@ -103,7 +103,7 @@ try {
     configFile: false,
     logLevel: 'error',
     build: {
-      lib: { entry: join(ROOT, 'src/lib/songs.ts'), formats: ['es'], fileName: 'songs' },
+      lib: { entry: join(ROOT, 'src/lib/songSearch.ts'), formats: ['es'], fileName: 'songs' },
       outDir: dir,
       emptyOutDir: false,
       minify: false,
