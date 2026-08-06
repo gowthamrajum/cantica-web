@@ -8,17 +8,18 @@ import { PsalmFields } from './PsalmFields'
 
 export type PickSource = 'songs' | 'psalms'
 
-/** A short page keeps the sheet a fixed, predictable height. */
-const PAGE_SIZE = 6
+/** A short list keeps the sheet a fixed, predictable height. */
+const SHOWN = 6
 
 /**
  * Picking what goes into a service, as a modal rather than a panel wedged into
  * the page. The builder screen is then just the service you're assembling — the
  * songbook only exists while you're actually choosing from it.
  *
- * Results are paged rather than dumped: rendering the whole match set made the
- * sheet grow to the height of the songbook, which is unusable on a phone and
- * pointless when you're picking one song.
+ * Only the best few matches are shown, and there is no paging: you find a song
+ * here by typing more of it, not by walking through two thousand results six at
+ * a time. Browsing the songbook is what the Songs screen is for — that one is
+ * paged.
  *
  * Search and psalm-reference state live here, not in the builder: they are
  * scratch input for this one interaction and shouldn't outlive it.
@@ -46,9 +47,8 @@ export function ServicePickerSheet({
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   const [matches, setMatches] = useState<SongMeta[] | null>(null)
-  /** How many the search matched in all — only the current page is fetched. */
+  /** How many the search matched in all — only the first few are fetched. */
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
   /** The whole library's size, for the placeholder — not the match count. */
   const [library, setLibrary] = useState<number | null>(null)
 
@@ -64,24 +64,20 @@ export function ServicePickerSheet({
     void countSongs().then(setLibrary)
   }, [open])
 
-  // Only search while the sheet is actually up — no point filtering the whole
-  // songbook for a list nobody is looking at.
-  // A new search starts at the first page; the fetch below follows.
-  useEffect(() => {
-    if (open && source === 'songs') setPage(0)
-  }, [debounced, source, open])
-
   /**
-   * Only the page being looked at is fetched.
+   * Only the handful being shown is fetched.
    *
    * A common word matches most of four and a half thousand songs, and the sheet
    * shows six of them. Carrying the rest out of the worker to render those six
    * is work nobody asked for — and it is paid on every keystroke.
+   *
+   * Only search while the sheet is actually up: no point filtering the whole
+   * songbook for a list nobody is looking at.
    */
   useEffect(() => {
     let alive = true
     if (!open || source !== 'songs') return
-    void searchSongs(debounced, page * PAGE_SIZE, PAGE_SIZE).then((r) => {
+    void searchSongs(debounced, 0, SHOWN).then((r) => {
       if (!alive) return
       setMatches(r.songs)
       setTotal(r.total)
@@ -89,15 +85,9 @@ export function ServicePickerSheet({
     return () => {
       alive = false
     }
-  }, [debounced, source, open, page])
+  }, [debounced, source, open])
 
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const safePage = Math.min(page, pages - 1)
-  // The fetch already returned exactly this page — slicing it again by the page
-  // offset would look past the end of it and render nothing.
   const visible = matches ?? []
-  const firstShown = total === 0 ? 0 : safePage * PAGE_SIZE + 1
-  const lastShown = Math.min(total, (safePage + 1) * PAGE_SIZE)
 
   return (
     <Sheet open={open} title="Add to service" onClose={onClose}>
@@ -156,32 +146,9 @@ export function ServicePickerSheet({
                 ))}
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-2 px-[var(--gutter)]">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={safePage === 0}
-                  aria-label="Previous page"
-                >
-                  <Icon name="back" size={18} strokeWidth={2.2} />
-                </button>
-                <span className="text-[13px] tabular-nums text-ink-muted">
-                  {firstShown}–{lastShown} of {total.toLocaleString()}
-                </span>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}
-                  disabled={safePage >= pages - 1}
-                  aria-label="Next page"
-                >
-                  <Icon name="chevron" size={18} strokeWidth={2.2} />
-                </button>
-              </div>
-              {total > PAGE_SIZE && (
-                <p className="px-[var(--gutter)] pt-1.5 text-center text-[12.5px] text-ink-muted">
-                  Keep typing to narrow it down.
+              {total > visible.length && (
+                <p className="px-[var(--gutter)] pt-2.5 text-center text-[12.5px] text-ink-muted">
+                  Showing {visible.length} of {total.toLocaleString()} — keep typing to narrow it down.
                 </p>
               )}
             </>

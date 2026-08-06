@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Screen } from '../components/app/Screen'
 import { useScreenScroll } from '../components/app/screenScroll'
@@ -6,27 +6,32 @@ import { Icon } from '../components/app/Icons'
 import { SearchField } from '../components/app/SearchField'
 import { searchSongs, type SongMeta } from '../lib/songs'
 
-const PAGE = 80
+const PAGE = 50
 
 export function Songs(): JSX.Element {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   const [songs, setSongs] = useState<SongMeta[] | null>(null)
-  /** How many the search matched in all — what tells the list to keep going. */
+  /** How many the search matched in all — only this page was fetched. */
   const [total, setTotal] = useState<number | null>(null)
+  const [page, setPage] = useState(0)
   const [error, setError] = useState(false)
   const scrollEl = useScreenScroll()
-  const sentinel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q), 200)
     return () => clearTimeout(t)
   }, [q])
 
+  // A new search starts at the first page — page 7 of the old results has
+  // nothing to do with what was just typed.
+  useEffect(() => {
+    setPage(0)
+  }, [debounced])
+
   useEffect(() => {
     let alive = true
-    setTotal(null)
-    searchSongs(debounced, 0, PAGE)
+    searchSongs(debounced, page * PAGE, PAGE)
       .then((r) => {
         if (!alive) return
         setSongs(r.songs)
@@ -36,42 +41,33 @@ export function Songs(): JSX.Element {
     return () => {
       alive = false
     }
-  }, [debounced])
+  }, [debounced, page])
 
-  /**
-   * Infinite scroll — a "Show more" button is a website affordance; a list that
-   * simply keeps going is the app one.
-   *
-   * Each turn of it now FETCHES the next page rather than revealing more of a
-   * list already in hand: a search for a common word matches thousands of songs,
-   * and carrying all of them out of the worker to show fifty is work nobody
-   * asked for. `loading` guards against the observer firing twice before the
-   * page it asked for has arrived.
-   */
-  const loading = useRef(false)
-  useEffect(() => {
-    const el = sentinel.current
-    if (!el || !scrollEl || !songs || total === null || songs.length >= total) return
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting) || loading.current) return
-        loading.current = true
-        const from = songs.length
-        void searchSongs(debounced, from, PAGE)
-          .then((r) => {
-            // Appended by position, so a page that arrives late cannot
-            // duplicate what is already on screen.
-            setSongs((prev) => (prev && prev.length === from ? [...prev, ...r.songs] : prev))
-          })
-          .finally(() => {
-            loading.current = false
-          })
-      },
-      { root: scrollEl, rootMargin: '600px 0px' }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [scrollEl, songs, total, debounced])
+  const pages = Math.max(1, Math.ceil((total ?? 0) / PAGE))
+  const safePage = Math.min(page, pages - 1)
+  const firstShown = !total ? 0 : safePage * PAGE + 1
+  const lastShown = Math.min(total ?? 0, (safePage + 1) * PAGE)
+
+  // Turning the page puts you at the top of it. Landing halfway down a fresh
+  // fifty songs — where the last page happened to leave the scroll — reads as
+  // the list having jumped rather than moved on.
+  //
+  // The reset has to wait for the new rows: doing it in the click handler puts
+  // the scroll at 0 while the OLD page is still on screen, and the browser then
+  // anchors the swapped-in rows back to where you were reading. Measured going
+  // from page 2 to 3 — it left you at 2326px, the bottom of a page you had not
+  // seen the top of.
+  const turned = useRef(false)
+  const turn = (to: number): void => {
+    if (to === safePage) return
+    turned.current = true
+    setPage(to)
+  }
+  useLayoutEffect(() => {
+    if (!turned.current || !songs) return
+    turned.current = false
+    scrollEl?.scrollTo({ top: 0 })
+  }, [songs, scrollEl])
 
   const visible = useMemo(() => songs ?? [], [songs])
   const searching = debounced.trim().length > 0
@@ -141,10 +137,33 @@ export function Songs(): JSX.Element {
         </div>
       ))}
 
-      <div ref={sentinel} aria-hidden="true" />
-      {songs && total !== null && songs.length < total && (
-        <div className="flex justify-center py-6">
-          <span className="spinner" />
+      {/* Paged rather than scrolling on forever: four and a half thousand songs
+          is a book, and a book tells you where in it you are. An endless list
+          answers "how much is left?" with nothing, and loses your place the
+          moment you open a song and come back. */}
+      {songs && songs.length > 0 && total !== null && (
+        <div className="pager">
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => turn(Math.max(0, safePage - 1))}
+            disabled={safePage === 0}
+            aria-label="Previous page"
+          >
+            <Icon name="back" size={18} strokeWidth={2.2} />
+          </button>
+          <span className="pager-count">
+            {firstShown.toLocaleString()}–{lastShown.toLocaleString()} of {total.toLocaleString()}
+          </span>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => turn(Math.min(pages - 1, safePage + 1))}
+            disabled={safePage >= pages - 1}
+            aria-label="Next page"
+          >
+            <Icon name="chevron" size={18} strokeWidth={2.2} />
+          </button>
         </div>
       )}
     </Screen>

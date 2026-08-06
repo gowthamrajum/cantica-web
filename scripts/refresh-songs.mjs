@@ -11,8 +11,9 @@
  * Those are real fields the library needs and this app never looks at, and at
  * four and a half thousand songs they are pure weight in everybody's browser.
  *
- *   node scripts/refresh-songs.mjs            report what would change
- *   node scripts/refresh-songs.mjs --apply    write src/data/songsData.json
+ *   node scripts/refresh-songs.mjs                          report what would change
+ *   node scripts/refresh-songs.mjs --apply                   write src/data/songsData.json
+ *   node scripts/refresh-songs.mjs --apply --allow-shrink    …when songs were removed on purpose
  */
 import fs from 'fs'
 import path from 'path'
@@ -22,6 +23,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(HERE, '..', 'src', 'data', 'songsData.json')
 const BASE = process.env.RELAY_BASE || 'https://grey-gratis-ice.onrender.com'
 const APPLY = process.argv.includes('--apply')
+/** Songs really were removed from the library — see the refusal below. */
+const ALLOW_SHRINK = process.argv.includes('--allow-shrink')
 
 const mb = (n) => `${(n / 1048576).toFixed(1)} MB`
 
@@ -93,10 +96,12 @@ if (!APPLY) {
   process.exit(0)
 }
 // Refuse to shrink the library by accident: a truncated answer from the relay
-// would otherwise quietly delete songs from everybody's phone.
-if (songs.length < before.length) {
+// would otherwise quietly delete songs from everybody's phone. A deliberate
+// removal says so on the command line — deleting the file to get past this
+// would throw away the very diff that shows what is going.
+if (songs.length < before.length && !ALLOW_SHRINK) {
   console.error(`\nREFUSING: this would drop the bundle from ${before.length} to ${songs.length} songs.`)
-  console.error('If that is really intended, delete the file first.')
+  console.error('If songs really were removed from the library, pass --allow-shrink.')
   process.exit(1)
 }
 fs.writeFileSync(OUT, text)

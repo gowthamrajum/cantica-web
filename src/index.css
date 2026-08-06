@@ -820,6 +820,21 @@
 
 /* Holds the song results at a constant height (six rows plus the pager) so the
    bottom-anchored sheet never grows or shrinks as the match count changes. */
+/* The songbook's page turner. Sits under the list with the same gutter as the
+   rows, and keeps the count from shifting about as the digits change. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px var(--gutter) 6px;
+}
+.pager-count {
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+
 .picker-results {
   display: flex;
   flex-direction: column;
