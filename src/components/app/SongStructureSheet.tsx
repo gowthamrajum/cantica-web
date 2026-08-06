@@ -394,8 +394,8 @@ export function SongStructureSheet({
       }
     >
       <p className="mb-3 text-[13px] leading-relaxed text-ink-muted">
-        Untick a stanza to leave it out. The one marked <b>repeats</b> comes back between the
-        others — usually the Pallavi.
+        Untick a stanza to leave it out. Tick <b>repeats</b> on the one that comes back between the
+        others — usually the Pallavi — and tick it again to stop it.
       </p>
 
       <div className="list-group">
@@ -430,13 +430,21 @@ export function SongStructureSheet({
                 <span className="list-title block">{sec.label}</span>
                 <span className="list-sub block truncate">{first}</span>
               </span>
+              {/* A checkbox, not a one-way switch: tapping the marked one
+                  clears it. It only ever SET the repeat before, so the way to
+                  undo was to scroll up to "Nothing repeats" — which is not
+                  where anyone looks for the opposite of a button they just
+                  pressed. Still one at a time; a song has one refrain. */}
               <button
-                className={`flex-none rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                className={`flex flex-none items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide ${
                   recurring === id ? 'bg-gold-500 text-white' : 'bg-black/5 text-ink-muted'
                 } disabled:opacity-40`}
                 disabled={!on}
-                onClick={() => setRecurring(id)}
+                aria-pressed={recurring === id}
+                title={recurring === id ? 'Stop this one repeating' : 'Play this one between the others'}
+                onClick={() => setRecurring(recurring === id ? null : id)}
               >
+                <Icon name={recurring === id ? 'check' : 'plus'} size={12} strokeWidth={3} />
                 Repeats
               </button>
               <button
