@@ -85,7 +85,26 @@ export function SongStructureSheet({
     // includedIds is the arrangement WITH the repeat woven in; the sheet works
     // in distinct sections, so take each id once, in first-seen order.
     const distinct = kept ? [...new Set(kept)] : null
-    setOrder(distinct?.length ? [...distinct, ...all.filter((id) => !distinct.includes(id))] : all)
+    /**
+     * Rebuild the running order with the LEFT-OUT sections back where they
+     * belong.
+     *
+     * includedIds records only what plays, so reopening a song that had stanza 1
+     * left out used to append it after the ones that were kept — and turning it
+     * back on then played it last, in the wrong place, for good. The stanza had
+     * not been moved; it had been dropped off the end of a list and pushed back
+     * on.
+     *
+     * So each excluded section keeps its natural position and the included ones
+     * take the saved order among themselves. A song nobody reordered comes back
+     * exactly as it is written; one that WAS reordered keeps it.
+     */
+    const rebuilt = (): string[] => {
+      if (!distinct?.length) return all
+      const queue = [...distinct]
+      return all.map((id) => (distinct.includes(id) ? queue.shift() ?? id : id))
+    }
+    setOrder(rebuilt())
     setIncluded(new Set(distinct?.length ? distinct : all))
     setRecurring(
       initial ? (initial.recurringId ?? null) : detectRecurringSection(sections)
