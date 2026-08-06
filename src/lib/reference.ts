@@ -1,5 +1,6 @@
 import { TE_BOOKS, teBook, type IndexedBible } from './bible'
 import { romanizeTelugu, romanMatches, romanPrefix } from './teluguRoman'
+import { bilingualScriptureSlides } from './scriptureSlides'
 
 /** Every book's Telugu name romanised once — "యోహాను సువార్త" -> "yohanu suvartha",
  *  which is what someone without a Telugu keyboard actually types. */
@@ -171,25 +172,34 @@ export function parseReference(input: string, order: string[]): Reference | null
 
 export type VerseLang = 'both' | 'telugu' | 'english'
 
-/** A parsed reference → the lines to put on the screen, and what to call it. */
+/**
+ * A parsed reference → ONE SLIDE PER VERSE, as the desktop builds them.
+ *
+ * A passage all on one slide is unreadable from the back of a room and is not
+ * what Add verse does on the projection machine — mirrors bilingualScriptureSlides,
+ * down to each slide carrying its own reference as label and caption.
+ *
+ * `lines` is the whole passage flattened, kept only so a presenter too old to
+ * know about `slides` still shows the words rather than nothing.
+ */
 export function versesFor(
   ref: Reference,
   te: IndexedBible | null,
   en: IndexedBible | null,
   lang: VerseLang
-): { label: string; lines: string[] } | null {
+): { label: string; lines: string[]; slides: { label: string; lines: string[] }[] } | null {
   const want = ref.verses ? new Set(ref.verses) : null
+
   const inRange = (b: IndexedBible | null): { verse: number; text: string }[] =>
     (b?.byBook[ref.book]?.[ref.chapter] ?? []).filter((v) => !want || want.has(v.verse))
 
   const teV = inRange(te)
   const enV = inRange(en)
-  const n = Math.max(teV.length, enV.length)
-  if (!n) return null
-
+  if (!teV.length && !enV.length) return null
   // Consecutive runs become ranges and gaps become commas, so a label says what
   // is actually on screen: [13,14,15,16] -> "13-16", [13,16] -> "13,16".
   const nums = [...new Set([...teV, ...enV].map((v) => v.verse))].sort((a, b) => a - b)
+
   const parts: string[] = []
   for (let i = 0; i < nums.length; ) {
     let j = i
@@ -199,18 +209,24 @@ export function versesFor(
   }
   const span = parts.join(',')
 
-  const lines: string[] = []
-  for (let i = 0; i < n; i++) {
-    // Telugu above its English, verse by verse — the same pairing the rest of
-    // the app uses, so a verse thrown up mid-sermon looks like everything else.
-    if (lang !== 'english' && teV[i]) lines.push(teV[i].text)
-    if (lang !== 'telugu' && enV[i]) lines.push(enV[i].text)
-  }
-  if (!lines.length) return null
+  // lumen's own builder, given this app's accessors. The verse numbers are the
+  // union of both translations, so a verse present in one and missing from the
+  // other still gets its slide.
+  const teByVerse = new Map(teV.map((v) => [v.verse, v.text]))
+  const enByVerse = new Map(enV.map((v) => [v.verse, v.text]))
+  const slides = bilingualScriptureSlides(
+    nums,
+    lang,
+    (n) => teByVerse.get(n) ?? '',
+    (n) => enByVerse.get(n) ?? '',
+    (n) => `${lang === 'telugu' ? teBook(ref.book) : ref.book} ${ref.chapter}:${n}`
+  )
+  if (!slides.length) return null
+  const lines = slides.flatMap((sl) => sl.lines)
 
   const label =
     lang === 'telugu'
       ? `${teBook(ref.book)} ${ref.chapter}:${span}`
       : `${ref.book} ${ref.chapter}:${span}`
-  return { label, lines }
+  return { label, lines, slides }
 }

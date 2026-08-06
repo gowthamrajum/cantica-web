@@ -88,10 +88,18 @@ export const streamUrl = (room: string, view: LiveView = 'users'): string =>
 // needs to know anything about scripture.
 export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end' | 'verse'
 
-/** What a `verse` command carries. */
+/**
+ * What a `verse` command carries.
+ *
+ * `slides` is the real payload — one per verse, as the desktop builds them, each
+ * labelled with its own reference. `lines` is the whole passage flattened and
+ * exists only for a presenter too old to know about `slides`: it shows the words
+ * on one slide rather than showing nothing.
+ */
 export interface VersePayload {
   label: string
   lines: string[]
+  slides?: { label: string; lines: string[] }[]
 }
 
 export interface ControlStatus {

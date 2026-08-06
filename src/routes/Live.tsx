@@ -99,6 +99,9 @@ export function Live(): JSX.Element {
   useEffect(() => setItems(envelope?.service.items ?? []), [envelope])
   /** An item that has just been given a verse, waiting for the deck to catch up. */
   const jumpToLastOf = useRef<number | null>(null)
+  /** How long that item's run was before the verses landed, so the jump can find
+   *  the first NEW slide rather than the first old one. */
+  const verseFrom = useRef(0)
   const deck = useMemo(() => flattenDeck(items), [items])
   const name = envelope?.service.name ?? 'Live Service'
   const theme = envelope?.service.theme as Theme | undefined
@@ -221,29 +224,27 @@ export function Live(): JSX.Element {
           // a verse is wanted and a countdown would take it away mid-sentence.
           const at = cursor >= 0 && cursor < deck.length ? deck[cursor].item : -1
           if (at < 0) return
+          // One slide per verse, as the desktop builds them. A whole passage on
+          // one slide is unreadable from the back of a room.
           const passage = arg
-          setItems((list) =>
-            list.map((it, i) =>
-              i === at
-                ? {
-                    ...it,
-                    slides: [
-                      ...it.slides,
-                      {
-                        id: `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-                        kind: 'scripture' as const,
-                        label: passage.label,
-                        lines: passage.lines,
-                        caption: passage.label
-                      }
-                    ]
-                  }
-                : it
-            )
-          )
+          const parts = passage.slides?.length
+            ? passage.slides
+            : [{ label: passage.label, lines: passage.lines }]
+          const built = parts
+            .filter((sl) => sl.lines?.some((l) => l && l.trim()))
+            .map((sl, k) => ({
+              id: `v-${Date.now().toString(36)}-${k}-${Math.random().toString(36).slice(2, 6)}`,
+              kind: 'scripture' as const,
+              label: sl.label,
+              lines: sl.lines,
+              caption: sl.label
+            }))
+          if (!built.length) return
+          setItems((list) => list.map((it, i) => (i === at ? { ...it, slides: [...it.slides, ...built] } : it)))
           // The cursor cannot move until the deck has been rebuilt around the
           // new slide, so the jump is deferred rather than computed against a
           // deck that is one slide out of date.
+          verseFrom.current = deck.reduce((acc, d, i) => (d.item === at ? i + 1 : acc), 0)
           jumpToLastOf.current = at
         } else if (cmd === 'goto' && arg !== null && typeof arg === 'number') {
           // The outline the remote sees is the ITEM list, so a goto lands on the
@@ -262,8 +263,10 @@ export function Live(): JSX.Element {
     const at = jumpToLastOf.current
     if (at == null) return
     jumpToLastOf.current = null
-    const last = deck.reduce((acc, d, i) => (d.item === at ? i : acc), -1)
-    if (last >= 0) setCursor(last)
+    // The FIRST of the verses just added, not the last: a passage is read from
+    // its opening verse, and Next walks the rest.
+    const first = deck.findIndex((d, i) => d.item === at && i >= verseFrom.current)
+    if (first >= 0) setCursor(first)
   }, [deck])
 
   useEffect(() => {
