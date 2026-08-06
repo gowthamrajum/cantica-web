@@ -1,7 +1,50 @@
-import { Icon } from './Icons'
+import { Fragment } from 'react'
+import { Icon, type IconName } from './Icons'
 import { prettyDate } from '../../lib/serviceSlot'
 import { usableLinks } from '../../lib/links'
-import type { ServiceEnvelope } from '../../lib/buildService'
+import type { ItemKind, ServiceEnvelope, ServiceItem } from '../../lib/buildService'
+
+/** Read the order at a glance: a clip and a countdown should not both be notes. */
+const ICON_FOR: Partial<Record<ItemKind, IconName>> = {
+  song: 'songs',
+  scripture: 'text',
+  text: 'text',
+  media: 'watch',
+  video: 'watch',
+  countdown: 'calendar',
+  blank: 'minus'
+}
+
+/**
+ * The gap between two items, and the way something gets into it.
+ *
+ * Kept deliberately quiet — a thin rule with a small plus — because there is one
+ * of these between every pair of rows, and a service of a dozen items would
+ * otherwise be half buttons.
+ */
+function InsertHere({
+  at,
+  onAdd,
+  disabled
+}: {
+  at: number
+  onAdd: (at: number) => void
+  disabled?: boolean
+}): JSX.Element {
+  return (
+    <div className="insert-gap">
+      <button
+        type="button"
+        className="insert-gap-btn"
+        onClick={() => onAdd(at)}
+        disabled={disabled}
+        aria-label={`Add something at position ${at + 1}`}
+      >
+        <Icon name="plus" size={15} strokeWidth={2.6} />
+      </button>
+    </div>
+  )
+}
 
 /**
  * A service this app can read but not rewrite.
@@ -25,6 +68,14 @@ export function SavedServiceView({
   origin,
   sharing,
   rebuilding,
+  items,
+  onMove,
+  dirty,
+  saving,
+  onSaveOrder,
+  onResetOrder,
+  onAdd,
+  onRemove,
   onPreviewAll,
   onPreviewItem,
   onShare,
@@ -45,9 +96,18 @@ export function SavedServiceView({
   onBroadcast: () => void
   /** Work the deck back into editable picks — it reports what it can't first. */
   onRebuild?: () => void
+  /** The order being edited — the stored one until something is moved. */
+  items: ServiceItem[]
+  onMove: (index: number, dir: -1 | 1) => void
+  dirty: boolean
+  saving: boolean
+  onSaveOrder: () => void
+  onResetOrder: () => void
+  /** Put something new in at this index. */
+  onAdd?: (at: number) => void
+  onRemove?: (index: number) => void
   onClose: () => void
 }): JSX.Element {
-  const items = envelope.service.items ?? []
   const links = usableLinks(envelope.service.links)
   const slides = items.reduce((n, it) => n + (it.slides?.length ?? 0), 0)
   /** Slides with words on them — the only ones a phone broadcast can carry. */
@@ -110,18 +170,16 @@ export function SavedServiceView({
       )}
 
       <div className="list-group mt-3">
+        {/* A gap before the first item too: something has to be able to go at
+            the top of a service, not only after whatever is already there. */}
+        {onAdd && <InsertHere at={0} onAdd={onAdd} disabled={saving} />}
         {items.map((it, i) => {
           const n = it.slides?.length ?? 0
           return (
-            <button
-              key={it.id ?? i}
-              type="button"
-              className="list-row has-ico"
-              onClick={() => onPreviewItem(i)}
-              disabled={!n}
-            >
+            <Fragment key={it.id ?? i}>
+            <div className="list-row has-ico">
               <span className="list-ico bg-navy-500">
-                <Icon name={it.kind === 'scripture' ? 'text' : 'songs'} size={18} strokeWidth={2} />
+                <Icon name={ICON_FOR[it.kind] ?? 'songs'} size={18} strokeWidth={2} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="list-title block truncate">
@@ -132,25 +190,102 @@ export function SavedServiceView({
                   {it.slot ? ` · ${it.slot}` : ''}
                 </span>
               </span>
-              <Icon name="eye" size={17} className="list-chev" />
-            </button>
+              {/* Moving an item needs nothing the deck doesn't already hold, so
+                  it is the one edit that can be made here without loss — the
+                  slides travel exactly as the presenter built them. */}
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => onMove(i, -1)}
+                disabled={i === 0 || saving}
+                aria-label={`Move ${it.title} up`}
+              >
+                <Icon name="chevron" size={17} className="-rotate-90" />
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => onMove(i, 1)}
+                disabled={i === items.length - 1 || saving}
+                aria-label={`Move ${it.title} down`}
+              >
+                <Icon name="chevron" size={17} className="rotate-90" />
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => onPreviewItem(i)}
+                disabled={!n}
+                aria-label={`Preview ${it.title}`}
+              >
+                <Icon name="eye" size={17} />
+              </button>
+              {onRemove && (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => onRemove(i)}
+                  disabled={saving}
+                  aria-label={`Remove ${it.title}`}
+                >
+                  <Icon name="close" size={17} />
+                </button>
+              )}
+            </div>
+            {onAdd && <InsertHere at={i + 1} onAdd={onAdd} disabled={saving} />}
+            </Fragment>
           )
         })}
       </div>
 
+      {/* Only once something has moved: a Save that is always there invites the
+          question of what it would save. */}
+      {dirty && (
+        <div className="mt-3 px-[var(--gutter)]">
+          <button className="btn-app btn-app-primary btn-block" onClick={onSaveOrder} disabled={saving}>
+            {saving ? 'Saving…' : 'Save the new order'}
+          </button>
+          <button
+            className="btn-app btn-app-quiet btn-block mt-2 text-[15px]"
+            onClick={onResetOrder}
+            disabled={saving}
+          >
+            Put it back
+          </button>
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+            Only the order changes. Every slide — the videos, the countdown, the announcement layouts — is written
+            back exactly as the presenter built it.
+          </p>
+        </div>
+      )}
+
       <div className="mt-3 px-[var(--gutter)]">
-        <button className="btn-app btn-app-gold btn-block" onClick={onBroadcast} disabled={!withText}>
+        <button
+          className="btn-app btn-app-gold btn-block"
+          onClick={onBroadcast}
+          disabled={!withText || dirty || saving}
+        >
           <Icon name="broadcast" size={18} strokeWidth={2.1} /> Broadcast live
         </button>
       </div>
       <div className="mt-2 flex gap-2 px-[var(--gutter)]">
-        <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={onShare} disabled={sharing}>
+        <button
+          className="btn-app btn-app-quiet flex-1 text-[15px]"
+          onClick={onShare}
+          disabled={sharing || dirty || saving}
+        >
           {sharing ? 'Preparing…' : 'Share'}
         </button>
         <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={onPreviewAll} disabled={!slides}>
           Preview
         </button>
       </div>
+      {dirty && (
+        <p className="mt-2 px-[var(--gutter)] text-[13px] leading-relaxed text-ink-muted">
+          Save the new order before sharing or broadcasting — both work from the stored copy, which still has the
+          old one.
+        </p>
+      )}
       <p className="mt-2 px-[var(--gutter)] text-[13px] leading-relaxed text-ink-muted">
         {/* A phone broadcast carries words, not the presenter's video, images or
             countdown — so say how much of this order would actually go out. */}

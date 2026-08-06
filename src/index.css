@@ -440,6 +440,49 @@
   box-shadow: theme('boxShadow.soft');
   overflow: hidden;
 }
+/* The gap between two items in an editable order, and the plus that fills it.
+   One sits between every pair of rows, so it stays a hairline until it is
+   reached for — a dozen full-width buttons would read as the list itself. */
+.insert-gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  position: relative;
+}
+.insert-gap::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: theme('colors.line');
+}
+.insert-gap-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid theme('colors.line');
+  background: theme('colors.card');
+  color: theme('colors.ink.muted');
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.insert-gap-btn:active {
+  transform: scale(0.9);
+}
+.insert-gap-btn:disabled {
+  opacity: 0.4;
+}
+@media (hover: hover) {
+  .insert-gap-btn:hover {
+    color: theme('colors.gold.600');
+    border-color: theme('colors.gold.500');
+  }
+}
+
 .list-row {
   position: relative;
   display: flex;

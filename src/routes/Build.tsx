@@ -23,6 +23,11 @@ import { loadBible } from '../lib/bible'
 import { createService, findService, getService, updateService } from '../lib/relay'
 import { readEnvelope } from '../lib/livecast'
 import { picksFromDeck } from '../lib/deckToPicks'
+import { backgroundForUrl, insertAt, mediaItem } from '../lib/deckItems'
+import { AddDeckItemSheet, type AddKind } from '../components/app/AddDeckItemSheet'
+import { MediaUrlFields } from '../components/app/MediaUrlFields'
+import { MediaUploadFields } from '../components/app/MediaUploadFields'
+import { mediaConfig, type MediaConfig } from '../lib/mediaUpload'
 import { fromBuilderState, isFromPresenter, readBuilderState, toBuilderState } from '../lib/builderState'
 import {
   DAYS,
@@ -39,10 +44,13 @@ import { shareFiles } from '../lib/shareFiles'
 import {
   buildService,
   countSlides,
+  psalmToItems,
   roleAlsoGeneral,
+  songToItem,
   type Pick,
   type PsalmVerse,
   type ServiceEnvelope,
+  type ServiceItem,
   type ServiceLang,
   type SongStructure
 } from '../lib/buildService'
@@ -125,6 +133,27 @@ export function Build(): JSX.Element {
   } | null>(null)
   /** Which of the read-only service's items is being previewed. */
   const [viewPreview, setViewPreview] = useState<number | 'all' | null>(null)
+  /**
+   * The order being edited in the read-only view.
+   *
+   * Reordering is the one edit a finished deck can take without loss: it needs
+   * nothing the deck doesn't already hold, so the slides go back exactly as the
+   * presenter built them — the videos, the countdown, the composed announcement
+   * layouts, the QR code. Everything else about the deck is left alone.
+   */
+  const [viewItems, setViewItems] = useState<ServiceItem[]>([])
+  const [viewSaving, setViewSaving] = useState(false)
+  /**
+   * Where something new goes, once the operator has tapped a gap.
+   *
+   * Held from the moment the plus is pressed until the thing is built, because
+   * choosing a song takes two more sheets and the position has to survive them
+   * — otherwise it lands wherever the list happened to end.
+   */
+  const [addAt, setAddAt] = useState<number | null>(null)
+  const [addKind, setAddKind] = useState<AddKind | null>(null)
+  /** Whether a media store is configured, so the sheet can offer upload or not. */
+  const [media, setMedia] = useState<MediaConfig>({ enabled: false, maxBytes: 0 })
   /**
    * A recovered deck waiting on "yes, edit it here".
    *
@@ -466,6 +495,12 @@ export function Build(): JSX.Element {
     }
   }
 
+  // Asked once: whether a file can be uploaded at all is a property of the
+  // deployment, not of this service.
+  useEffect(() => {
+    void mediaConfig().then(setMedia)
+  }, [])
+
   // The slot the builder opens on was chosen by nobody, so learn its state for
   // the button but don't interrupt with it before the user has said anything.
   useEffect(() => {
@@ -558,6 +593,7 @@ export function Build(): JSX.Element {
         setNote('That service couldn’t be read.')
         return
       }
+      setViewItems(env.service.items ?? [])
       setViewing({
         id: s.id,
         day: s.serviceDay,
@@ -624,6 +660,92 @@ export function Build(): JSX.Element {
     } finally {
       setRebuilding(false)
     }
+  }
+
+  /**
+   * Save a reordered deck back, verbatim apart from the order.
+   *
+   * The envelope that comes off the relay is spread whole rather than rebuilt,
+   * so everything this app has no concept of — the presenter's obsStyle, the
+   * origin stamp, per-item broadcast flags, composed slide layouts — survives a
+   * round trip through a builder that never knew those fields existed.
+   */
+  const saveViewOrder = async (): Promise<void> => {
+    if (!viewing) return
+    setViewSaving(true)
+    try {
+      const next = {
+        ...viewing.envelope,
+        service: { ...viewing.envelope.service, items: viewItems }
+      }
+      const r = await updateService(viewing.id, next, {
+        serviceDay: viewing.day,
+        serviceDate: viewing.date
+      })
+      if (r.ok) {
+        // The stored deck IS this one now, so the baseline moves with it and
+        // Share and Broadcast come back.
+        setViewing({ ...viewing, envelope: next })
+        setNote('Saved the new order.')
+      } else {
+        setNote('message' in r ? r.message : 'Could not save the new order.')
+      }
+    } finally {
+      setViewSaving(false)
+    }
+  }
+
+  /**
+   * A psalm reference → the pair of items Cantica presents it as: a Responsive
+   * Reading heading and the verses. Returns null when the reference names
+   * nothing, so the sheet can stay open and say so.
+   */
+  const psalmItemsFor = async (
+    chapter: string,
+    from: string,
+    to: string
+  ): Promise<{ items: ServiceItem[]; label: string } | null> => {
+    const ch = Math.max(1, Math.min(150, Number(chapter) || 1))
+    const [te, en] = await Promise.all([loadBible('telugu'), loadBible('web')])
+    const enByVerse = new Map((en.byBook['Psalms']?.[ch] ?? []).map((v) => [v.verse, v.text]))
+    let verses: PsalmVerse[] = (te.byBook['Psalms']?.[ch] ?? []).map((v) => ({
+      verse: v.verse,
+      telugu: v.text,
+      english: enByVerse.get(v.verse) ?? ''
+    }))
+    const lo = Number(from)
+    const hi = Number(to)
+    if (from.trim() && to.trim()) {
+      if (lo > hi) {
+        setNote('First verse must not be after the last.')
+        return null
+      }
+      verses = verses.filter((v) => v.verse >= lo && v.verse <= hi)
+    }
+    if (!verses.length) {
+      setNote('No verses for that reference.')
+      return null
+    }
+    const items = psalmToItems(ch, verses, lang)
+    if (!items.length) return null
+    return { items, label: `Psalm ${ch}${from.trim() && to.trim() ? `:${lo}-${hi}` : ''}` }
+  }
+
+  /** Put freshly built items into the deck at the held position. */
+  const addToDeck = (added: ServiceItem[], what: string): void => {
+    setViewItems((list) => insertAt(list, addAt, added))
+    setAddKind(null)
+    setAddAt(null)
+    setNote(`Added ${what}. Save the new order to keep it.`)
+  }
+
+  /** "before Sermon" / "at the end" — so the sheet can say where this lands. */
+  const addPosition = (): string => {
+    if (addAt == null) return 'at the end'
+    const after = viewItems[addAt - 1]
+    const before = viewItems[addAt]
+    if (!before) return after ? `after ${after.title}` : 'as the first item'
+    return after ? `between ${after.title} and ${before.title}` : `before ${before.title}`
   }
 
   /** Adopt the recovered picks — the builder now edits that service. */
@@ -759,6 +881,13 @@ export function Build(): JSX.Element {
   // A service opened for reading takes the whole screen: the builder's controls
   // all write, and showing them beside a deck they cannot change would offer an
   // edit that silently applies to something else.
+  // Compared by id sequence: the items themselves are untouched by a move, so
+  // only their positions can differ.
+  const viewDirty =
+    !!viewing &&
+    viewItems.map((it) => it.id).join('\u0000') !==
+      (viewing.envelope.service.items ?? []).map((it) => it.id).join('\u0000')
+
   if (viewing) {
     return (
       <Screen
@@ -772,6 +901,33 @@ export function Build(): JSX.Element {
             date={viewing.date}
             origin={viewing.origin}
             sharing={sharing}
+            items={viewItems}
+            onMove={(i, dir) =>
+              setViewItems((list) => {
+                const j = i + dir
+                if (j < 0 || j >= list.length) return list
+                const out = list.slice()
+                ;[out[i], out[j]] = [out[j], out[i]]
+                return out
+              })
+            }
+            dirty={viewDirty}
+            saving={viewSaving}
+            onSaveOrder={() => void saveViewOrder()}
+            onAdd={(at) => {
+              setAddAt(at)
+              setAddKind(null)
+              setNote('')
+            }}
+            onRemove={(i) => {
+              const gone = viewItems[i]?.title ?? 'that item'
+              setViewItems((list) => list.filter((_, j) => j !== i))
+              setNote(`Removed ${gone}. Save the new order to keep it.`)
+            }}
+            onResetOrder={() => {
+              setViewItems(viewing.envelope.service.items ?? [])
+              setNote('')
+            }}
             onPreviewAll={() => setViewPreview('all')}
             onPreviewItem={(i) => setViewPreview(i)}
             onShare={() => void shareEnvelope(viewing.envelope, `${viewing.day} Service · ${prettyDate(viewing.date)}`)}
@@ -800,6 +956,94 @@ export function Build(): JSX.Element {
           currentDate={viewing.date}
           currentDay={viewing.day}
           busyId={openingId}
+        />
+
+        {/* Choosing what goes in, then building it. A song takes two more
+            sheets after this one, which is why the position is held in state
+            rather than passed along. */}
+        <AddDeckItemSheet
+          open={addAt !== null && addKind === null}
+          position={addPosition()}
+          uploadReady={media.enabled}
+          onPick={(k) => {
+            setAddKind(k)
+            if (k === 'song') setPickerOpen(true)
+          }}
+          onClose={() => {
+            setAddAt(null)
+            setAddKind(null)
+          }}
+        />
+
+        <Sheet
+          open={addKind === 'url'}
+          title="Add a link"
+          onClose={() => setAddKind(null)}
+        >
+          <MediaUrlFields
+            onAdd={(url, name) => {
+              const bg = backgroundForUrl(url)
+              if (bg) addToDeck([mediaItem(name, bg)], name)
+            }}
+            onCancel={() => setAddKind(null)}
+          />
+        </Sheet>
+
+        <Sheet open={addKind === 'media'} title="Add a file" onClose={() => setAddKind(null)}>
+          <MediaUploadFields
+            maxBytes={media.maxBytes}
+            onUploaded={(url, nm) => {
+              const bg = backgroundForUrl(url)
+              if (bg) addToDeck([mediaItem(nm, bg)], nm)
+            }}
+            onCancel={() => setAddKind(null)}
+          />
+        </Sheet>
+
+        <Sheet open={addKind === 'psalm'} title="Add a responsive reading" onClose={() => setAddKind(null)}>
+          <PsalmFields
+            submitVerb="Add"
+            onSubmit={async (c, f, t) => {
+              const built = await psalmItemsFor(c, f, t)
+              if (!built) return false
+              addToDeck(built.items, built.label)
+              return true
+            }}
+          />
+        </Sheet>
+
+        <ServicePickerSheet
+          open={pickerOpen && addKind === 'song'}
+          source="songs"
+          allowPsalms={false}
+          onSourceChange={() => {}}
+          onClose={() => {
+            setPickerOpen(false)
+            setAddKind(null)
+          }}
+          onPickSong={(m) => {
+            setPickerOpen(false)
+            void getSong(m.song_id).then((song) => song && setPending(song))
+          }}
+          onAddPsalm={async () => false}
+        />
+
+        <SongStructureSheet
+          song={addKind === 'song' ? pending : null}
+          lang={lang}
+          initial={null}
+          confirmVerb="Add"
+          onCancel={() => {
+            setPending(null)
+            setAddKind(null)
+          }}
+          onAdd={(structure) => {
+            const song = pending
+            setPending(null)
+            if (!song) return
+            const item = songToItem(song, lang, structure)
+            if (item) addToDeck([item], song.song_name)
+          }}
         />
 
         {rebuildSheet}

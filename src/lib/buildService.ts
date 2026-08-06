@@ -14,18 +14,45 @@ import { usableLinks, type ServiceLink } from './links'
 
 export type ServiceLang = 'both' | 'telugu' | 'english'
 
+/**
+ * A slide's backdrop, in the shape Cantica already renders.
+ *
+ * `value` is a URL for image/video/audio and the bare 11-character id for
+ * youtube — that is what lumen's own mediaSlide and youtubeId produce, and a
+ * deck edited here has to be indistinguishable from one built there.
+ */
+export interface SlideBackground {
+  type: 'image' | 'video' | 'audio' | 'youtube'
+  value: string
+  fit?: 'cover' | 'contain'
+}
+
 export interface ServiceSlide {
   id: string
-  kind: 'text' | 'scripture'
+  /** 'media' is a backdrop with no words — a clip, a photo, a YouTube link. */
+  kind: 'text' | 'scripture' | 'media'
   label: string
   lines: string[]
   singleLine?: boolean
   caption?: string
+  background?: SlideBackground
 }
+
+/**
+ * `kind` is deliberately widened past what this app BUILDS.
+ *
+ * A deck published from the presenter carries kinds this builder never
+ * produces — countdown, blank, ppt, pdf — and once such a deck can be edited
+ * here, those items pass through the same code paths as the ones we made. They
+ * are typed rather than cast away so that anything reading `kind` has to
+ * account for them.
+ */
+export type ItemKind = 'song' | 'scripture' | 'text' | 'media' | 'video' | 'countdown' | 'blank' | 'ppt' | 'pdf'
+
 export interface ServiceItem {
   id: string
   title: string
-  kind: 'song' | 'scripture'
+  kind: ItemKind
   slides: ServiceSlide[]
   /** where Cantica drops this on import (see SLOT_*) */
   slot?: string
