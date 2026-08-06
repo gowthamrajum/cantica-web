@@ -438,13 +438,17 @@ export function SongStructureSheet({
     setConfirmReset(false)
   }
 
-  const rowDrag = useRowDrag((from, to) =>
-    setOrder((prev) => {
-      const next = prev.slice()
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
+  const rowDrag = useRowDrag(
+    (from, to) =>
+      setOrder((prev) => {
+        const next = prev.slice()
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        return next
+      }),
+    // Its own attribute: this sheet floats over the service's draggable list,
+    // and a shared one let the aim fall through to the songs underneath.
+    'data-section-row'
   )
 
   /** Another go at the same section, dropped in right below this one and ready
@@ -546,13 +550,14 @@ export function SongStructureSheet({
           // shifts under the finger while it is being aimed.
           const dragging = rowDrag.carrying(key)
           const aiming = rowDrag.aimingAt(idx)
+          const aimingEnd = rowDrag.aimingEnd(idx, order.length)
           return (
             <div
               key={key}
-              data-row-index={idx}
+              data-section-row={idx}
               className={`border-y-2 border-transparent ${aiming ? '!border-t-gold-500' : ''} ${
-                dragging ? 'opacity-40' : ''
-              }`}
+                aimingEnd ? '!border-b-gold-500' : ''
+              } ${dragging ? 'opacity-40' : ''}`}
             >
             <div className={`list-row gap-2 ${on ? '' : 'opacity-45'}`}>
               <button className="icon-btn flex-none" onClick={() => toggle(key)} aria-label={on ? 'Leave out' : 'Include'}>

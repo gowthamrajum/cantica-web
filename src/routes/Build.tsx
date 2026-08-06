@@ -345,13 +345,15 @@ export function Build(): JSX.Element {
   const removeAt = (i: number): void => setPicks((p) => p.filter((_, j) => j !== i))
   // Drag a song where it goes. The arrows it replaces moved one step per tap,
   // so putting the last song first in an eight-song service took seven.
-  const pickDrag = useRowDrag((from, to) =>
-    setPicks((p) => {
-      const next = p.slice()
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
+  const pickDrag = useRowDrag(
+    (from, to) =>
+      setPicks((p) => {
+        const next = p.slice()
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        return next
+      }),
+    'data-pick-row'
   )
   const setLangAt = (i: number, l: ServiceLang): void =>
     setPicks((p) => p.map((x, j) => (j === i ? { ...x, lang: l } : x)))
@@ -1184,10 +1186,12 @@ export function Build(): JSX.Element {
             {picks.map((p, i) => (
               <div
                 key={p.key}
-                data-row-index={i}
+                data-pick-row={i}
                 className={`list-row flex-col !items-start gap-0 border-y-2 border-transparent text-left ${
                   pickDrag.aimingAt(i) ? '!border-t-gold-500' : ''
-                } ${pickDrag.carrying(p.key) ? 'opacity-40' : ''}`}
+                } ${pickDrag.aimingEnd(i, picks.length) ? '!border-b-gold-500' : ''} ${
+                  pickDrag.carrying(p.key) ? 'opacity-40' : ''
+                }`}
               >
                 {/* Collapsed, an item is one line: enough to read the order and
                     check a role. Eight items with their controls open ran most

@@ -27,6 +27,9 @@ export interface RowDrag {
   }
   /** True for the row the drop mark belongs above. */
   aimingAt: (index: number) => boolean
+  /** True for the LAST row when the drop lands after it — the mark goes below
+   *  that row, there being no row after it to sit above. */
+  aimingEnd: (index: number, total: number) => boolean
   /** True for the row being carried, so it can be faded. */
   carrying: (key: string) => boolean
 }
@@ -48,10 +51,40 @@ export function useRowDrag(
    */
   const live = useRef<{ key: string; from: number; to: number } | null>(null)
 
+  /**
+   * Which slot the finger is over — including the one past the end.
+   *
+   * A hit test alone cannot answer "after the last row": below it there is no
+   * row to hit, so the aim stopped at the last one and a section could not be
+   * moved to the bottom. A miss therefore falls back to comparing the pointer
+   * against the list's own rows — which also stops the aim escaping to a
+   * DIFFERENT list, since the sheet floats over the service and both have rows.
+   */
   const rowAt = (x: number, y: number): number | null => {
-    const el = document.elementFromPoint(x, y)?.closest(`[${attr}]`)
-    const n = el ? Number((el as HTMLElement).getAttribute(attr)) : NaN
-    return Number.isFinite(n) ? n : null
+    const rows = [...document.querySelectorAll<HTMLElement>(`[${attr}]`)]
+    if (!rows.length) return null
+
+    const hit = document.elementFromPoint(x, y)?.closest(`[${attr}]`)
+    if (hit && rows.includes(hit as HTMLElement)) {
+      const n = Number((hit as HTMLElement).getAttribute(attr))
+      return Number.isFinite(n) ? n : null
+    }
+
+    const first = rows[0].getBoundingClientRect()
+    const last = rows[rows.length - 1].getBoundingClientRect()
+    if (y >= last.bottom) return rows.length // past the end — drop at the bottom
+    if (y <= first.top) return 0
+    let best: number | null = null
+    let bestD = Infinity
+    for (const r of rows) {
+      const b = r.getBoundingClientRect()
+      const d = Math.abs(y - (b.top + b.height / 2))
+      if (d < bestD) {
+        bestD = d
+        best = Number(r.getAttribute(attr))
+      }
+    }
+    return best
   }
 
   return {
@@ -86,6 +119,7 @@ export function useRowDrag(
       onContextMenu: (e) => e.preventDefault()
     }),
     aimingAt: (index) => !!drag && drag.to === index && drag.from !== index,
+    aimingEnd: (index, total) => !!drag && drag.to >= total && index === total - 1 && drag.from !== index,
     carrying: (key) => drag?.key === key
   }
 }
