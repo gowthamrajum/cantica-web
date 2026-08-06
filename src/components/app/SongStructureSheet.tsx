@@ -70,8 +70,6 @@ export function SongStructureSheet({
    * it, which is what every arrangement did before this existed.
    */
   const [repeatUnits, setRepeatUnits] = useState<number[]>([])
-  /** whether the "which lines come back" picker is open */
-  const [pickingRepeat, setPickingRepeat] = useState(false)
   /** Whether the last time round is the whole refrain — how a song usually ends. */
   const [fullAtEnd, setFullAtEnd] = useState(true)
   /**
@@ -115,15 +113,24 @@ export function SongStructureSheet({
     }
     setOrder(rebuilt())
     setIncluded(new Set(distinct?.length ? distinct : all))
-    setRecurring(
-      initial ? (initial.recurringId ?? null) : detectRecurringSection(sections)
-    )
+    const rec = initial ? (initial.recurringId ?? null) : detectRecurringSection(sections)
+    setRecurring(rec)
     setGroups(initial?.groups ?? {})
     setLineOrder(initial?.order ?? {})
-    setRepeatUnits(initial?.repeatUnits ?? [])
+    // Everything ticked unless a narrower choice was saved. An arrangement made
+    // before this existed has no repeatUnits and repeated the refrain whole, so
+    // all-ticked is both the right default and the truth about that song.
+    const recSec = rec ? sections.find((x) => x.id === rec) : null
+    const recUnits = recSec
+      ? sectionUnits(recSec.lines.filter((l) => l && l.trim()), lang === 'both').length
+      : 0
+    setRepeatUnits(
+      initial?.repeatUnits?.length
+        ? initial.repeatUnits
+        : Array.from({ length: recUnits }, (_, k) => k)
+    )
     setFullAtEnd(initial?.repeatFullAtEnd !== false)
     setEditing(null)
-    setPickingRepeat(false)
   }, [song, lang, initial]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const byId = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections])
@@ -461,9 +468,11 @@ export function SongStructureSheet({
                   setRecurring(next)
                   // A selection is a set of positions INSIDE one section; it
                   // means nothing against a different one.
-                  setRepeatUnits([])
+                  // Marking a section as the refrain ticks all of its lines:
+                  // the whole thing repeats until somebody says otherwise, and
+                  // an empty list would read as "nothing repeats".
+                  setRepeatUnits(next ? unitsOf(next).map((_, k) => k) : [])
                   setFullAtEnd(true)
-                  setPickingRepeat(false)
                 }}
               >
                 <Icon name={recurring === id ? 'check' : 'plus'} size={12} strokeWidth={3} />
@@ -494,97 +503,77 @@ export function SongStructureSheet({
               </span>
             </div>
 
-            {/* Which part of the refrain comes back. Only on the refrain, and
-                only once it is marked — everywhere else there is nothing for a
-                reprise to be part of. */}
+            {/* The refrain's lines, ticked. Shown as soon as a section is
+                marked — the question "which of these come back?" only exists
+                once it is the refrain, and hiding it behind a summary row made
+                it something to go and find rather than something to answer. */}
             {recurring === id && on && (
               <div className="border-t border-black/5 bg-gold-500/[0.06] px-3 py-2">
-                <button
-                  className="flex w-full items-center gap-2 py-1 text-left"
-                  onClick={() => setPickingRepeat((v) => !v)}
-                  aria-expanded={pickingRepeat}
-                >
-                  <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-ink">
-                    Comes back:{' '}
-                    <span className="font-normal text-ink-muted">
-                      {repeatUnits.length ? `${repeatUnits.length} of ${unitsOf(id).length} lines` : 'the whole thing'}
-                    </span>
-                  </span>
-                  <Icon
-                    name="chevron"
-                    size={15}
-                    strokeWidth={2.4}
-                    className={`flex-none text-ink-muted transition-transform ${pickingRepeat ? 'rotate-90' : ''}`}
-                  />
-                </button>
+                <p className="mb-1.5 text-[12px] leading-relaxed text-ink-muted">
+                  All of it comes back between the stanzas. Untick anything that shouldn’t.
+                  {bilingual && ' A Telugu line and its transliteration are one — they come and go together.'}
+                </p>
+                {unitsOf(id).map((u, ui) => {
+                  const picked = repeatUnits.includes(ui)
+                  // The last ticked line cannot be unticked: a refrain of
+                  // nothing is not an arrangement, it is a mistake.
+                  const lastOne = picked && repeatUnits.length === 1
+                  return (
+                    <button
+                      key={ui}
+                      className="flex w-full items-start gap-2 py-1 text-left disabled:opacity-100"
+                      disabled={lastOne}
+                      title={lastOne ? 'At least one line has to come back' : undefined}
+                      onClick={() =>
+                        setRepeatUnits((prev) =>
+                          prev.includes(ui) ? prev.filter((x) => x !== ui) : [...prev, ui].sort((a, b) => a - b)
+                        )
+                      }
+                    >
+                      <span
+                        className={`mt-[3px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
+                          picked ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
+                        }`}
+                      >
+                        <Icon name="check" size={12} strokeWidth={3.2} />
+                      </span>
+                      <span
+                        className={`min-w-0 flex-1 text-[13px] leading-snug ${
+                          picked ? 'text-ink' : 'text-ink-muted line-through decoration-ink-muted/40'
+                        }`}
+                      >
+                        {unitLines(u).map((l, li) => (
+                          <span key={li} className="block truncate">
+                            {l}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  )
+                })}
 
-                {pickingRepeat && (
-                  <>
-                    <p className="mb-1.5 mt-1 text-[12px] leading-relaxed text-ink-muted">
-                      It is sung in full the first time. Tick the lines that come back after each stanza — leave
-                      them all unticked for the whole refrain every time.
-                    </p>
-                    {unitsOf(id).map((u, ui) => {
-                      const picked = repeatUnits.includes(ui)
-                      return (
-                        <button
-                          key={ui}
-                          className="flex w-full items-start gap-2 py-1 text-left"
-                          onClick={() =>
-                            setRepeatUnits((prev) =>
-                              prev.includes(ui) ? prev.filter((x) => x !== ui) : [...prev, ui].sort((a, b) => a - b)
-                            )
-                          }
-                        >
-                          <span
-                            className={`mt-[3px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
-                              picked ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
-                            }`}
-                          >
-                            <Icon name="check" size={12} strokeWidth={3.2} />
-                          </span>
-                          <span className={`min-w-0 flex-1 text-[13px] leading-snug ${picked ? 'text-ink' : 'text-ink-muted'}`}>
-                            {unitLines(u).map((l, li) => (
-                              <span key={li} className="block truncate">
-                                {l}
-                              </span>
-                            ))}
-                          </span>
-                        </button>
-                      )
-                    })}
-                    {repeatUnits.length > 0 && (
-                      <>
-                        {/* How a song usually ends: the middles are the hook,
-                            the last time round is sung out in full. */}
-                        <button
-                          className="mt-2 flex w-full items-start gap-2 border-t border-black/5 pt-2 text-left"
-                          onClick={() => setFullAtEnd((v) => !v)}
-                          aria-pressed={fullAtEnd}
-                        >
-                          <span
-                            className={`mt-[2px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
-                              fullAtEnd ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
-                            }`}
-                          >
-                            <Icon name="check" size={12} strokeWidth={3.2} />
-                          </span>
-                          <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink">
-                            Close on the whole refrain
-                            <span className="block text-ink-muted">
-                              After the last stanza: the ticked lines as usual, then all of it once more to finish.
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          className="mt-2 text-[12.5px] font-semibold text-gold-600"
-                          onClick={() => setRepeatUnits([])}
-                        >
-                          Clear — bring the whole refrain back every time
-                        </button>
-                      </>
-                    )}
-                  </>
+                {/* Only once something has been left out is there anything for a
+                    full refrain at the end to be different from. */}
+                {repeatUnits.length < unitsOf(id).length && (
+                  <button
+                    className="mt-2 flex w-full items-start gap-2 border-t border-black/5 pt-2 text-left"
+                    onClick={() => setFullAtEnd((v) => !v)}
+                    aria-pressed={fullAtEnd}
+                  >
+                    <span
+                      className={`mt-[2px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
+                        fullAtEnd ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
+                      }`}
+                    >
+                      <Icon name="check" size={12} strokeWidth={3.2} />
+                    </span>
+                    <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink">
+                      Close on the whole refrain
+                      <span className="block text-ink-muted">
+                        After the last stanza: the ticked lines as usual, then all of it once more to finish.
+                      </span>
+                    </span>
+                  </button>
                 )}
               </div>
             )}
