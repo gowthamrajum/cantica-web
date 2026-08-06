@@ -414,7 +414,7 @@ export function Build(): JSX.Element {
         type: 'application/pdf'
       })
       const count = env.service.items.length
-      const outcome = await shareFiles([pdf, json], label, `${label} — ${count} items`)
+      const outcome = await shareFiles([pdf, json], label, `${label} — ${count} part${count === 1 ? '' : 's'}`)
       setNote(
         outcome === 'shared'
           ? 'Shared the PDF and the Cantica file.'
@@ -458,7 +458,7 @@ export function Build(): JSX.Element {
       detail:
         message ??
         (state
-          ? `Saved with ${state.picks.length} item${state.picks.length === 1 ? '' : 's'}.`
+          ? `Saved with ${state.picks.length} part${state.picks.length === 1 ? '' : 's'}.`
           : env
             ? `${presenter ? 'Built on the presenter' : 'Saved without an arrangement'} — ${
                 env.service.items.length
@@ -536,8 +536,8 @@ export function Build(): JSX.Element {
       setEditing(true)
       setExists(null)
       setNote(
-        `Loaded ${restored.length} item${restored.length === 1 ? '' : 's'} — saving updates this service.` +
-          (skipped ? ` ${skipped} item${skipped === 1 ? '' : 's'} could not be restored.` : '')
+        `Loaded ${restored.length} part${restored.length === 1 ? '' : 's'} — saving updates this service.` +
+          (skipped ? ` ${skipped} part${skipped === 1 ? '' : 's'} couldn’t be brought over.` : '')
       )
     } finally {
       setLoadingExisting(false)
@@ -586,10 +586,10 @@ export function Build(): JSX.Element {
         setExists(null)
         setSavedOpen(false)
         setNote(
-          `Loaded ${restored.length} item${restored.length === 1 ? '' : 's'} from ${s.serviceDay} · ${prettyDate(
+          `Loaded ${restored.length} part${restored.length === 1 ? '' : 's'} from ${s.serviceDay} · ${prettyDate(
             s.serviceDate
           )} — saving updates this service.` +
-            (skipped ? ` ${skipped} item${skipped === 1 ? '' : 's'} could not be restored.` : '')
+            (skipped ? ` ${skipped} part${skipped === 1 ? '' : 's'} couldn’t be brought over.` : '')
         )
         return
       }
@@ -645,7 +645,7 @@ export function Build(): JSX.Element {
         // nothing here for the builder to hold".
         const n = env.service.items.length
         say(
-          `There are no songs or psalms in this service to rebuild — its ${n} item${n === 1 ? '' : 's'} are ` +
+          `There are no songs or psalms in this service to rebuild — its ${n} part${n === 1 ? '' : 's'} are ` +
             `videos, cards and announcements. You can still reorder them, take things out, and add songs, ` +
             `readings, links or files.`
         )
@@ -749,7 +749,7 @@ export function Build(): JSX.Element {
     if (addAt == null) return 'at the end'
     const after = viewItems[addAt - 1]
     const before = viewItems[addAt]
-    if (!before) return after ? `after ${after.title}` : 'as the first item'
+    if (!before) return after ? `after ${after.title}` : 'at the start'
     return after ? `between ${after.title} and ${before.title}` : `before ${before.title}`
   }
 
@@ -775,10 +775,10 @@ export function Build(): JSX.Element {
     setSavedOpen(false)
     const n = rebuild.dropped.length
     setNote(
-      `Rebuilt ${rebuild.picks.length} item${rebuild.picks.length === 1 ? '' : 's'} from ${rebuild.day} · ${prettyDate(
+      `Rebuilt ${rebuild.picks.length} part${rebuild.picks.length === 1 ? '' : 's'} from ${rebuild.day} · ${prettyDate(
         rebuild.date
       )}. Songs are in written order — set their arrangements, then save.` +
-        (n ? ` ${n} item${n === 1 ? '' : 's'} couldn’t be rebuilt and will not survive the save.` : '')
+        (n ? ` ${n} part${n === 1 ? '' : 's'} couldn’t be rebuilt, and saving leaves ${n === 1 ? 'it' : 'them'} out.` : '')
     )
     setRebuild(null)
   }
@@ -838,15 +838,15 @@ export function Build(): JSX.Element {
               {rebuild.day} · {prettyDate(rebuild.date)}
             </p>
             <p className="mb-3 text-[14.5px] leading-relaxed text-ink-soft">
-              Found <b className="text-ink">{rebuild.picks.length}</b> item
+              Found <b className="text-ink">{rebuild.picks.length}</b> part
               {rebuild.picks.length === 1 ? '' : 's'} in the songbook. They come back as whole songs in written
-              order — the deck doesn’t record which stanzas played or how lines were grouped, so those choices are
+              order — which stanzas played, and how the lines were grouped, weren’t kept, so those choices are
               yours to make again.
             </p>
             {rebuild.dropped.length > 0 ? (
               <>
                 <p className="mb-2 text-[14.5px] leading-relaxed text-amber-700">
-                  <b>{rebuild.dropped.length} item{rebuild.dropped.length === 1 ? '' : 's'} can’t be rebuilt.</b>{' '}
+                  <b>{rebuild.dropped.length} part{rebuild.dropped.length === 1 ? '' : 's'} can’t be rebuilt.</b>{' '}
                   They stay on the presenter’s copy, but they will not be in this one — and saving replaces that
                   copy.
                 </p>
@@ -1116,7 +1116,7 @@ export function Build(): JSX.Element {
                 be dismissed — this is what tells you whether you're starting
                 fresh or standing on an existing service. */}
             {checking ? (
-              <span className="mt-1 block text-[12.5px] text-ink-muted">Checking this slot…</span>
+              <span className="mt-1 block text-[12.5px] text-ink-muted">Checking this day…</span>
             ) : editing ? (
               <span className="pill mt-1.5 bg-emerald-50 text-emerald-700">Editing the saved service</span>
             ) : savedId !== null ? (
@@ -1129,8 +1129,8 @@ export function Build(): JSX.Element {
         </button>
         {stale && (
           <p className="mt-2 px-[var(--gutter)] text-[13px] leading-relaxed text-amber-700">
-            That date is over a week past — the service store purges services more than 7 days old, so this one may
-            not survive. You can still export the file.
+            That date is over a week past, so this service may not be kept much longer. Share a copy if you want
+            to hold on to it.
           </p>
         )}
 
@@ -1153,7 +1153,7 @@ export function Build(): JSX.Element {
         </button>
 
         <div className="mt-3 mb-1">
-          <span className="list-label">Language for new items</span>
+          <span className="list-label">Language for what you add</span>
           <Segmented options={LANGS} value={lang} onChange={setLang} ariaLabel="Lyric language" />
         </div>
       </Collapsible>
@@ -1174,7 +1174,7 @@ export function Build(): JSX.Element {
         <div className="flex items-baseline gap-2 px-[var(--gutter)]">
           <span className="list-label">Service</span>
           <span className="text-[12px] text-ink-muted">
-            {envelope.service.items.length} item{envelope.service.items.length === 1 ? '' : 's'} · {slides} slide
+            {envelope.service.items.length} part{envelope.service.items.length === 1 ? '' : 's'} · {slides} slide
             {slides === 1 ? '' : 's'}
           </span>
         </div>

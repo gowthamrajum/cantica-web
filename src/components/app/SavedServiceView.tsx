@@ -126,7 +126,7 @@ export function SavedServiceView({
           <div className="min-w-0 flex-1">
             <p className="list-title truncate">{envelope.service.name}</p>
             <p className="list-sub">
-              {day} · {prettyDate(date)} · {items.length} item{items.length === 1 ? '' : 's'} · {slides} slide
+              {day} · {prettyDate(date)} · {items.length} part{items.length === 1 ? '' : 's'} · {slides} slide
               {slides === 1 ? '' : 's'}
             </p>
             <span className="pill mt-1.5 bg-line/60 text-ink-muted">

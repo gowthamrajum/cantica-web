@@ -1,5 +1,5 @@
 import { Screen, Section } from '../components/app/Screen'
-import { ListGroup, ListNote, ListRow } from '../components/app/List'
+import { ListGroup, ListRow } from '../components/app/List'
 import { CHURCH, zeffyEmbedUrl, zeffyFormUrl } from '../lib/church'
 
 export function Give(): JSX.Element {
@@ -40,7 +40,6 @@ export function Give(): JSX.Element {
         <ListRow icon="pin" tint="green" title="In person" subtitle="On Sunday at the worship service" chevron={false} />
         <ListRow icon="globe" tint="navy" title="By mail" subtitle={CHURCH.address} chevron={false} />
       </ListGroup>
-      <ListNote>Zeffy passes 100% of your gift on to the church — no platform fee is deducted.</ListNote>
     </Screen>
   )
 }

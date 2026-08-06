@@ -82,7 +82,7 @@ export function ServiceExistsSheet({
                   ? 'Open the saved service here, change it, and save it back'
                   : canView
                     ? 'Reorder it, take things out, and add songs, readings, links or files'
-                    : 'This one was saved in a form this app can’t read'}
+                    : 'This one can’t be opened here'}
               </span>
             </span>
             {(canLoad || canView) && <Icon name="chevron" size={17} className="list-chev" />}

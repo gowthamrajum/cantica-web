@@ -107,7 +107,7 @@ export function SlidePreview({
   return (
     <Sheet open={open} title={title} onClose={onClose}>
       <p className="mb-3 text-[13px] text-ink-muted">
-        {items.length} item{items.length === 1 ? '' : 's'} · {total} slide{total === 1 ? '' : 's'} — sized by
+        {items.length} part{items.length === 1 ? '' : 's'} · {total} slide{total === 1 ? '' : 's'} — sized by
         measuring the text, as Cantica does, so this is the split you'll get.
       </p>
       {total === 0 ? (
