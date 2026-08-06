@@ -76,6 +76,13 @@ export function SongStructureSheet({
   const [editing, setEditing] = useState<string | null>(null)
   /** Distinguishes one copy of a section from the next; never reused. */
   const nextKey = useRef(0)
+  /**
+   * Whether the refrain's line list is open. Closed to begin with: the whole
+   * refrain repeating is what almost every song wants, so the list is an answer
+   * to a question most services never ask, and open by default it pushed the
+   * stanzas below it off the screen.
+   */
+  const [pickingRepeat, setPickingRepeat] = useState(false)
   /** Armed once, so a tap that would throw the arrangement away asks first. */
   const [confirmReset, setConfirmReset] = useState(false)
   /**
@@ -157,6 +164,7 @@ export function SongStructureSheet({
         ? initial.repeatUnits
         : Array.from({ length: recUnits }, (_, k) => k)
     )
+    setPickingRepeat(false)
     setFullAtEnd(initial?.repeatFullAtEnd !== false)
     setEditing(null)
   }, [song, lang, initial]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -441,30 +449,32 @@ export function SongStructureSheet({
 
   /** Another go at the same section, dropped in right below this one and ready
    *  to be moved wherever it is actually wanted. */
-  const duplicate = (key: string): void =>
+  const duplicate = (key: string): void => {
+    // Everything decided BEFORE the updater. An updater has to be pure — React
+    // may run it more than once — so minting a key inside one burns two, and a
+    // setState made from within one is dropped. Both were happening here.
+    const i = order.findIndex((o) => o.key === key)
+    if (i < 0) return
+    const copy = { key: `${order[i].id}#${nextKey.current++}`, id: order[i].id }
     setOrder((prev) => {
-      const i = prev.findIndex((o) => o.key === key)
-      if (i < 0) return prev
-      const copy = { key: `${prev[i].id}#${nextKey.current++}`, id: prev[i].id }
-      setIncluded((inc) => new Set(inc).add(copy.key))
       const next = prev.slice()
       next.splice(i + 1, 0, copy)
       return next
     })
+    setIncluded((inc) => new Set(inc).add(copy.key))
+  }
 
   /** Take a copy away. The first appearance of a section is not a copy — that
    *  one is unticked instead, which is what leaving it out has always meant. */
-  const removeCopy = (key: string): void =>
-    setOrder((prev) => {
-      const i = prev.findIndex((o) => o.key === key)
-      if (i < 0) return prev
-      setIncluded((inc) => {
-        const n = new Set(inc)
-        n.delete(key)
-        return n
-      })
-      return prev.filter((_, k) => k !== i)
+  const removeCopy = (key: string): void => {
+    if (!order.some((o) => o.key === key)) return
+    setOrder((prev) => prev.filter((o) => o.key !== key))
+    setIncluded((inc) => {
+      const n = new Set(inc)
+      n.delete(key)
+      return n
     })
+  }
 
   // The real arrangement and the real slide count, from the same functions the
   // export uses — so what this promises is what lands in Cantica.
@@ -578,6 +588,7 @@ export function SongStructureSheet({
                   // an empty list would read as "nothing repeats".
                   setRepeatUnits(next ? unitsOf(next).map((_, k) => k) : [])
                   setFullAtEnd(true)
+                  setPickingRepeat(false)
                 }}
               >
                 <Icon name={recurring === id ? 'check' : 'plus'} size={12} strokeWidth={3} />
@@ -601,9 +612,9 @@ export function SongStructureSheet({
                 className="icon-btn flex-none"
                 onClick={() => (isCopy && nth > 1 ? removeCopy(key) : duplicate(key))}
                 aria-label={isCopy && nth > 1 ? `Remove this copy of ${sec.label}` : `Add another ${sec.label}`}
-                title={isCopy && nth > 1 ? 'Remove this copy' : 'Sing it again — then move it where you want'}
+                title={isCopy && nth > 1 ? 'Remove this copy' : 'Another go at this one — then drag it where you want'}
               >
-                <Icon name={isCopy && nth > 1 ? 'minus' : 'plus'} size={16} />
+                <Icon name={isCopy && nth > 1 ? 'close' : 'copy'} size={16} />
               </button>
               {/* Drag it where it goes. The buttons it replaces walked a
                   section one step per tap, which for a song of eight sections
@@ -624,7 +635,29 @@ export function SongStructureSheet({
                 it something to go and find rather than something to answer. */}
             {recurring === id && on && (
               <div className="border-t border-black/5 bg-gold-500/[0.06] px-3 py-2">
-                <p className="mb-1.5 text-[12px] leading-relaxed text-ink-muted">
+                <button
+                  className="flex w-full items-center gap-2 py-0.5 text-left"
+                  onClick={() => setPickingRepeat((v) => !v)}
+                  aria-expanded={pickingRepeat}
+                >
+                  <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-ink">
+                    Repeated lines{' '}
+                    <span className="font-normal text-ink-muted">
+                      {repeatUnits.length === unitsOf(id).length
+                        ? '· all of it'
+                        : `· ${repeatUnits.length} of ${unitsOf(id).length}`}
+                    </span>
+                  </span>
+                  <Icon
+                    name="chevron"
+                    size={15}
+                    strokeWidth={2.4}
+                    className={`flex-none text-ink-muted transition-transform ${pickingRepeat ? 'rotate-90' : ''}`}
+                  />
+                </button>
+                {pickingRepeat && (
+                <>
+                <p className="mb-1.5 mt-1 text-[12px] leading-relaxed text-ink-muted">
                   All of it comes back between the stanzas. Untick anything that shouldn’t.
                   {bilingual && ' A Telugu line and its transliteration are one — they come and go together.'}
                 </p>
@@ -689,6 +722,8 @@ export function SongStructureSheet({
                       </span>
                     </span>
                   </button>
+                )}
+                </>
                 )}
               </div>
             )}

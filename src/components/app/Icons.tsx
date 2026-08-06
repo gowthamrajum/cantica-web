@@ -38,6 +38,7 @@ export type IconName =
   | 'communion'
   | 'broadcast'
   | 'grip'
+  | 'copy'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
 
@@ -209,5 +210,13 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M5.4 18.6a9.3 9.3 0 0 1 0-13.2M18.6 5.4a9.3 9.3 0 0 1 0 13.2" />
     </>
   ),
-  grip: <path d="M6 9.5h12M6 14.5h12" />
+  grip: <path d="M6 9.5h12M6 14.5h12" />,
+  // Two sheets, one behind the other — "another one of these", which a plus
+  // does not say: a plus is what adds something new.
+  copy: (
+    <>
+      <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.2" />
+      <path d="M15.5 5.4A2.2 2.2 0 0 0 13.4 4H6.2A2.2 2.2 0 0 0 4 6.2v7.2a2.2 2.2 0 0 0 1.4 2.1" />
+    </>
+  )
 }

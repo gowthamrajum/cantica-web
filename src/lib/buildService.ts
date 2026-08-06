@@ -350,10 +350,14 @@ export function buildSongArrangement(
     const others = included.filter((s) => !isRefrain(s))
     if (!others.length) return [rec.id]
     const arr = isRefrain(included[0]) ? [rec.id] : []
-    for (const s of others) {
+    others.forEach((s, i) => {
       arr.push(s.id)
-      arr.push(rec.id)
-    }
+      // The refrain comes after the SECTION, not after each go at it. A stanza
+      // placed twice is sung through twice and then the refrain — wedging one
+      // between the two halves of a doubled stanza is not what doubling it
+      // meant.
+      if (others[i + 1]?.id !== s.id) arr.push(rec.id)
+    })
     // The song closes on the refrain ENTIRE, after the trimmed reprise that
     // follows the last stanza — the hook, and then the whole thing sung out.
     // That is one extra time round, not a different last one, which is why it
