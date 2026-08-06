@@ -355,6 +355,19 @@ function OperatorMirror({
     [conn.room, conn.pin, me, onBadPin]
   )
 
+  /** The sermon card itself, over any verses put up since. */
+  const jumpToSermon = useCallback(async (): Promise<void> => {
+    const i = state?.order?.findIndex((o) => o.live) ?? -1
+    if (i >= 0) await run('goto', i)
+  }, [state, run])
+
+  /** The section after the sermon, over the rest of them. */
+  const jumpToNextSection = useCallback(async (): Promise<void> => {
+    const order = state?.order ?? []
+    const i = order.findIndex((o) => o.live)
+    if (i >= 0 && i + 1 < order.length) await run('goto', i + 1)
+  }, [state, run])
+
   const exit = useCallback((): void => {
     releaseOperator(conn.room, me)
     onDisconnect()
@@ -521,6 +534,19 @@ function OperatorMirror({
             {nextState ? <ConfidenceCard state={nextState} /> : <div className="op2-end">End of service</div>}
           </div>
         </section>
+
+        {/* Where the sermon goes after a verse, on the screen the operator is
+            actually looking at rather than behind a sheet they have closed.
+            Both are ordinary `goto`s: it already means "the first slide of item
+            N", and a verse is appended INSIDE the sermon item — so the sermon
+            card is goto(live) and the next section is goto(live + 1), however
+            many verses went up in between. Neither has to count them. */}
+        {onSermon && !ended && (
+          <div className="op2-sermon-nav">
+            <button onClick={() => void jumpToSermon()}>Back to sermon</button>
+            <button onClick={() => void jumpToNextSection()}>Next section</button>
+          </div>
+        )}
       </div>
 
       {feedback && (
@@ -530,22 +556,10 @@ function OperatorMirror({
       )}
       {flash && <div className="op2-toast">{flash}</div>}
 
-      {/* Both jumps are ordinary `goto`s: it already means "the first slide of
-          item N", and a verse is appended INSIDE the sermon item — so the
-          sermon card is goto(live) and the next section is goto(live + 1),
-          whatever number of verses went up in between. */}
       <SermonVerseSheet
         open={verseOpen}
         onClose={() => setVerseOpen(false)}
         onSend={(payload) => run('verse', payload)}
-        onBackToSermon={() => {
-          const i = state?.order?.findIndex((o) => o.live) ?? -1
-          if (i >= 0) void run('goto', i)
-        }}
-        onNextSection={() => {
-          const i = state?.order?.findIndex((o) => o.live) ?? -1
-          if (i >= 0 && i + 1 < (state?.order?.length ?? 0)) void run('goto', i + 1)
-        }}
       />
 
       {/* The seat went elsewhere: stop pretending this phone still drives the
