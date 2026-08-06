@@ -72,6 +72,8 @@ export function SongStructureSheet({
   const [repeatUnits, setRepeatUnits] = useState<number[]>([])
   /** whether the "which lines come back" picker is open */
   const [pickingRepeat, setPickingRepeat] = useState(false)
+  /** Whether the last time round is the whole refrain — how a song usually ends. */
+  const [fullAtEnd, setFullAtEnd] = useState(true)
   /**
    * The line being held, and where it would land.
    *
@@ -119,6 +121,7 @@ export function SongStructureSheet({
     setGroups(initial?.groups ?? {})
     setLineOrder(initial?.order ?? {})
     setRepeatUnits(initial?.repeatUnits ?? [])
+    setFullAtEnd(initial?.repeatFullAtEnd !== false)
     setEditing(null)
     setPickingRepeat(false)
   }, [song, lang, initial]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -378,7 +381,8 @@ export function SongStructureSheet({
     recurringId: recurring,
     groups,
     order: lineOrder,
-    repeatUnits
+    repeatUnits,
+    repeatFullAtEnd: fullAtEnd
   }
   const playOrder = buildSongArrangement(sections, includedInOrder, recurring)
   const slideCount = song ? (songToItem(song, lang, structure)?.slides.length ?? 0) : 0
@@ -458,6 +462,7 @@ export function SongStructureSheet({
                   // A selection is a set of positions INSIDE one section; it
                   // means nothing against a different one.
                   setRepeatUnits([])
+                  setFullAtEnd(true)
                   setPickingRepeat(false)
                 }}
               >
@@ -549,12 +554,35 @@ export function SongStructureSheet({
                       )
                     })}
                     {repeatUnits.length > 0 && (
-                      <button
-                        className="mt-1 text-[12.5px] font-semibold text-gold-600"
-                        onClick={() => setRepeatUnits([])}
-                      >
-                        Clear — bring the whole refrain back
-                      </button>
+                      <>
+                        {/* How a song usually ends: the middles are the hook,
+                            the last time round is sung out in full. */}
+                        <button
+                          className="mt-2 flex w-full items-start gap-2 border-t border-black/5 pt-2 text-left"
+                          onClick={() => setFullAtEnd((v) => !v)}
+                          aria-pressed={fullAtEnd}
+                        >
+                          <span
+                            className={`mt-[2px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
+                              fullAtEnd ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
+                            }`}
+                          >
+                            <Icon name="check" size={12} strokeWidth={3.2} />
+                          </span>
+                          <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink">
+                            End with the whole refrain
+                            <span className="block text-ink-muted">
+                              After the last stanza, sing all of it again rather than the ticked lines.
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          className="mt-2 text-[12.5px] font-semibold text-gold-600"
+                          onClick={() => setRepeatUnits([])}
+                        >
+                          Clear — bring the whole refrain back every time
+                        </button>
+                      </>
                     )}
                   </>
                 )}

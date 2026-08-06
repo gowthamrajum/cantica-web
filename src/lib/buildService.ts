@@ -377,6 +377,15 @@ export interface SongStructure {
    * with nothing under it.
    */
   repeatUnits?: number[]
+  /**
+   * Whether the LAST time round is the whole refrain again.
+   *
+   * A song usually ends on the full refrain even when the reprises between
+   * stanzas are trimmed — the hook carries the middle, and the ending is sung
+   * out. Defaults to true, and only means anything when `repeatUnits` names a
+   * part; a refrain that comes back whole every time is unaffected either way.
+   */
+  repeatFullAtEnd?: boolean
 }
 
 /** A song → one Cantica item. Omit `structure` and the whole song plays in
@@ -396,15 +405,28 @@ export function songToItem(
   const sections = order.map((id) => byId.get(id)).filter(Boolean) as SongSection[]
 
   const slides: ServiceSlide[] = []
-  // The recurring section's FIRST appearance is the refrain in full; the ones
-  // after it are the reprise, and may be only part of it.
-  let recurringSeen = false
+  /**
+   * Where the refrain falls in the running order.
+   *
+   * The first time is the refrain in full, and so — unless told otherwise — is
+   * the last, because that is how a song ends. Only the times in between are the
+   * trimmed reprise.
+   */
+  const recurringAt = structure?.recurringId
+    ? sections.reduce<number[]>((acc, s, i) => (s.id === structure.recurringId ? [...acc, i] : acc), [])
+    : []
+  const lastRecurring = structure?.repeatFullAtEnd === false ? -1 : recurringAt[recurringAt.length - 1] ?? -1
+  let sectionIndex = -1
   for (const sec of sections) {
     const lines = sec.lines.filter((l) => l && l.trim()).map(formatLyricLine)
-    if (!lines.length) continue
+    if (!lines.length) {
+      sectionIndex++
+      continue
+    }
+    sectionIndex++
     const isRecurring = !!structure?.recurringId && sec.id === structure.recurringId
-    const isReprise = isRecurring && recurringSeen
-    if (isRecurring) recurringSeen = true
+    const isReprise =
+      isRecurring && sectionIndex !== recurringAt[0] && sectionIndex !== lastRecurring
     const natural = sectionUnits(lines, both)
     const moved = structure?.order?.[sec.id]
     const full = applyOrder(natural, moved)
