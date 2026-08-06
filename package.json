@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "search-audit": "node scripts/search-audit.mjs"
+    "search-audit": "node scripts/search-audit.mjs",
+    "arrangement-audit": "npx --yes tsx scripts/arrangement-audit.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",

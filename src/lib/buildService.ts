@@ -409,9 +409,23 @@ export function songToItem(
   const both = lang === 'both'
   const lpp = both ? 4 : 2
   const all = songSections(song, lang)
-  // Only when part of the refrain is being held back is there anything for a
-  // full one at the end to be different FROM.
-  const trimmed = !!structure?.repeatUnits?.length
+  /**
+   * Is part of the refrain actually being held back?
+   *
+   * A NON-EMPTY repeatUnits is not the same question. The sheet ticks every
+   * line of a refrain the moment one is chosen, so it arrives naming the whole
+   * thing — and a whole refrain held back is not held back at all. Reading that
+   * as trimmed closed the song with a full refrain after a reprise identical to
+   * it: Parama Jeevamu ended on the same two slides twice over.
+   *
+   * So it has to be a PROPER part: at least one unit, and not all of them.
+   */
+  const recurring = structure?.recurringId ? all.find((s) => s.id === structure.recurringId) : undefined
+  const recurringUnits = recurring
+    ? sectionUnits(recurring.lines.filter((l) => l && l.trim()).map(formatLyricLine), both).length
+    : 0
+  const heldBack = new Set((structure?.repeatUnits ?? []).filter((i) => i >= 0 && i < recurringUnits))
+  const trimmed = heldBack.size > 0 && heldBack.size < recurringUnits
   const order = structure?.includedIds?.length
     ? buildSongArrangement(all, structure.includedIds, structure.recurringId ?? null, {
         closeWithRefrain: trimmed && structure.repeatFullAtEnd !== false
@@ -446,9 +460,11 @@ export function songToItem(
     const natural = sectionUnits(lines, both)
     const moved = structure?.order?.[sec.id]
     const full = applyOrder(natural, moved)
-    // A reprise takes only the chosen units, in the order they are written.
-    const picked = structure?.repeatUnits?.filter((i) => i >= 0 && i < full.length) ?? []
-    const units = isReprise && picked.length ? [...new Set(picked)].sort((a, b) => a - b).map((i) => full[i]) : full
+    // A reprise takes only the chosen units, in the order they are written —
+    // and only when those are a proper part of the refrain. With every unit
+    // ticked, `full` is passed through by identity, so the section groups and
+    // slices exactly as it does anywhere else it appears.
+    const units = isReprise && trimmed ? [...heldBack].sort((a, b) => a - b).map((i) => full[i]) : full
     const reordered = units !== natural
     // A grouping describes the WHOLE section, so it cannot describe a reprise
     // that is a few of its units — that falls through to the automatic split.
