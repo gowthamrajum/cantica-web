@@ -1,4 +1,9 @@
 // Single source of truth for church-specific content.
+import type { ServiceLink } from './links'
+
+export { usableLinks } from './links'
+export type { ServiceLink } from './links'
+
 export interface ServiceTime {
   name: string
   te: string
@@ -7,6 +12,8 @@ export interface ServiceTime {
   note?: string
   /** Short form for compact rows ("Sun · 11:00 AM"). */
   short: string
+  /** How to join or watch this one from home. */
+  links?: ServiceLink[]
 }
 
 export const CHURCH = {
@@ -26,6 +33,11 @@ export const CHURCH = {
   liveTime: 'Sundays · 11:00 AM',
   // Watch stream (the existing Cantica relay). Kept for the Watch CTA.
   watchUrl: 'https://grey-gratis-ice.onrender.com/broadcasts',
+  // ---------------------------------------------------------------------
+  // The `url` fields below are the church's own addresses and are the one
+  // thing here nobody can guess. Paste them in and the buttons appear; leave
+  // one blank and its button stays hidden rather than leading nowhere.
+  // ---------------------------------------------------------------------
   services: [
     {
       name: 'Worship Service',
@@ -33,7 +45,8 @@ export const CHURCH = {
       when: 'Sunday · 11:00 AM',
       short: 'Sun · 11:00 AM',
       where: 'In person · 8001 Mustang Drive',
-      note: 'The whole family gathers.'
+      note: 'The whole family gathers.',
+      links: [{ label: 'Watch on YouTube', url: '', kind: 'youtube' }]
     },
     {
       name: 'Bible Study',
@@ -41,7 +54,8 @@ export const CHURCH = {
       when: 'Wednesday · 8:00 PM',
       short: 'Wed · 8:00 PM',
       where: 'Online · on Zoom',
-      note: 'Grow deeper in the Word.'
+      note: 'Grow deeper in the Word.',
+      links: [{ label: 'Join on Zoom', url: '', kind: 'zoom' }]
     },
     {
       name: 'Saturday Prayer',
@@ -49,7 +63,8 @@ export const CHURCH = {
       when: 'Saturday · 8:00 PM',
       short: 'Sat · 8:00 PM',
       where: 'Online · on Zoom',
-      note: 'We pray together.'
+      note: 'We pray together.',
+      links: [{ label: 'Join on Zoom', url: '', kind: 'zoom' }]
     }
   ] satisfies ServiceTime[],
 

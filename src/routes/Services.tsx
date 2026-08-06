@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Screen, Section } from '../components/app/Screen'
 import { Icon } from '../components/app/Icons'
 import { Logo } from '../components/Logo'
-import { CHURCH } from '../lib/church'
+import { CHURCH, usableLinks } from '../lib/church'
 
 export function Services(): JSX.Element {
   return (
@@ -30,6 +30,23 @@ export function Services(): JSX.Element {
               <p className="text-[14.5px] text-ink-soft">{s.where}</p>
               {s.note && <p className="pt-1.5 text-[14px] italic text-ink-muted">{s.note}</p>}
             </div>
+            {/* Two of these three gatherings happen online and used to say so
+                without saying where. This is the where. */}
+            {usableLinks(s.links).length > 0 && (
+              <div className="mt-3.5 flex flex-wrap gap-2">
+                {usableLinks(s.links).map((l) => (
+                  <a
+                    key={l.url}
+                    href={l.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`btn-app text-[15px] ${l.kind === 'youtube' ? 'btn-app-gold' : 'btn-app-quiet'} flex-1`}
+                  >
+                    {l.label} <Icon name="external" size={16} strokeWidth={2.2} />
+                  </a>
+                ))}
+              </div>
+            )}
           </article>
         ))}
       </Section>

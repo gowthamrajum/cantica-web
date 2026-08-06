@@ -4,10 +4,14 @@ import { Icon } from './Icons'
 /**
  * Raised when the chosen day and date already hold a service.
  *
- * One slot holds exactly one service, so there are only two honest things to do:
- * open the one that's there and edit it, or put this one on a different day or
- * date. Neither writes anything by itself — the sheet only decides which of the
- * two you're doing.
+ * One slot holds exactly one service, so nothing here writes anything by
+ * itself — the sheet only decides what you are doing with the one that's there:
+ * edit it, read it, or leave it alone and put this service on another date.
+ *
+ * Reading is the answer for an order the presenter published. It cannot be
+ * rearranged here, but it is still this Sunday's service, and the alternative —
+ * telling someone the slot is taken and offering only a different date — is how
+ * you end up with two services for one Sunday.
  */
 export function ServiceExistsSheet({
   open,
@@ -15,7 +19,9 @@ export function ServiceExistsSheet({
   detail,
   busy,
   canLoad,
+  canView,
   onLoad,
+  onView,
   onNewSlot,
   onDismiss
 }: {
@@ -26,10 +32,17 @@ export function ServiceExistsSheet({
   busy: boolean
   /** False for services saved before the builder recorded how they were made. */
   canLoad: boolean
+  /** True when the deck can at least be read — anything this app understands. */
+  canView?: boolean
   onLoad: () => void
+  onView?: () => void
   onNewSlot: () => void
   onDismiss: () => void
 }): JSX.Element {
+  // Only when it can't be edited: for one that can, reading is what opening it
+  // already gives you, and a second door to the same room is a decision nobody
+  // needed to make.
+  const readOnly = !canLoad && !!canView && !!onView
   return (
     <Sheet open={open} title="A service already exists" onClose={onDismiss}>
       <div className="px-[var(--gutter)]">
@@ -53,11 +66,26 @@ export function ServiceExistsSheet({
               <span className="list-sub block">
                 {canLoad
                   ? 'Open the saved service here, change it, and save it back'
-                  : 'This one was saved before editing was supported, so it can’t be reopened'}
+                  : readOnly
+                    ? 'This one wasn’t assembled here, so its songs can’t be rearranged'
+                    : 'This one was saved before editing was supported, so it can’t be reopened'}
               </span>
             </span>
             {canLoad && <Icon name="chevron" size={17} className="list-chev" />}
           </button>
+
+          {readOnly && (
+            <button type="button" className="list-row has-ico" onClick={onView} disabled={busy}>
+              <span className="list-ico bg-navy-500">
+                <Icon name="eye" size={18} strokeWidth={2.2} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="list-title block">Open it for reading</span>
+                <span className="list-sub block">See its order, share the sheet, and broadcast it</span>
+              </span>
+              <Icon name="chevron" size={17} className="list-chev" />
+            </button>
+          )}
 
           <button type="button" className="list-row has-ico" onClick={onNewSlot} disabled={busy}>
             <span className="list-ico bg-gold-500">

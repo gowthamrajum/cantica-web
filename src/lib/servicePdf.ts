@@ -1,4 +1,5 @@
 import type { ServiceEnvelope, ServiceItem } from './buildService'
+import { usableLinks, type ServiceLink } from './links'
 
 /**
  * A printable service sheet, laid out to be read from a music stand.
@@ -111,7 +112,13 @@ function toPages(items: ServiceItem[]): PdfPage[] {
   return pages
 }
 
-function pageHtml(page: PdfPage, index: number, total: number, subtitle: string): string {
+function pageHtml(
+  page: PdfPage,
+  index: number,
+  total: number,
+  subtitle: string,
+  links: ServiceLink[] = []
+): string {
   const body = page.blocks.map((b) => `<div style="margin:0 0 0.72em 0">${columns(b)}</div>`).join('')
 
   const meta = [`${index + 1} / ${total}`, page.slot === 'offering' ? 'Offering' : '', page.slot === 'communion' ? 'Communion' : '', page.cont ? 'continued' : '']
@@ -140,8 +147,10 @@ function pageHtml(page: PdfPage, index: number, total: number, subtitle: string)
     </div>
     <div data-body style="flex:1;min-height:0;overflow:hidden;font-size:${MAX_BODY_PX}px;line-height:1.4;font-weight:500;">${body}</div>
     <div style="border-top:1px solid #e8ddc9;padding-top:12px;margin-top:16px;flex:none;
-                font-size:12px;color:#8b8172;display:flex;justify-content:space-between;">
-      <span>${esc(subtitle)}</span><span>Telugu Community Church</span>
+                font-size:12px;color:#8b8172;display:flex;justify-content:space-between;gap:16px;text-align:left;">
+      <span>${esc(subtitle)}${links
+        .map((l) => `<br>${esc(l.label)} — ${esc(l.url)}`)
+        .join('')}</span><span style="flex:none;">Telugu Community Church</span>
     </div>
   </div>`
 }
@@ -198,9 +207,13 @@ export async function buildServicePdf(envelope: ServiceEnvelope, subtitle: strin
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [PAGE_W, PAGE_H] })
     let first = true
 
+    // On the first sheet only. Whoever is reading from the stand needs the
+    // stream address once, not printed under every song.
+    const links = usableLinks(envelope.service.links)
+
     /** Lay one page out and hand back its body element for measuring. */
     const layout = (p: PdfPage, i: number, n: number): HTMLElement => {
-      host.innerHTML = pageHtml(p, i, n, subtitle)
+      host.innerHTML = pageHtml(p, i, n, subtitle, i === 0 ? links : [])
       return (host.firstElementChild as HTMLElement).querySelector('[data-body]') as HTMLElement
     }
 

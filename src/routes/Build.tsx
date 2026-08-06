@@ -8,6 +8,10 @@ import { SongStructureSheet } from '../components/app/SongStructureSheet'
 import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
 import { ServicePickerSheet, type PickSource } from '../components/app/ServicePickerSheet'
+import { SavedServicesSheet } from '../components/app/SavedServicesSheet'
+import { SavedServiceView } from '../components/app/SavedServiceView'
+import { ServiceLinksEditor } from '../components/app/ServiceLinksEditor'
+import type { ServiceLink } from '../lib/links'
 import { ConfirmSheet } from '../components/app/ConfirmSheet'
 import { Sheet } from '../components/app/Sheet'
 import { PsalmFields } from '../components/app/PsalmFields'
@@ -17,8 +21,11 @@ import { SongRoleSheet, type Role } from '../components/app/SongRoleSheet'
 import { getSong, type Song, type SongMeta } from '../lib/songs'
 import { loadBible } from '../lib/bible'
 import { createService, findService, getService, updateService } from '../lib/relay'
-import { fromBuilderState, readBuilderState, toBuilderState } from '../lib/builderState'
+import { readEnvelope } from '../lib/livecast'
+import { fromBuilderState, isFromPresenter, readBuilderState, toBuilderState } from '../lib/builderState'
 import {
+  DAYS,
+  dayOf,
   daysPast,
   defaultSlot,
   isFirstSundayOfMonth,
@@ -34,6 +41,7 @@ import {
   roleAlsoGeneral,
   type Pick,
   type PsalmVerse,
+  type ServiceEnvelope,
   type ServiceLang,
   type SongStructure
 } from '../lib/buildService'
@@ -88,13 +96,36 @@ export function Build(): JSX.Element {
 
   // The "this slot is taken" prompt, raised when a slot is chosen (or when a
   // save races another caller to it).
-  const [exists, setExists] = useState<{ id: number; detail: string; canLoad: boolean } | null>(null)
+  const [exists, setExists] = useState<{
+    id: number
+    detail: string
+    canLoad: boolean
+    canView: boolean
+  } | null>(null)
   const [loadingExisting, setLoadingExisting] = useState(false)
   // Guards against a stale slot check landing after a newer one.
   const checkToken = useRef(0)
 
+  // The "open a saved service" list, and the service it opened for reading.
+  // Only a service carrying a builder sidecar can come back as picks; one built
+  // on the presenter is a finished deck and opens as itself — see
+  // SavedServiceView for why rebuilding it would be a guess.
+  const [savedOpen, setSavedOpen] = useState(false)
+  const [openingId, setOpeningId] = useState<number | null>(null)
+  const [viewing, setViewing] = useState<{
+    id: number
+    day: string
+    date: string
+    envelope: ServiceEnvelope
+    origin: 'presenter' | 'unknown'
+  } | null>(null)
+  /** Which of the read-only service's items is being previewed. */
+  const [viewPreview, setViewPreview] = useState<number | 'all' | null>(null)
+
   const [lang, setLang] = useState<ServiceLang>('both')
   const [picks, setPicks] = useState<Pick[]>([])
+  /** Where this service can be watched or joined — saved with the deck. */
+  const [links, setLinks] = useState<ServiceLink[]>([])
   const [source, setSource] = useState<PickSource>('songs')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [preview, setPreview] = useState<number | 'all' | null>(null)
@@ -272,13 +303,13 @@ export function Build(): JSX.Element {
   const setLangAt = (i: number, l: ServiceLang): void =>
     setPicks((p) => p.map((x, j) => (j === i ? { ...x, lang: l } : x)))
 
-  const envelope = useMemo(() => buildService(name, picks), [name, picks])
+  const envelope = useMemo(() => buildService(name, picks, links), [name, picks, links])
   // What gets stored: the deck Cantica reads, plus a record of how it was
   // assembled so this builder can reopen it. The exported FILE stays the plain
   // envelope — Cantica has no use for the sidecar.
   const builderState = useMemo(
-    () => toBuilderState(slot.day, slot.date, picks),
-    [slot.day, slot.date, picks]
+    () => toBuilderState(slot.day, slot.date, picks, links),
+    [slot.day, slot.date, picks, links]
   )
   const payload = useMemo(() => ({ ...envelope, builder: builderState }), [envelope, builderState])
 
@@ -312,20 +343,23 @@ export function Build(): JSX.Element {
    * capturing pages, so it takes a moment on a long service.
    */
   const [sharing, setSharing] = useState(false)
-  const shareService = async (): Promise<void> => {
-    if (!committed || sharing) return
+  /** Share any built envelope under a given name — the one being assembled, or
+   *  one only being read. */
+  const shareEnvelope = async (env: ServiceEnvelope, label: string): Promise<void> => {
+    if (sharing) return
     setSharing(true)
     setNote('Building the PDF…')
     try {
-      // `name` already carries the day and the date, so it is the filename.
-      const safe = name.replace(/[\\/:*?"<>|]+/g, ' ').trim()
-      const json = new File([JSON.stringify(envelope, null, 2)], `${safe}.cantica.json`, {
+      // The label already carries the day and the date, so it is the filename.
+      const safe = label.replace(/[\\/:*?"<>|]+/g, ' ').trim()
+      const json = new File([JSON.stringify(env, null, 2)], `${safe}.cantica.json`, {
         type: 'application/json'
       })
-      const pdf = new File([await buildServicePdf(envelope, name)], `${safe}.pdf`, {
+      const pdf = new File([await buildServicePdf(env, label)], `${safe}.pdf`, {
         type: 'application/pdf'
       })
-      const outcome = await shareFiles([pdf, json], name, `${name} — ${picks.length} items`)
+      const count = env.service.items.length
+      const outcome = await shareFiles([pdf, json], label, `${label} — ${count} items`)
       setNote(
         outcome === 'shared'
           ? 'Shared the PDF and the Cantica file.'
@@ -340,21 +374,41 @@ export function Build(): JSX.Element {
     }
   }
 
-  /** Read a stored service well enough to say what can be done with it. */
+  /** The service being assembled — shareable only once it has been saved. */
+  const shareService = (): void => {
+    if (!committed) return
+    void shareEnvelope(envelope, name)
+  }
+
+  /**
+   * Read a stored service well enough to say what can be done with it.
+   *
+   * Three answers, not two. It can be reopened as picks; or it can only be read
+   * — which is the presenter's own orders, and used to be reported as "saved
+   * before editing was supported", sending someone off to build a second
+   * service for a Sunday that already had one; or it can't be read at all.
+   */
   const describeExisting = async (
     id: number,
     message?: string
-  ): Promise<{ id: number; detail: string; canLoad: boolean }> => {
+  ): Promise<{ id: number; detail: string; canLoad: boolean; canView: boolean }> => {
     const full = await getService(id)
     const state = full ? readBuilderState(full.serviceData) : null
+    const env = !state && full ? readEnvelope(full.serviceData) : null
+    const presenter = !!full && isFromPresenter(full.serviceData)
     return {
       id,
       canLoad: !!state,
+      canView: !!env,
       detail:
         message ??
         (state
           ? `Saved with ${state.picks.length} item${state.picks.length === 1 ? '' : 's'}.`
-          : 'This day and date already has a service saved.')
+          : env
+            ? `${presenter ? 'Built on the presenter' : 'Saved without an arrangement'} — ${
+                env.service.items.length
+              } item${env.service.items.length === 1 ? '' : 's'}.`
+            : 'This day and date already has a service saved.')
     }
   }
 
@@ -409,11 +463,13 @@ export function Build(): JSX.Element {
         return
       }
       const { picks: restored, skipped } = await fromBuilderState(state)
+      const restoredLinks = state.links ?? []
       setPicks(restored)
+      setLinks(restoredLinks)
       // The baseline is what the RESTORED picks produce, not the stored
       // sidecar: a psalm's range is re-derived from its verses, so the two can
       // differ harmlessly and would otherwise read as an unsaved change.
-      setSavedKey(JSON.stringify(toBuilderState(slot.day, slot.date, restored)))
+      setSavedKey(JSON.stringify(toBuilderState(slot.day, slot.date, restored, restoredLinks)))
       setSavedId(exists.id)
       setEditing(true)
       setExists(null)
@@ -423,6 +479,74 @@ export function Build(): JSX.Element {
       )
     } finally {
       setLoadingExisting(false)
+    }
+  }
+
+  /**
+   * Open any service in the store, from any day.
+   *
+   * Two things can come back. One this builder saved carries a record of how it
+   * was assembled, so it reopens as picks and the builder moves onto its slot —
+   * the same thing loadExisting does, reached from the list rather than from the
+   * slot. One the presenter published carries no such record, so it opens for
+   * reading: SavedServiceView says what that means and why.
+   */
+  const openSaved = async (s: { id: number; serviceDay: string; serviceDate: string }): Promise<void> => {
+    setOpeningId(s.id)
+    try {
+      const full = await getService(s.id)
+      if (!full) {
+        setNote('That service couldn’t be opened.')
+        return
+      }
+      const state = readBuilderState(full.serviceData)
+      if (state) {
+        const { picks: restored, skipped } = await fromBuilderState(state)
+        const restoredLinks = state.links ?? []
+        // serviceDay is free text on the relay — anything could have written it.
+        // A slot the picker cannot represent would strand the builder on a day
+        // it can't show, so fall back to the weekday the date actually is.
+        const day = (DAYS as readonly string[]).includes(s.serviceDay)
+          ? (s.serviceDay as ServiceSlot['day'])
+          : dayOf(s.serviceDate) ?? slot.day
+        const next = { day, date: s.serviceDate }
+        // Everything about the slot moves together: a load that changed the
+        // picks but left the builder pointing at last week would save Sunday's
+        // service onto the wrong date.
+        checkToken.current++
+        setViewing(null)
+        setSlot(next)
+        setPicks(restored)
+        setLinks(restoredLinks)
+        setSavedKey(JSON.stringify(toBuilderState(next.day, next.date, restored, restoredLinks)))
+        setSavedId(s.id)
+        setEditing(true)
+        setExists(null)
+        setSavedOpen(false)
+        setNote(
+          `Loaded ${restored.length} item${restored.length === 1 ? '' : 's'} from ${s.serviceDay} · ${prettyDate(
+            s.serviceDate
+          )} — saving updates this service.` +
+            (skipped ? ` ${skipped} item${skipped === 1 ? '' : 's'} could not be restored.` : '')
+        )
+        return
+      }
+      const env = readEnvelope(full.serviceData)
+      if (!env) {
+        setNote('That service couldn’t be read.')
+        return
+      }
+      setViewing({
+        id: s.id,
+        day: s.serviceDay,
+        date: s.serviceDate,
+        envelope: env,
+        origin: isFromPresenter(full.serviceData) ? 'presenter' : 'unknown'
+      })
+      setSavedOpen(false)
+      setNote('')
+    } finally {
+      setOpeningId(null)
     }
   }
 
@@ -466,6 +590,77 @@ export function Build(): JSX.Element {
 
   // The relay purges a service once its date is more than a week past.
   const stale = daysPast(slot.date) > 7
+
+  // A service opened for reading takes the whole screen: the builder's controls
+  // all write, and showing them beside a deck they cannot change would offer an
+  // edit that silently applies to something else.
+  if (viewing) {
+    return (
+      <Screen
+        title="Service Builder"
+        subtitle={`${viewing.day} · ${prettyDate(viewing.date)} — open for reading.`}
+      >
+        <Section>
+          <SavedServiceView
+            envelope={viewing.envelope}
+            day={viewing.day}
+            date={viewing.date}
+            origin={viewing.origin}
+            sharing={sharing}
+            onPreviewAll={() => setViewPreview('all')}
+            onPreviewItem={(i) => setViewPreview(i)}
+            onShare={() => void shareEnvelope(viewing.envelope, `${viewing.day} Service · ${prettyDate(viewing.date)}`)}
+            onBroadcast={() => navigate(`/live/${viewing.id}`)}
+            onClose={() => {
+              setViewing(null)
+              setNote('')
+            }}
+          />
+          {note && <p className="mt-2 px-[var(--gutter)] text-[13px] text-ink-muted">{note}</p>}
+          <div className="mt-3 px-[var(--gutter)]">
+            <button className="btn-app btn-app-quiet btn-block text-[15px]" onClick={() => setSavedOpen(true)}>
+              Open another service
+            </button>
+          </div>
+        </Section>
+
+        <SavedServicesSheet
+          open={savedOpen}
+          onClose={() => setSavedOpen(false)}
+          onPick={(s) => void openSaved(s)}
+          currentDate={viewing.date}
+          currentDay={viewing.day}
+          busyId={openingId}
+        />
+
+        {/* One item or the whole deck, from the SAME envelope — a slice keeps
+            the service's own theme and background rather than the defaults a
+            freshly built one would carry. */}
+        <SlidePreview
+          open={viewPreview !== null}
+          envelope={
+            viewPreview === null
+              ? null
+              : viewPreview === 'all'
+                ? viewing.envelope
+                : {
+                    ...viewing.envelope,
+                    service: {
+                      ...viewing.envelope.service,
+                      items: viewing.envelope.service.items.slice(viewPreview, viewPreview + 1)
+                    }
+                  }
+          }
+          title={
+            viewPreview === null || viewPreview === 'all'
+              ? viewing.envelope.service.name
+              : viewing.envelope.service.items[viewPreview]?.title ?? 'Preview'
+          }
+          onClose={() => setViewPreview(null)}
+        />
+      </Screen>
+    )
+  }
 
   return (
     <Screen title="Service Builder" subtitle="Say when the service is, pick its songs and readings, then save it.">
@@ -519,10 +714,39 @@ export function Build(): JSX.Element {
           </p>
         )}
 
+        {/* Everything in the store, not only what sits on this slot — including
+            the orders the presenter computer publishes, which can be read and
+            broadcast here even though they can't be edited. */}
+        <button
+          type="button"
+          onClick={() => setSavedOpen(true)}
+          className="app-card pressable mt-2 flex w-full items-center gap-3 p-4 text-left"
+        >
+          <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-navy-500 text-gold-300">
+            <Icon name="text" size={19} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="list-title block">Open a saved service</span>
+            <span className="list-sub block">Any day — including one built on the presenter</span>
+          </span>
+          <Icon name="chevron" size={17} className="list-chev" />
+        </button>
+
         <div className="mt-3 mb-1">
           <span className="list-label">Language for new items</span>
           <Segmented options={LANGS} value={lang} onChange={setLang} ariaLabel="Lyric language" />
         </div>
+      </Collapsible>
+
+      {/* Closed unless the service already carries links: most don't, and an
+          empty pair of text fields is not worth the screen it costs. */}
+      <Collapsible
+        title="Links"
+        open={disc.isOpen('links')}
+        onToggle={() => disc.toggle('links')}
+        summary={links.length ? `${links.length} link${links.length === 1 ? '' : 's'}` : 'none'}
+      >
+        <ServiceLinksEditor links={links} onChange={setLinks} />
       </Collapsible>
 
 
@@ -789,13 +1013,27 @@ export function Build(): JSX.Element {
         onAddPsalm={addPsalm}
       />
 
+      <SavedServicesSheet
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        onPick={(s) => void openSaved(s)}
+        currentDate={slot.date}
+        currentDay={slot.day}
+        busyId={openingId}
+      />
+
       <ServiceExistsSheet
         open={exists !== null}
         slotLabel={`${slot.day} · ${prettyDate(slot.date)}`}
         detail={exists?.detail}
         canLoad={exists?.canLoad ?? false}
-        busy={loadingExisting}
+        canView={exists?.canView ?? false}
+        busy={loadingExisting || openingId !== null}
         onLoad={() => void loadExisting()}
+        onView={() => {
+          if (exists) void openSaved({ id: exists.id, serviceDay: slot.day, serviceDate: slot.date })
+          setExists(null)
+        }}
         onNewSlot={() => {
           setExists(null)
           setSlotOpen(true)

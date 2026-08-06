@@ -1,5 +1,6 @@
 import { getSong } from './songs'
 import { loadBible } from './bible'
+import { usableLinks, type ServiceLink } from './links'
 import type { Pick, PsalmVerse, ServiceLang, SongRole, SongStructure } from './buildService'
 
 /**
@@ -47,14 +48,24 @@ export interface BuilderState {
   day: string
   date: string
   picks: SavedPick[]
+  /** Where this service can be watched or joined. Also on the envelope, but
+   *  read back from here — this is the record of what was typed. */
+  links?: ServiceLink[]
 }
 
 /** Distil the live picks into something small enough to store and reload. */
-export function toBuilderState(day: string, date: string, picks: Pick[]): BuilderState {
+export function toBuilderState(
+  day: string,
+  date: string,
+  picks: Pick[],
+  links: ServiceLink[] = []
+): BuilderState {
+  const usable = usableLinks(links)
   return {
     version: BUILDER_STATE_VERSION,
     day,
     date,
+    ...(usable.length ? { links: usable } : {}),
     picks: picks.map((p): SavedPick =>
       p.type === 'song'
         ? {
@@ -92,8 +103,40 @@ export function readBuilderState(serviceData: unknown): BuilderState | null {
   if (!b || typeof b !== 'object') return null
   const s = b as Partial<BuilderState>
   if (!Array.isArray(s.picks)) return null
-  return { version: Number(s.version ?? 1), day: String(s.day ?? ''), date: String(s.date ?? ''), picks: s.picks }
+  return {
+    version: Number(s.version ?? 1),
+    day: String(s.day ?? ''),
+    date: String(s.date ?? ''),
+    picks: s.picks,
+    links: usableLinks(Array.isArray(s.links) ? s.links : [])
+  }
 }
+
+/**
+ * Which app put a service in the store.
+ *
+ * Written by the presenter when it publishes its own order; absent on
+ * everything this builder saves, and on anything saved before either app knew
+ * to say. So "no origin" means "built here", which is the safe reading — a
+ * service with a builder sidecar is reopenable whatever it claims, and one
+ * without is not.
+ */
+export interface ServiceOrigin {
+  app?: string
+  publishedAt?: string
+}
+
+export function readOrigin(serviceData: unknown): ServiceOrigin | null {
+  if (!serviceData || typeof serviceData !== 'object') return null
+  const o = (serviceData as { origin?: unknown }).origin
+  if (!o || typeof o !== 'object') return null
+  const { app, publishedAt } = o as ServiceOrigin
+  return { app: app ? String(app) : undefined, publishedAt: publishedAt ? String(publishedAt) : undefined }
+}
+
+/** Assembled on the projection machine and published from there. */
+export const isFromPresenter = (serviceData: unknown): boolean =>
+  readOrigin(serviceData)?.app === 'lumen-presenter'
 
 /**
  * Rebuild live picks from a sidecar. Anything that no longer resolves — a song

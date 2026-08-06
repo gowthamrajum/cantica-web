@@ -239,6 +239,29 @@ async function readError(r: Response): Promise<string> {
 }
 
 /**
+ * Every service the store is holding between two dates, newest first.
+ *
+ * Not all of them were built here: the presenter can publish its own order to
+ * the same table, and one of those is still a service the church may want to
+ * read, share or put on air from a phone. The list says nothing about which is
+ * which — only the stored deck knows, and that costs a second request — so the
+ * caller decides how much it needs to know before showing a row.
+ */
+export async function listServices(from: string, to: string): Promise<ServiceSummary[]> {
+  try {
+    const r = await fetch(
+      `${RELAY_BASE}/services?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { cache: 'no-store' }
+    )
+    if (!r.ok) return []
+    const j = (await r.json()) as { services?: ServiceSummary[] }
+    return Array.isArray(j.services) ? j.services : []
+  } catch {
+    return []
+  }
+}
+
+/**
  * The service already filed under this slot, if any. Lets a caller know it is
  * about to update rather than create — the list endpoint is narrow (`from`/`to`
  * bracket a single date) and omits the deck, so this is cheap.

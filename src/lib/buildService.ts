@@ -10,6 +10,7 @@
  * paginates differently in each app.
  */
 import type { Song } from './songs'
+import { usableLinks, type ServiceLink } from './links'
 
 export type ServiceLang = 'both' | 'telugu' | 'english'
 
@@ -38,6 +39,14 @@ export interface ServiceEnvelope {
     items: ServiceItem[]
     background: unknown
     theme: unknown
+    /**
+     * Where this particular service can be watched or joined — the stream for
+     * this Sunday, a link to the week's notes. Cantica ignores the field (it
+     * reads `items` and nothing else), so it rides along harmlessly in a deck
+     * the desktop imports; it is for the people reading the service, on the
+     * sheet and in this app.
+     */
+    links?: ServiceLink[]
   }
 }
 
@@ -487,7 +496,11 @@ export type Pick =
   | { key: string; type: 'psalm'; chapter: number; verses: PsalmVerse[]; lang: ServiceLang }
 
 /** Build the `cantica-service` envelope from an ordered selection. */
-export function buildService(name: string, picks: Pick[] = []): ServiceEnvelope {
+export function buildService(
+  name: string,
+  picks: Pick[] = [],
+  links: ServiceLink[] = []
+): ServiceEnvelope {
   const items: ServiceItem[] = []
   for (const p of picks) {
     if (p.type === 'song') {
@@ -509,11 +522,20 @@ export function buildService(name: string, picks: Pick[] = []): ServiceEnvelope 
       items.push(...psalmToItems(p.chapter, p.verses, p.lang ?? 'both').map((it) => ({ ...it, slot: SLOT_WORSHIP })))
     }
   }
+  const usable = usableLinks(links)
   return {
     format: 'cantica-service',
     version: 1,
     exportedAt: new Date().toISOString(),
-    service: { name: name || 'Sunday Service', items, background: CANTICA_BACKGROUND, theme: CANTICA_THEME }
+    service: {
+      name: name || 'Sunday Service',
+      items,
+      background: CANTICA_BACKGROUND,
+      theme: CANTICA_THEME,
+      // Omitted entirely when there are none, so a service without links
+      // produces byte-for-byte what it produced before the field existed.
+      ...(usable.length ? { links: usable } : {})
+    }
   }
 }
 

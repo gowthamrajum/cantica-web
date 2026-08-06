@@ -5,7 +5,7 @@ import { ListGroup, ListRow } from '../components/app/List'
 import { Sheet } from '../components/app/Sheet'
 import { Icon } from '../components/app/Icons'
 import { Logo } from '../components/Logo'
-import { CHURCH } from '../lib/church'
+import { CHURCH, usableLinks } from '../lib/church'
 import { prettyServiceName } from '../lib/format'
 import { useSessions } from '../lib/useSessions'
 import type { SessionSummary } from '../lib/relay'
@@ -25,6 +25,11 @@ export function Watch(): JSX.Element {
 
   const empty = sessions !== null && sessions.length === 0
   const dbg = typeof window !== 'undefined' && window.location.search.includes('debug') ? '?debug=1' : ''
+
+  /** Every gathering that can be joined from a phone, flattened to one row each. */
+  const online = CHURCH.services.flatMap((service) =>
+    usableLinks(service.links).map((link) => ({ service, link }))
+  )
 
   return (
     <Screen
@@ -78,6 +83,24 @@ export function Watch(): JSX.Element {
               <ListRow key={s.name} title={s.name} subtitle={`${s.te} · ${s.where}`} value={s.short} chevron={false} />
             ))}
           </ListGroup>
+
+          {/* Nothing is on air here — but the stream and the Zoom rooms are
+              somewhere else, and this is the screen someone is on when they're
+              looking for them. */}
+          {online.length > 0 && (
+            <ListGroup label="Watch or join online">
+              {online.map(({ service, link }) => (
+                <ListRow
+                  key={link.url}
+                  icon={link.kind === 'youtube' ? 'watch' : 'people'}
+                  tint={link.kind === 'youtube' ? 'red' : 'navy'}
+                  title={link.label}
+                  subtitle={`${service.name} · ${service.short}`}
+                  href={link.url}
+                />
+              ))}
+            </ListGroup>
+          )}
         </>
       )}
 
