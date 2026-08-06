@@ -20,7 +20,6 @@ export function ServiceExistsSheet({
   busy,
   canLoad,
   canView,
-  rebuilds,
   note,
   onLoad,
   onView,
@@ -36,8 +35,6 @@ export function ServiceExistsSheet({
   canLoad: boolean
   /** True when the deck can at least be read — anything this app understands. */
   canView?: boolean
-  /** Editing this one means rebuilding it from its slides, not reopening it. */
-  rebuilds?: boolean
   /** What just happened, when an action here had something to answer. */
   note?: string
   onLoad: () => void
@@ -45,7 +42,6 @@ export function ServiceExistsSheet({
   onNewSlot: () => void
   onDismiss: () => void
 }): JSX.Element {
-  const readOnly = !!canView && !!onView
   return (
     <Sheet open={open} title="A service already exists" onClose={onDismiss}>
       <div className="px-[var(--gutter)]">
@@ -64,40 +60,33 @@ export function ServiceExistsSheet({
         )}
 
         <div className="list-group">
+          {/* One way in, not two. A deck without a builder sidecar used to be
+              openable only for reading, so this offered "make edits" (which
+              refused) beside "open for reading" (which was the real answer).
+              Opening one now gives a full editor — reorder, remove, add songs,
+              readings, links and files — so the two rows are the same door and
+              only differ in how the service gets loaded. */}
           <button
             type="button"
             className="list-row has-ico"
-            onClick={onLoad}
-            disabled={busy || !canLoad}
+            onClick={canLoad ? onLoad : onView}
+            disabled={busy || (!canLoad && !canView)}
           >
-            <span className={`list-ico ${canLoad ? 'bg-navy-700' : 'bg-ink-muted'}`}>
+            <span className={`list-ico ${canLoad || canView ? 'bg-navy-700' : 'bg-ink-muted'}`}>
               <Icon name="text" size={18} strokeWidth={2.2} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="list-title block">{busy ? 'Loading…' : 'Load it and make edits'}</span>
+              <span className="list-title block">{busy ? 'Loading…' : 'Open it and make edits'}</span>
               <span className="list-sub block">
-                {!canLoad
-                  ? 'This one was saved before editing was supported, so it can’t be reopened'
-                  : rebuilds
-                    ? 'Find its songs in the songbook and edit them here — it says what it can’t rebuild first'
-                    : 'Open the saved service here, change it, and save it back'}
+                {canLoad
+                  ? 'Open the saved service here, change it, and save it back'
+                  : canView
+                    ? 'Reorder it, take things out, and add songs, readings, links or files'
+                    : 'This one was saved in a form this app can’t read'}
               </span>
             </span>
-            {canLoad && <Icon name="chevron" size={17} className="list-chev" />}
+            {(canLoad || canView) && <Icon name="chevron" size={17} className="list-chev" />}
           </button>
-
-          {readOnly && (
-            <button type="button" className="list-row has-ico" onClick={onView} disabled={busy}>
-              <span className="list-ico bg-navy-500">
-                <Icon name="eye" size={18} strokeWidth={2.2} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="list-title block">Open it for reading</span>
-                <span className="list-sub block">See its order, share the sheet, and broadcast it</span>
-              </span>
-              <Icon name="chevron" size={17} className="list-chev" />
-            </button>
-          )}
 
           <button type="button" className="list-row has-ico" onClick={onNewSlot} disabled={busy}>
             <span className="list-ico bg-gold-500">

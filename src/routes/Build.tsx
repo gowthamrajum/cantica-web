@@ -640,9 +640,9 @@ export function Build(): JSX.Element {
         // nothing here for the builder to hold".
         const n = env.service.items.length
         say(
-          `There are no songs or psalms in this service. Its ${n} item${n === 1 ? '' : 's'} — the videos, cards ` +
-            `and announcements around the music — have no equivalent the builder can edit. Open it for reading ` +
-            `instead, or add the songs on the presenter and publish it again.`
+          `There are no songs or psalms in this service to rebuild — its ${n} item${n === 1 ? '' : 's'} are ` +
+            `videos, cards and announcements. You can still reorder them, take things out, and add songs, ` +
+            `readings, links or files.`
         )
         return
       }
@@ -892,7 +892,7 @@ export function Build(): JSX.Element {
     return (
       <Screen
         title="Service Builder"
-        subtitle={`${viewing.day} · ${prettyDate(viewing.date)} — open for reading.`}
+        subtitle={`${viewing.day} · ${prettyDate(viewing.date)} — reorder it, or add to it.`}
       >
         <Section>
           <SavedServiceView
@@ -1437,16 +1437,20 @@ export function Build(): JSX.Element {
         busyId={openingId}
       />
 
+      {/* canLoad and canView are reported honestly rather than OR'd together to
+          force the button on: they mean different things — reopen the picks
+          that built it, or open the deck itself — and the sheet picks the door
+          from them. Conflating them sent every presenter deck down the rebuild
+          path, which is the one that can't help. */}
       <ServiceExistsSheet
         open={exists !== null}
         slotLabel={`${slot.day} · ${prettyDate(slot.date)}`}
         detail={exists?.detail}
         // A deck that can be read can be worked back into picks, so "make edits"
         // is offered for it too — it just goes the long way round.
-        canLoad={(exists?.canLoad ?? false) || (exists?.canView ?? false)}
+        canLoad={exists?.canLoad ?? false}
         canView={exists?.canView ?? false}
         note={existsNote}
-        rebuilds={!exists?.canLoad && (exists?.canView ?? false)}
         busy={loadingExisting || openingId !== null || rebuilding}
         onLoad={() => {
           if (!exists) return

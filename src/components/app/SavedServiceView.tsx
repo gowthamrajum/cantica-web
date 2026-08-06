@@ -139,8 +139,8 @@ export function SavedServiceView({
         </div>
         <p className="mt-3 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-muted">
           {origin === 'presenter'
-            ? 'This order was put together on the presenter computer. Read it, share it and broadcast it as it is — or rebuild its songs to edit them here.'
-            : 'This service was saved before the builder kept a record of how it was assembled. Read it, share it and broadcast it as it is — or rebuild its songs to edit them here.'}
+            ? 'Put together on the presenter computer. Reorder it, take things out, and add songs, readings, links or files — every slide it already has is written back exactly as it was.'
+            : 'Saved before the builder kept a record of how it was assembled. Reorder it, take things out, and add songs, readings, links or files — every slide it already has is written back exactly as it was.'}
         </p>
         {onRebuild && (
           <button
@@ -148,8 +148,14 @@ export function SavedServiceView({
             onClick={onRebuild}
             disabled={rebuilding}
           >
-            {rebuilding ? 'Looking…' : 'Rebuild its songs to edit'}
+            {rebuilding ? 'Looking…' : 'Rebuild its songs as picks'}
           </button>
+        )}
+        {onRebuild && (
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+            Only if you want a song's stanzas and repeats back under the builder's control — that rebuilds the
+            service from its songs alone and drops everything else, and it says what it would drop first.
+          </p>
         )}
       </div>
 
