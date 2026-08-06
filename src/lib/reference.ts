@@ -22,9 +22,34 @@ const ROMAN: Record<string, string> = Object.fromEntries(
 export interface Reference {
   book: string
   chapter: number
-  /** inclusive; `to` equals `from` for a single verse */
-  from: number
-  to: number
+  /** The verses named, expanded and sorted; null means the whole chapter. */
+  verses: number[] | null
+}
+
+/**
+ * Expand a verse spec ("13", "13-16", "13,16", "13-16,20") into a sorted, unique
+ * list. Reversed ranges ("16-13") are tolerated. Non-numeric junk is ignored.
+ *
+ * Ported verbatim from lumen's shared/bible — as this whole file should have
+ * been. A comma list is exactly the thing a preacher says ("verses 13 and 16")
+ * and the hand-rolled from/to this replaced could not express it.
+ */
+export function parseVerseSpec(spec: string): number[] {
+  const out = new Set<number>()
+  for (const part of spec.split(',')) {
+    const p = part.trim()
+    if (!p) continue
+    const range = p.match(/^(\d+)\s*-\s*(\d+)$/)
+    if (range) {
+      let a = parseInt(range[1], 10)
+      let b = parseInt(range[2], 10)
+      if (a > b) [a, b] = [b, a]
+      for (let n = a; n <= b; n++) out.add(n)
+    } else if (/^\d+$/.test(p)) {
+      out.add(parseInt(p, 10))
+    }
+  }
+  return [...out].sort((a, b) => a - b)
 }
 
 /** Common short forms people actually type, where a prefix match would be wrong
@@ -121,18 +146,27 @@ export function suggestBooks(input: string, order: string[]): string[] {
 export function parseReference(input: string, order: string[]): Reference | null {
   const s = String(input ?? '').trim()
   if (!s) return null
-  // Book name, then chapter, then an optional verse or verse range. The book
-  // group is lazy so "1 John 3" splits after "1 John" rather than swallowing
-  // the 3.
-  const m = /^(.+?)\s*(\d{1,3})(?:\s*[:.\s]\s*(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?)?\s*$/.exec(s)
+  // lumen's own shape: book, chapter, then a verse SPEC — a single verse, a
+  // range, a comma list, or any mix. An en dash is normalised first, because a
+  // phone keyboard produces one and the spec grammar only knows the hyphen.
+  const m = /^(.+?)\s*(\d{1,3})?\s*(?::\s*([\d\s,-]+))?$/.exec(
+    s
+      // An en dash is what a phone keyboard offers for a range, and a full stop
+      // is what a lot of people type for the colon ("Rom 8.28"). Both are
+      // normalised into the grammar rather than added to it, so the spec stays
+      // the one lumen parses.
+      .replace(/[–—]/g, '-')
+      .replace(/(\d)\s*\.\s*(\d)/g, '$1:$2')
+  )
   if (!m) return null
   const book = matchBook(m[1], order)
   if (!book) return null
-  const chapter = Number(m[2])
-  const from = m[3] ? Number(m[3]) : 1
-  const to = m[4] ? Number(m[4]) : m[3] ? from : 999
-  if (!chapter || from < 1 || to < from) return null
-  return { book, chapter, from, to }
+  const chapter = m[2] ? Number(m[2]) : 0
+  if (!chapter) return null
+  const verses = m[3] ? parseVerseSpec(m[3]) : null
+  // An empty or garbled spec (a lone "-") means the whole chapter, rather than
+  // nothing — which is the more useful reading of a half-typed reference.
+  return { book, chapter, verses: verses && verses.length ? verses : null }
 }
 
 export type VerseLang = 'both' | 'telugu' | 'english'
@@ -144,17 +178,26 @@ export function versesFor(
   en: IndexedBible | null,
   lang: VerseLang
 ): { label: string; lines: string[] } | null {
+  const want = ref.verses ? new Set(ref.verses) : null
   const inRange = (b: IndexedBible | null): { verse: number; text: string }[] =>
-    (b?.byBook[ref.book]?.[ref.chapter] ?? []).filter((v) => v.verse >= ref.from && v.verse <= ref.to)
+    (b?.byBook[ref.book]?.[ref.chapter] ?? []).filter((v) => !want || want.has(v.verse))
 
   const teV = inRange(te)
   const enV = inRange(en)
   const n = Math.max(teV.length, enV.length)
   if (!n) return null
 
-  const last = Math.max(teV[teV.length - 1]?.verse ?? 0, enV[enV.length - 1]?.verse ?? 0)
-  const first = Math.min(teV[0]?.verse ?? 999, enV[0]?.verse ?? 999)
-  const span = first === last ? `${first}` : `${first}-${last}`
+  // Consecutive runs become ranges and gaps become commas, so a label says what
+  // is actually on screen: [13,14,15,16] -> "13-16", [13,16] -> "13,16".
+  const nums = [...new Set([...teV, ...enV].map((v) => v.verse))].sort((a, b) => a - b)
+  const parts: string[] = []
+  for (let i = 0; i < nums.length; ) {
+    let j = i
+    while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++
+    parts.push(j > i ? `${nums[i]}-${nums[j]}` : `${nums[i]}`)
+    i = j + 1
+  }
+  const span = parts.join(',')
 
   const lines: string[] = []
   for (let i = 0; i < n; i++) {
