@@ -337,7 +337,8 @@ export function detectRecurringSection(sections: SongSection[]): string | null {
 export function buildSongArrangement(
   sections: SongSection[],
   includedIds: string[],
-  recurringId: string | null
+  recurringId: string | null,
+  opts: { closeWithRefrain?: boolean } = {}
 ): string[] {
   const byId = new Map(sections.map((s) => [s.id, s]))
   const included = includedIds.map((id) => byId.get(id)).filter(Boolean) as SongSection[]
@@ -353,6 +354,11 @@ export function buildSongArrangement(
       arr.push(s.id)
       arr.push(rec.id)
     }
+    // The song closes on the refrain ENTIRE, after the trimmed reprise that
+    // follows the last stanza — the hook, and then the whole thing sung out.
+    // That is one extra time round, not a different last one, which is why it
+    // is added here rather than rendered differently below.
+    if (opts.closeWithRefrain && arr[arr.length - 1] === rec.id) arr.push(rec.id)
     return arr
   }
   return included.map((s) => s.id)
@@ -378,12 +384,13 @@ export interface SongStructure {
    */
   repeatUnits?: number[]
   /**
-   * Whether the LAST time round is the whole refrain again.
+   * Whether the song closes on the whole refrain, after the trimmed reprise.
    *
-   * A song usually ends on the full refrain even when the reprises between
-   * stanzas are trimmed — the hook carries the middle, and the ending is sung
-   * out. Defaults to true, and only means anything when `repeatUnits` names a
-   * part; a refrain that comes back whole every time is unaffected either way.
+   * The ending a song usually wants is the hook once more and then the refrain
+   * sung out entire — so this ADDS a time round rather than changing the last
+   * one: … S2 · P(hook) · P(whole). Defaults to true, and only means anything
+   * when `repeatUnits` names a part; a refrain that comes back whole every time
+   * is unaffected either way.
    */
   repeatFullAtEnd?: boolean
 }
@@ -398,8 +405,13 @@ export function songToItem(
   const both = lang === 'both'
   const lpp = both ? 4 : 2
   const all = songSections(song, lang)
+  // Only when part of the refrain is being held back is there anything for a
+  // full one at the end to be different FROM.
+  const trimmed = !!structure?.repeatUnits?.length
   const order = structure?.includedIds?.length
-    ? buildSongArrangement(all, structure.includedIds, structure.recurringId ?? null)
+    ? buildSongArrangement(all, structure.includedIds, structure.recurringId ?? null, {
+        closeWithRefrain: trimmed && structure.repeatFullAtEnd !== false
+      })
     : all.map((s) => s.id)
   const byId = new Map(all.map((s) => [s.id, s]))
   const sections = order.map((id) => byId.get(id)).filter(Boolean) as SongSection[]

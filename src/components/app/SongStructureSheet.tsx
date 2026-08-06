@@ -570,9 +570,9 @@ export function SongStructureSheet({
                             <Icon name="check" size={12} strokeWidth={3.2} />
                           </span>
                           <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink">
-                            End with the whole refrain
+                            Close on the whole refrain
                             <span className="block text-ink-muted">
-                              After the last stanza, sing all of it again rather than the ticked lines.
+                              After the last stanza: the ticked lines as usual, then all of it once more to finish.
                             </span>
                           </span>
                         </button>
