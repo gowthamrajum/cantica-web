@@ -66,6 +66,13 @@ export function SongStructureSheet({
   /** which section's slides are open for editing */
   const [editing, setEditing] = useState<string | null>(null)
   /**
+   * Which units of the refrain come BACK between the stanzas. Empty means all of
+   * it, which is what every arrangement did before this existed.
+   */
+  const [repeatUnits, setRepeatUnits] = useState<number[]>([])
+  /** whether the "which lines come back" picker is open */
+  const [pickingRepeat, setPickingRepeat] = useState(false)
+  /**
    * The line being held, and where it would land.
    *
    * `join` is which side of a slide heading the drop sits on — the difference
@@ -111,7 +118,9 @@ export function SongStructureSheet({
     )
     setGroups(initial?.groups ?? {})
     setLineOrder(initial?.order ?? {})
+    setRepeatUnits(initial?.repeatUnits ?? [])
     setEditing(null)
+    setPickingRepeat(false)
   }, [song, lang, initial]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const byId = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections])
@@ -368,7 +377,8 @@ export function SongStructureSheet({
     includedIds: includedInOrder,
     recurringId: recurring,
     groups,
-    order: lineOrder
+    order: lineOrder,
+    repeatUnits
   }
   const playOrder = buildSongArrangement(sections, includedInOrder, recurring)
   const slideCount = song ? (songToItem(song, lang, structure)?.slides.length ?? 0) : 0
@@ -442,7 +452,14 @@ export function SongStructureSheet({
                 disabled={!on}
                 aria-pressed={recurring === id}
                 title={recurring === id ? 'Stop this one repeating' : 'Play this one between the others'}
-                onClick={() => setRecurring(recurring === id ? null : id)}
+                onClick={() => {
+                  const next = recurring === id ? null : id
+                  setRecurring(next)
+                  // A selection is a set of positions INSIDE one section; it
+                  // means nothing against a different one.
+                  setRepeatUnits([])
+                  setPickingRepeat(false)
+                }}
               >
                 <Icon name={recurring === id ? 'check' : 'plus'} size={12} strokeWidth={3} />
                 Repeats
@@ -471,6 +488,78 @@ export function SongStructureSheet({
                 </button>
               </span>
             </div>
+
+            {/* Which part of the refrain comes back. Only on the refrain, and
+                only once it is marked — everywhere else there is nothing for a
+                reprise to be part of. */}
+            {recurring === id && on && (
+              <div className="border-t border-black/5 bg-gold-500/[0.06] px-3 py-2">
+                <button
+                  className="flex w-full items-center gap-2 py-1 text-left"
+                  onClick={() => setPickingRepeat((v) => !v)}
+                  aria-expanded={pickingRepeat}
+                >
+                  <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-ink">
+                    Comes back:{' '}
+                    <span className="font-normal text-ink-muted">
+                      {repeatUnits.length ? `${repeatUnits.length} of ${unitsOf(id).length} lines` : 'the whole thing'}
+                    </span>
+                  </span>
+                  <Icon
+                    name="chevron"
+                    size={15}
+                    strokeWidth={2.4}
+                    className={`flex-none text-ink-muted transition-transform ${pickingRepeat ? 'rotate-90' : ''}`}
+                  />
+                </button>
+
+                {pickingRepeat && (
+                  <>
+                    <p className="mb-1.5 mt-1 text-[12px] leading-relaxed text-ink-muted">
+                      It is sung in full the first time. Tick the lines that come back after each stanza — leave
+                      them all unticked for the whole refrain every time.
+                    </p>
+                    {unitsOf(id).map((u, ui) => {
+                      const picked = repeatUnits.includes(ui)
+                      return (
+                        <button
+                          key={ui}
+                          className="flex w-full items-start gap-2 py-1 text-left"
+                          onClick={() =>
+                            setRepeatUnits((prev) =>
+                              prev.includes(ui) ? prev.filter((x) => x !== ui) : [...prev, ui].sort((a, b) => a - b)
+                            )
+                          }
+                        >
+                          <span
+                            className={`mt-[3px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
+                              picked ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
+                            }`}
+                          >
+                            <Icon name="check" size={12} strokeWidth={3.2} />
+                          </span>
+                          <span className={`min-w-0 flex-1 text-[13px] leading-snug ${picked ? 'text-ink' : 'text-ink-muted'}`}>
+                            {unitLines(u).map((l, li) => (
+                              <span key={li} className="block truncate">
+                                {l}
+                              </span>
+                            ))}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {repeatUnits.length > 0 && (
+                      <button
+                        className="mt-1 text-[12.5px] font-semibold text-gold-600"
+                        onClick={() => setRepeatUnits([])}
+                      >
+                        Clear — bring the whole refrain back
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {editing === id && (
               <div ref={listRef} className="border-t border-black/5 bg-black/[0.02] px-3 py-2">

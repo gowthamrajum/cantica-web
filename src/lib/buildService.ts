@@ -365,6 +365,18 @@ export interface SongStructure {
   groups?: Record<string, number[]>
   /** section id -> the units' order, when the operator moved a line */
   order?: Record<string, number[]>
+  /**
+   * Which units of the recurring section come BACK between the stanzas.
+   *
+   * A refrain is very often sung whole the first time and only in part after
+   * each stanza — the last two lines, the hook. Absent or empty means the whole
+   * thing comes back, which is what every arrangement made before this did.
+   *
+   * Units, not lines: in a bilingual song a Telugu line and its transliteration
+   * are one unit, and choosing half of a pair would put a line on the screen
+   * with nothing under it.
+   */
+  repeatUnits?: number[]
 }
 
 /** A song → one Cantica item. Omit `structure` and the whole song plays in
@@ -384,25 +396,51 @@ export function songToItem(
   const sections = order.map((id) => byId.get(id)).filter(Boolean) as SongSection[]
 
   const slides: ServiceSlide[] = []
+  // The recurring section's FIRST appearance is the refrain in full; the ones
+  // after it are the reprise, and may be only part of it.
+  let recurringSeen = false
   for (const sec of sections) {
     const lines = sec.lines.filter((l) => l && l.trim()).map(formatLyricLine)
     if (!lines.length) continue
+    const isRecurring = !!structure?.recurringId && sec.id === structure.recurringId
+    const isReprise = isRecurring && recurringSeen
+    if (isRecurring) recurringSeen = true
     const natural = sectionUnits(lines, both)
     const moved = structure?.order?.[sec.id]
-    const units = applyOrder(natural, moved)
+    const full = applyOrder(natural, moved)
+    // A reprise takes only the chosen units, in the order they are written.
+    const picked = structure?.repeatUnits?.filter((i) => i >= 0 && i < full.length) ?? []
+    const units = isReprise && picked.length ? [...new Set(picked)].sort((a, b) => a - b).map((i) => full[i]) : full
     const reordered = units !== natural
-    const chosen = structure?.groups?.[sec.id]
+    // A grouping describes the WHOLE section, so it cannot describe a reprise
+    // that is a few of its units — that falls through to the automatic split.
+    const chosen = isReprise && units !== full ? undefined : structure?.groups?.[sec.id]
     // An operator grouping wins while it still accounts for every unit; a stale
     // one falls back to the automatic split rather than mis-slicing. Once lines
     // have been moved the fallback has to slice the moved order, not the written
     // one — otherwise the split would silently undo the move.
+    /**
+     * A reprise is grouped by UNIT COUNT, not by re-splitting its lines.
+     *
+     * The line-level chunkers read a section's block layout — every Telugu line,
+     * then every English one — and a handful of units flattened back out reads
+     * as te,en,te,en instead. Splitting that put each pair on a slide of its
+     * own. The units are already the right shape, so they are simply dealt out
+     * as many per slide as the chunker would have.
+     */
+    const per = both ? Math.max(1, Math.round(lpp / 2)) : lpp
+    const evenly = Array.from({ length: Math.ceil(units.length / per) }, (_, k) =>
+      Math.min(per, units.length - k * per)
+    )
     const chunks = groupsFit(chosen, units.length)
       ? applyGroups(units, chosen as number[])
-      : reordered
-        ? applyGroups(units, autoGroups(lines, both, lpp))
-        : both
-          ? chunkBilingualLines(lines, Math.max(1, Math.round(lpp / 2)))
-          : chunkLyricLines(lines, lpp, true)
+      : units !== full
+        ? applyGroups(units, evenly)
+        : reordered
+          ? applyGroups(units, autoGroups(lines, both, lpp))
+          : both
+            ? chunkBilingualLines(lines, Math.max(1, Math.round(lpp / 2)))
+            : chunkLyricLines(lines, lpp, true)
     chunks.forEach((chunk, i) => {
       slides.push({
         id: uid(),
