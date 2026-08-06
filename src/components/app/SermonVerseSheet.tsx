@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Segmented } from './Segmented'
 import { loadBible, type IndexedBible } from '../../lib/bible'
-import { parseReference, versesFor, type VerseLang } from '../../lib/reference'
+import { parseReference, suggestBooks, versesFor, type VerseLang } from '../../lib/reference'
 import type { VersePayload } from '../../lib/relay'
 
 /**
@@ -31,11 +31,17 @@ const LANGS: { id: VerseLang; label: string }[] = [
 export function SermonVerseSheet({
   open,
   onClose,
-  onSend
+  onSend,
+  onBackToSermon,
+  onNextSection
 }: {
   open: boolean
   onClose: () => void
   onSend: (payload: VersePayload) => void | Promise<void>
+  /** Back to the sermon card, over any verses put up since. */
+  onBackToSermon: () => void
+  /** On to the next section, over the rest of them. */
+  onNextSection: () => void
 }): JSX.Element {
   const [te, setTe] = useState<IndexedBible | null>(null)
   const [en, setEn] = useState<IndexedBible | null>(null)
@@ -57,6 +63,17 @@ export function SermonVerseSheet({
 
   const order = te?.order ?? en?.order ?? []
   const ready = !!(te || en)
+
+  /**
+   * Books worth offering for what has been typed.
+   *
+   * Only while the BOOK is still being typed — once a chapter number is there
+   * the book is settled, and a dangling list under the field just swallows the
+   * next tap. "Yohanu" reaches John through the Telugu name romanised, which is
+   * what anybody without a Telugu keyboard types.
+   */
+  const typingBook = /^[^0-9]*$/.test(query.trim())
+  const books = typingBook && ready ? suggestBooks(query, order).slice(0, 6) : []
 
   const go = async (): Promise<void> => {
     if (!ready) return
@@ -117,6 +134,40 @@ export function SermonVerseSheet({
             {ready ? 'Put it on screen' : 'Loading the bible…'}
           </button>
         </form>
+
+        {books.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {books.map((b) => (
+              <button
+                key={b}
+                type="button"
+                className="pill bg-navy-700 text-paper"
+                // A space after it, because a chapter number always follows and
+                // this is being tapped by someone in a hurry.
+                onClick={() => {
+                  setQuery(`${b} `)
+                  setError('')
+                  input.current?.focus()
+                }}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Where the sermon goes next. Both skip the verses: they are appended
+            to the sermon item, so "the sermon card" is its first slide and "the
+            next section" is the item after it — neither has to count how many
+            verses went up. */}
+        <div className="mt-3 flex gap-2">
+          <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={onBackToSermon}>
+            Back to sermon
+          </button>
+          <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={onNextSection}>
+            Next section
+          </button>
+        </div>
 
         {error ? (
           <p className="mt-2 text-[13px] leading-relaxed text-amber-700">{error}</p>

@@ -1,4 +1,11 @@
 import { TE_BOOKS, teBook, type IndexedBible } from './bible'
+import { romanizeTelugu, romanMatches, romanPrefix } from './teluguRoman'
+
+/** Every book's Telugu name romanised once — "యోహాను సువార్త" -> "yohanu suvartha",
+ *  which is what someone without a Telugu keyboard actually types. */
+const ROMAN: Record<string, string> = Object.fromEntries(
+  Object.entries(TE_BOOKS).map(([en, te]) => [en, romanizeTelugu(te)])
+)
 
 /**
  * "John 3:16" typed by someone standing at the back of a church.
@@ -58,11 +65,53 @@ export function matchBook(input: string, order: string[]): string | null {
   const alias = ALIASES[q]
   if (alias && order.includes(alias)) return alias
 
-  const starts = order.filter((b) => norm(b).startsWith(q))
-  if (starts.length === 1) return starts[0]
-  const teStarts = Object.entries(TE_BOOKS).filter(([, te]) => norm(te).startsWith(q))
-  if (!starts.length && teStarts.length === 1 && order.includes(teStarts[0][0])) return teStarts[0][0]
-  return null
+  const hits = suggestBooks(input, order)
+  return hits.length === 1 ? hits[0] : null
+}
+
+/**
+ * Books worth offering for what has been typed — English, Telugu script, or the
+ * Telugu name romanised.
+ *
+ * Real prefixes come first and alone: the near-miss arm exists to rescue a
+ * search that found nothing, not to pad one that found the right book with
+ * three that merely rhyme with it. It matters because a book's everyday name
+ * and the one this translation prints often differ by an inflection — Psalms is
+ * printed "కీర్తనల గ్రంథము" (keerthanala granthamu) but spoken of as Keerthanalu
+ * — so on a strict prefix the entry would vanish exactly as it is finished.
+ */
+export function suggestBooks(input: string, order: string[]): string[] {
+  const q = norm(input)
+  if (!q || !/[a-zఀ-౿]/.test(q)) return []
+
+  /**
+   * A leading number is part of the name, and the roman fold throws it away —
+   * it strips everything that isn't a letter, so "1 J" folds to "j" and then
+   * prefix-matches Zephaniah, Zechariah and everything else beginning with one.
+   * So the number is honoured here instead: typed, only that numbered book can
+   * match; not typed, the plain book wins over its numbered namesakes, which is
+   * what "Yohanu" has to mean if it is to mean anything.
+   */
+  const num = /^\s*([123])\s*[^0-9]/.exec(input.trim())?.[1] ?? ''
+  const numbered = (b: string): string => (/^[123]\s/.test(b) ? b[0] : '')
+  const rank = (list: string[]): string[] => {
+    const fit = list.filter((b) => numbered(b) === num)
+    return fit.length ? fit : num ? [] : list
+  }
+
+  const exact = order.filter(
+    (b) => norm(b) === q || norm(TE_BOOKS[b] ?? '') === q || ALIASES[q] === b
+  )
+  if (exact.length) return exact
+
+  const starts = order.filter(
+    (b) =>
+      norm(b).startsWith(q) ||
+      norm(TE_BOOKS[b] ?? '').startsWith(q) ||
+      romanPrefix(ROMAN[b] ?? '', input)
+  )
+  if (starts.length) return rank(starts)
+  return rank(order.filter((b) => romanMatches(ROMAN[b] ?? '', input)))
 }
 
 /**

@@ -439,6 +439,12 @@ function OperatorMirror({
   useEffect(() => {
     if (confirmEnd || ending || ended || lostSeat) return
     const onKey = (e: KeyboardEvent): void => {
+      // Not while something is being typed. Space is both "next slide" and the
+      // commonest character in a reference, so without this, typing "John 3:16"
+      // advanced the service — and the operator had no way to know the two were
+      // the same key.
+      const t = e.target as HTMLElement | null
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault()
         void run('next')
@@ -524,10 +530,22 @@ function OperatorMirror({
       )}
       {flash && <div className="op2-toast">{flash}</div>}
 
+      {/* Both jumps are ordinary `goto`s: it already means "the first slide of
+          item N", and a verse is appended INSIDE the sermon item — so the
+          sermon card is goto(live) and the next section is goto(live + 1),
+          whatever number of verses went up in between. */}
       <SermonVerseSheet
         open={verseOpen}
         onClose={() => setVerseOpen(false)}
         onSend={(payload) => run('verse', payload)}
+        onBackToSermon={() => {
+          const i = state?.order?.findIndex((o) => o.live) ?? -1
+          if (i >= 0) void run('goto', i)
+        }}
+        onNextSection={() => {
+          const i = state?.order?.findIndex((o) => o.live) ?? -1
+          if (i >= 0 && i + 1 < (state?.order?.length ?? 0)) void run('goto', i + 1)
+        }}
       />
 
       {/* The seat went elsewhere: stop pretending this phone still drives the
