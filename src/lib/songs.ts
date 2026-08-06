@@ -98,6 +98,21 @@ export function listSongs(search = ''): Promise<SongMeta[]> {
   return run({ op: 'list', search }, (m) => m.listSongs(search))
 }
 
+/**
+ * One page of results, with the total so a list knows whether to go on.
+ *
+ * Preferred over listSongs for anything that renders a list: a common word
+ * matches most of the songbook, and every one of those matches would otherwise
+ * be copied out of the worker to render the first screenful.
+ */
+export function searchSongs(
+  search = '',
+  offset = 0,
+  limit = 50
+): Promise<{ songs: SongMeta[]; total: number }> {
+  return run({ op: 'page', search, offset, limit }, (m) => m.searchPage(search, offset, limit))
+}
+
 export function getSong(id: number): Promise<Song | undefined> {
   return run({ op: 'get', songId: id }, (m) => m.getSong(id))
 }

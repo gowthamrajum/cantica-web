@@ -4,7 +4,7 @@ import { Screen } from '../components/app/Screen'
 import { useScreenScroll } from '../components/app/screenScroll'
 import { Icon } from '../components/app/Icons'
 import { SearchField } from '../components/app/SearchField'
-import { listSongs, type SongMeta } from '../lib/songs'
+import { searchSongs, type SongMeta } from '../lib/songs'
 
 const PAGE = 80
 
@@ -12,8 +12,9 @@ export function Songs(): JSX.Element {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   const [songs, setSongs] = useState<SongMeta[] | null>(null)
+  /** How many the search matched in all — what tells the list to keep going. */
+  const [total, setTotal] = useState<number | null>(null)
   const [error, setError] = useState(false)
-  const [shown, setShown] = useState(PAGE)
   const scrollEl = useScreenScroll()
   const sentinel = useRef<HTMLDivElement>(null)
 
@@ -24,31 +25,55 @@ export function Songs(): JSX.Element {
 
   useEffect(() => {
     let alive = true
-    setShown(PAGE)
-    listSongs(debounced)
-      .then((s) => alive && setSongs(s))
+    setTotal(null)
+    searchSongs(debounced, 0, PAGE)
+      .then((r) => {
+        if (!alive) return
+        setSongs(r.songs)
+        setTotal(r.total)
+      })
       .catch(() => alive && setError(true))
     return () => {
       alive = false
     }
   }, [debounced])
 
-  // Infinite scroll — a "Show more" button is a website affordance; a list that
-  // simply keeps going is the app one.
+  /**
+   * Infinite scroll — a "Show more" button is a website affordance; a list that
+   * simply keeps going is the app one.
+   *
+   * Each turn of it now FETCHES the next page rather than revealing more of a
+   * list already in hand: a search for a common word matches thousands of songs,
+   * and carrying all of them out of the worker to show fifty is work nobody
+   * asked for. `loading` guards against the observer firing twice before the
+   * page it asked for has arrived.
+   */
+  const loading = useRef(false)
   useEffect(() => {
     const el = sentinel.current
-    if (!el || !scrollEl || !songs || shown >= songs.length) return
+    if (!el || !scrollEl || !songs || total === null || songs.length >= total) return
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setShown((n) => n + PAGE)
+        if (!entries.some((e) => e.isIntersecting) || loading.current) return
+        loading.current = true
+        const from = songs.length
+        void searchSongs(debounced, from, PAGE)
+          .then((r) => {
+            // Appended by position, so a page that arrives late cannot
+            // duplicate what is already on screen.
+            setSongs((prev) => (prev && prev.length === from ? [...prev, ...r.songs] : prev))
+          })
+          .finally(() => {
+            loading.current = false
+          })
       },
       { root: scrollEl, rootMargin: '600px 0px' }
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [scrollEl, songs, shown])
+  }, [scrollEl, songs, total, debounced])
 
-  const visible = useMemo(() => songs?.slice(0, shown) ?? [], [songs, shown])
+  const visible = useMemo(() => songs ?? [], [songs])
   const searching = debounced.trim().length > 0
 
   // Group into A/B/C-style sections by first character — the songbook is Telugu,
@@ -76,8 +101,11 @@ export function Songs(): JSX.Element {
         !songs
           ? 'Our worship songbook'
           : searching
-            ? `${songs.length.toLocaleString()} match${songs.length === 1 ? '' : 'es'} in titles and lyrics`
-            : `${songs.length.toLocaleString()} songs, available offline`
+            ? // The COUNT is the whole match set, not the page in hand: only a
+              // page is fetched now, and reporting its size told everyone that
+              // "yesu" matched 80 songs when it matches two thousand.
+              `${(total ?? songs.length).toLocaleString()} match${(total ?? songs.length) === 1 ? '' : 'es'} in titles and lyrics`
+            : `${(total ?? songs.length).toLocaleString()} songs`
       }
       affix={
         <SearchField value={q} onChange={setQ} placeholder="Search titles and lyrics…" ariaLabel="Search songs" />
@@ -114,7 +142,7 @@ export function Songs(): JSX.Element {
       ))}
 
       <div ref={sentinel} aria-hidden="true" />
-      {songs && shown < songs.length && (
+      {songs && total !== null && songs.length < total && (
         <div className="flex justify-center py-6">
           <span className="spinner" />
         </div>

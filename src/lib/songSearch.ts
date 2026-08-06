@@ -505,6 +505,25 @@ export async function listSongs(search = ''): Promise<SongMeta[]> {
   return hits.sort((a, b) => a.rank - b.rank || byName(a.meta, b.meta)).map((h) => h.meta)
 }
 
+/**
+ * One page of results, and how many there are in all.
+ *
+ * The ranking is unchanged and still considers every song — that is what makes
+ * the best match the first result rather than the first result of the first
+ * page. Only the slice handed back is bounded: a search for a common word
+ * matches most of the library, and shipping four thousand of them across a
+ * worker boundary to render fifty is work nobody asked for.
+ */
+export async function searchPage(
+  search: string,
+  offset = 0,
+  limit = 50
+): Promise<{ songs: SongMeta[]; total: number }> {
+  const all = await listSongs(search)
+  const from = Math.max(0, offset)
+  return { songs: all.slice(from, from + Math.max(1, limit)), total: all.length }
+}
+
 export async function getSong(id: number): Promise<Song | undefined> {
   const songs = await loadAll()
   return songs.find((s) => s.song_id === id)

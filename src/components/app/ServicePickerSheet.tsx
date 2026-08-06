@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Segmented } from './Segmented'
 import { Icon } from './Icons'
 import { SearchField } from './SearchField'
-import { countSongs, listSongs, type SongMeta } from '../../lib/songs'
+import { countSongs, searchSongs, type SongMeta } from '../../lib/songs'
 import { PsalmFields } from './PsalmFields'
 
 export type PickSource = 'songs' | 'psalms'
@@ -46,6 +46,8 @@ export function ServicePickerSheet({
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   const [matches, setMatches] = useState<SongMeta[] | null>(null)
+  /** How many the search matched in all — only the current page is fetched. */
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   /** The whole library's size, for the placeholder — not the match count. */
   const [library, setLibrary] = useState<number | null>(null)
@@ -64,23 +66,36 @@ export function ServicePickerSheet({
 
   // Only search while the sheet is actually up — no point filtering the whole
   // songbook for a list nobody is looking at.
+  // A new search starts at the first page; the fetch below follows.
+  useEffect(() => {
+    if (open && source === 'songs') setPage(0)
+  }, [debounced, source, open])
+
+  /**
+   * Only the page being looked at is fetched.
+   *
+   * A common word matches most of four and a half thousand songs, and the sheet
+   * shows six of them. Carrying the rest out of the worker to render those six
+   * is work nobody asked for — and it is paid on every keystroke.
+   */
   useEffect(() => {
     let alive = true
     if (!open || source !== 'songs') return
-    setPage(0)
-    void listSongs(debounced).then((s) => alive && setMatches(s))
+    void searchSongs(debounced, page * PAGE_SIZE, PAGE_SIZE).then((r) => {
+      if (!alive) return
+      setMatches(r.songs)
+      setTotal(r.total)
+    })
     return () => {
       alive = false
     }
-  }, [debounced, source, open])
+  }, [debounced, source, open, page])
 
-  const total = matches?.length ?? 0
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const safePage = Math.min(page, pages - 1)
-  const visible = useMemo(
-    () => (matches ?? []).slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
-    [matches, safePage]
-  )
+  // The fetch already returned exactly this page — slicing it again by the page
+  // offset would look past the end of it and render nothing.
+  const visible = matches ?? []
   const firstShown = total === 0 ? 0 : safePage * PAGE_SIZE + 1
   const lastShown = Math.min(total, (safePage + 1) * PAGE_SIZE)
 

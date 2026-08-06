@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 
 /**
  * The active screen's scroll container, so children can drive it (scroll to top
@@ -12,5 +12,27 @@ import { createContext, useContext } from 'react'
 export const ScrollCtx = createContext<HTMLDivElement | null>(null)
 
 export function useScreenScroll(): HTMLDivElement | null {
-  return useContext(ScrollCtx)
+  const provided = useContext(ScrollCtx)
+  const [found, setFound] = useState<HTMLDivElement | null>(null)
+
+  /**
+   * The context is null for the screens that need this most.
+   *
+   * A route renders <Screen> itself, so it sits OUTSIDE the provider its own
+   * child supplies and can never read it — which is every route that asks. The
+   * effect was silent: Songs' infinite scroll simply never armed, so the list
+   * stopped at its first page however far you scrolled, and the Bible never
+   * scrolled back to the top on a chapter change.
+   *
+   * Rather than restructure every screen around a render prop, the element is
+   * found in the DOM. It is unambiguous — one screen is mounted at a time — and
+   * re-read on each render so it follows navigation. React bails on a set to
+   * the same node, so this settles after the first paint.
+   */
+  useEffect(() => {
+    if (provided) return
+    setFound(document.querySelector<HTMLDivElement>('.screen-scroll'))
+  })
+
+  return provided ?? found
 }

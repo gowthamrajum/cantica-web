@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { countSongs, getSong, listSongs } from './songSearch'
+import { countSongs, getSong, listSongs, searchPage } from './songSearch'
 
 /**
  * The songbook, off the main thread.
@@ -17,6 +17,7 @@ import { countSongs, getSong, listSongs } from './songSearch'
 
 type Req =
   | { id: number; op: 'list'; search: string }
+  | { id: number; op: 'page'; search: string; offset: number; limit: number }
   | { id: number; op: 'get'; songId: number }
   | { id: number; op: 'count' }
 
@@ -26,9 +27,11 @@ self.onmessage = async (e: MessageEvent<Req>): Promise<void> => {
     const value =
       msg.op === 'list'
         ? await listSongs(msg.search)
-        : msg.op === 'get'
-          ? await getSong(msg.songId)
-          : await countSongs()
+        : msg.op === 'page'
+          ? await searchPage(msg.search, msg.offset, msg.limit)
+          : msg.op === 'get'
+            ? await getSong(msg.songId)
+            : await countSongs()
     ;(self as unknown as Worker).postMessage({ id: msg.id, value })
   } catch (err) {
     // The caller is waiting on a promise; a silent failure would hang it for
