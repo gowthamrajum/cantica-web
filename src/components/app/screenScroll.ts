@@ -26,13 +26,13 @@ export function useScreenScroll(): HTMLDivElement | null {
    *
    * Rather than restructure every screen around a render prop, the element is
    * found in the DOM. It is unambiguous — one screen is mounted at a time — and
-   * re-read on each render so it follows navigation. React bails on a set to
-   * the same node, so this settles after the first paint.
+   * looked up once per mount, which is once per route: the DOM is committed
+   * before any effect runs, so the node is already there.
    */
   useEffect(() => {
     if (provided) return
     setFound(document.querySelector<HTMLDivElement>('.screen-scroll'))
-  })
+  }, [provided])
 
   return provided ?? found
 }
