@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { RELAY_BASE, type OrderItem, type Slide } from './relay'
+import { RELAY_BASE, type OrderItem, type Slide, type VersePayload } from './relay'
+
+/** What a command carries: an index for `goto`, a passage for `verse`. */
+export type RemoteArg = number | VersePayload | null
 import type { ServiceEnvelope, ServiceItem, ServiceSlide } from './buildService'
 
 /**
@@ -200,7 +203,7 @@ export const publishOff = (room: string, f: BroadcastFrame): Promise<boolean> =>
 
 // ---- taking the Operator's commands ----
 
-export type PresenterCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end'
+export type PresenterCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end' | 'verse'
 
 /**
  * Register as this room's presenter and run whatever the phone Operator sends.
@@ -213,7 +216,7 @@ export type PresenterCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'lo
 export function useRemoteCommands(
   room: string,
   pin: string,
-  onCommand: (cmd: PresenterCmd, arg: number | null) => void
+  onCommand: (cmd: PresenterCmd, arg: RemoteArg) => void
 ): void {
   // Held in a ref so a re-render — every slide change is one — doesn't tear the
   // subscription down and hand the room back with a fresh PIN registration.
@@ -228,8 +231,19 @@ export function useRemoteCommands(
     const es = new EventSource(url)
     es.addEventListener('command', (e) => {
       try {
-        const msg = JSON.parse((e as MessageEvent).data) as { cmd?: string; arg?: number | null }
-        if (msg?.cmd) handler.current(msg.cmd as PresenterCmd, typeof msg.arg === 'number' ? msg.arg : null)
+        const msg = JSON.parse((e as MessageEvent).data) as { cmd?: string; arg?: unknown }
+        if (!msg?.cmd) return
+        // `goto` sends an index; `verse` sends a passage. Anything else that
+        // isn't one of those two shapes arrives as null rather than as a
+        // surprise for the handler to unpick.
+        const a = msg.arg
+        const arg: RemoteArg =
+          typeof a === 'number'
+            ? a
+            : a && typeof a === 'object' && Array.isArray((a as VersePayload).lines)
+              ? (a as VersePayload)
+              : null
+        handler.current(msg.cmd as PresenterCmd, arg)
       } catch {
         /* a malformed frame is not worth killing the stream over */
       }

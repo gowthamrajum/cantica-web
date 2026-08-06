@@ -1294,6 +1294,9 @@ html.channel-open #root {
 .op2-exit:active { transform: scale(0.94); }
 /* Ends the whole broadcast, not just this operator's session — red, and it asks. */
 .op2-stop { padding: 5px 11px; border-radius: 8px; background: rgba(239, 68, 68, 0.18); color: #fca5a5; font-size: 12px; font-weight: 700; }
+/* Sits beside End, in the accent rather than the alarm colour — it is the one
+   thing here that ADDS something to the service. */
+.op2-verse { padding: 5px 11px; border-radius: 8px; background: rgba(245, 195, 96, 0.18); color: #f5c360; font-size: 12px; font-weight: 700; }
 .op2-stop:active { transform: scale(0.94); }
 
 /* The confirmation, over everything: a swipe or an arrow key must not be able

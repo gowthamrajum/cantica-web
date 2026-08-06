@@ -26,7 +26,7 @@ import {
   useWakeLock,
   type BroadcastFrame
 } from '../lib/livecast'
-import type { ServiceEnvelope } from '../lib/buildService'
+import type { ServiceEnvelope, ServiceItem } from '../lib/buildService'
 
 /** px; below this a gesture is a tap meant for a control, not a swipe. */
 const SWIPE_MIN = 45
@@ -88,7 +88,17 @@ export function Live(): JSX.Element {
     }
   }, [serviceId])
 
-  const items = useMemo(() => envelope?.service.items ?? [], [envelope])
+  /**
+   * The deck, held as state rather than derived — because it can grow.
+   *
+   * A verse thrown up mid-sermon is appended to the item that is live, exactly
+   * as it is on the desktop, so it sits inside the sermon instead of becoming a
+   * section of its own and the order still reads as the service it is.
+   */
+  const [items, setItems] = useState<ServiceItem[]>([])
+  useEffect(() => setItems(envelope?.service.items ?? []), [envelope])
+  /** An item that has just been given a verse, waiting for the deck to catch up. */
+  const jumpToLastOf = useRef<number | null>(null)
   const deck = useMemo(() => flattenDeck(items), [items])
   const name = envelope?.service.name ?? 'Live Service'
   const theme = envelope?.service.theme as Theme | undefined
@@ -204,16 +214,57 @@ export function Live(): JSX.Element {
         else if (cmd === 'clear') setClearText((c) => !c)
         else if (cmd === 'logo') setShowLogo((l) => !l)
         else if (cmd === 'end') setEnded(true)
-        else if (cmd === 'goto' && arg !== null) {
+        else if (cmd === 'verse' && arg && typeof arg === 'object') {
+          // Onto whatever is live — which the operator only offers during the
+          // sermon, so it is the sermon. Deliberately no timer: it stays up
+          // until the operator moves on, because the preacher decides how long
+          // a verse is wanted and a countdown would take it away mid-sentence.
+          const at = cursor >= 0 && cursor < deck.length ? deck[cursor].item : -1
+          if (at < 0) return
+          const passage = arg
+          setItems((list) =>
+            list.map((it, i) =>
+              i === at
+                ? {
+                    ...it,
+                    slides: [
+                      ...it.slides,
+                      {
+                        id: `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+                        kind: 'scripture' as const,
+                        label: passage.label,
+                        lines: passage.lines,
+                        caption: passage.label
+                      }
+                    ]
+                  }
+                : it
+            )
+          )
+          // The cursor cannot move until the deck has been rebuilt around the
+          // new slide, so the jump is deferred rather than computed against a
+          // deck that is one slide out of date.
+          jumpToLastOf.current = at
+        } else if (cmd === 'goto' && arg !== null && typeof arg === 'number') {
           // The outline the remote sees is the ITEM list, so a goto lands on the
           // first slide of that item.
           const at = deck.findIndex((d) => d.item === arg)
           if (at >= 0) goTo(at)
         }
       },
-      [deck, goTo, goNext, goPrev]
+      [deck, cursor, goTo, goNext, goPrev]
     )
   )
+
+  // The deferred jump: land on the verse that was just appended, which is the
+  // last slide of the item it went into.
+  useEffect(() => {
+    const at = jumpToLastOf.current
+    if (at == null) return
+    jumpToLastOf.current = null
+    const last = deck.reduce((acc, d, i) => (d.item === at ? i : acc), -1)
+    if (last >= 0) setCursor(last)
+  }, [deck])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {

@@ -8,11 +8,13 @@ import {
   releaseOperator,
   sendControl,
   type ControlCmd,
+  type VersePayload,
   type OperatorRole,
   type SessionSummary
 } from '../lib/relay'
 import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
+import { SermonVerseSheet } from '../components/app/SermonVerseSheet'
 import { ConfidenceCard } from '../components/ConfidenceCard'
 import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
@@ -259,6 +261,21 @@ function OperatorMirror({
   // Operators see the unsuppressed deck (every slide), unlike audience/OBS viewers.
   const { state, connected, viewers } = useLiveState(conn.room, 'operator')
   const liveShowing = !!state?.slide && !state.blackout && !state.clearText && !state.showLogo
+  /**
+   * Whether the sermon is the item on screen.
+   *
+   * The operator already receives the outline with the live item marked, so
+   * this needs nothing new from the relay. Matched on the title in both
+   * languages — it is the church's own section card, built from a template, and
+   * the same test the desktop importer uses to find it.
+   */
+  const onSermon = !!state?.order?.some((it) => it.live && /sermon|వాక్యోపదేశం/i.test(it.title ?? ''))
+  const [verseOpen, setVerseOpen] = useState(false)
+  // Only ever offered during the sermon, so leaving it closes the sheet rather
+  // than leaving a way to put a verse over the next song.
+  useEffect(() => {
+    if (!onSermon) setVerseOpen(false)
+  }, [onSermon])
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   // Ending affects everyone watching, so it is asked rather than done on a tap
@@ -316,11 +333,11 @@ function OperatorMirror({
   }, [conn.room, conn.pin, me, ended, lostSeat])
 
   const run = useCallback(
-    async (cmd: ControlCmd): Promise<void> => {
+    async (cmd: ControlCmd, arg?: number | VersePayload): Promise<void> => {
       setFeedback(cmd)
       setTimeout(() => setFeedback(null), 450)
       try {
-        const r = await sendControl(conn.room, conn.pin, cmd, undefined, me)
+        const r = await sendControl(conn.room, conn.pin, cmd, arg, me)
         if (r.status === 401) {
           setFlash('PIN no longer valid')
           setTimeout(onBadPin, 900)
@@ -467,6 +484,13 @@ function OperatorMirror({
           <span className={`op2-status ${status.cls}`}>{status.label}</span>
           {/* Ending is the operator's, not just the presenter's: they are the one
               who knows the service is over. */}
+          {/* Only during the sermon. Everywhere else there is nothing for a
+              verse to be appended to that would make sense of it. */}
+          {onSermon && !ended && (
+            <button onClick={() => setVerseOpen(true)} className="op2-verse" title="Put a verse on screen">
+              Verse
+            </button>
+          )}
           <button onClick={() => setConfirmEnd(true)} className="op2-stop">
             End
           </button>
@@ -499,6 +523,12 @@ function OperatorMirror({
         </div>
       )}
       {flash && <div className="op2-toast">{flash}</div>}
+
+      <SermonVerseSheet
+        open={verseOpen}
+        onClose={() => setVerseOpen(false)}
+        onSend={(payload) => run('verse', payload)}
+      />
 
       {/* The seat went elsewhere: stop pretending this phone still drives the
           service, and get off the deck rather than leave a dead remote in

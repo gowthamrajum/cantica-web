@@ -82,7 +82,17 @@ export const streamUrl = (room: string, view: LiveView = 'users'): string =>
 // `end` takes the room off air: the presenter stops publishing and blacks it
 // out. The relay only carries it, so a presenter too old to know the command
 // simply ignores it and the broadcast stays up.
-export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end'
+// `verse` puts a passage on the screen mid-sermon. It carries the finished
+// lines rather than a reference: the operator's phone has both bibles bundled,
+// so it resolves the reference there and neither the relay nor the presenter
+// needs to know anything about scripture.
+export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end' | 'verse'
+
+/** What a `verse` command carries. */
+export interface VersePayload {
+  label: string
+  lines: string[]
+}
 
 export interface ControlStatus {
   /** a presenter is currently listening for commands */
@@ -181,7 +191,7 @@ export async function sendControl(
   room: string,
   pin: string,
   cmd: ControlCmd,
-  arg?: number,
+  arg?: number | VersePayload,
   operatorId?: string
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control`, {
