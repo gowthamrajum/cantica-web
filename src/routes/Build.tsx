@@ -840,6 +840,31 @@ export function Build(): JSX.Element {
     }
   }
 
+  /**
+   * Keep a saved service saved.
+   *
+   * Only once it EXISTS: creating one is a decision about which day it lands
+   * on, and a slot that turns out to be taken raises a prompt — neither is
+   * something to do behind the operator's back. So this updates, never creates.
+   *
+   * Debounced rather than on a fixed tick: the timer restarts on every change,
+   * so a run of edits writes once when they stop instead of catching the deck
+   * mid-rearrangement. A save already in flight, or a prompt already open,
+   * holds it off entirely.
+   */
+  const AUTOSAVE_MS = 30_000
+  const autoSaveRef = useRef<() => Promise<void>>(async () => {})
+  autoSaveRef.current = saveService
+  useEffect(() => {
+    if (!editing || savedId === null || !dirty || saving || exists || !picks.length) return
+    const t = setTimeout(() => {
+      void autoSaveRef.current()
+    }, AUTOSAVE_MS)
+    return () => clearTimeout(t)
+    // stateKey is what "a change" means — it is the same string `dirty` is
+    // derived from, so the timer restarts on the edit rather than on a render.
+  }, [stateKey, editing, savedId, dirty, saving, exists, picks.length])
+
   // The relay purges a service once its date is more than a week past.
   const stale = daysPast(slot.date) > 7
 
