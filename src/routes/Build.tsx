@@ -66,6 +66,22 @@ import {
  * of moving it here from Worship Ready.
  */
 
+/**
+ * The one word the chip carries. The full phrase stays on its title and label.
+ *
+ * A song sung in the worship set AND at the offering says "Offering" here: the
+ * note glyph beside it is what says it is in the set as well, and "General +
+ * offering" on a chip this size wraps or truncates to something worse than
+ * either half.
+ */
+const ROLE_CHIP: Record<string, string> = {
+  general: 'General',
+  offering: 'Offering',
+  'offering+general': 'Offering',
+  communion: 'Communion',
+  'communion+general': 'Communion'
+}
+
 /** Short forms for the role chip on a picked song. */
 const ROLE_LABEL: Record<string, string> = {
   general: 'General',
@@ -1254,10 +1270,12 @@ export function Build(): JSX.Element {
                     <Icon name="chevron" size={13} strokeWidth={2.4} className="text-ink-muted" />
                   </button>
 
-                  {/* The role reads as symbols rather than a phrase: an offering
-                      plate, a communion cup, and a note for the worship set —
-                      two glyphs when the song is sung twice. The words stay on
-                      the button's label for anyone who needs them. */}
+                  {/* The glyphs say what it is SET to — an offering plate, a
+                      communion cup, a note for the worship set, two of them
+                      when the song is sung twice. What they cannot say is what
+                      the button is FOR: a music note on a song reads as
+                      decoration, not as a question about when it is sung. So
+                      the word is there too, and a chevron to say it opens. */}
                   {p.type === 'song' && (
                     <button
                       className={`flex flex-none items-center gap-1 rounded-full px-2.5 py-1.5 ${
@@ -1271,9 +1289,11 @@ export function Build(): JSX.Element {
                       title={ROLE_LABEL[p.role ?? 'general']}
                       aria-label={`When is this sung? Currently: ${ROLE_LABEL[p.role ?? 'general']}`}
                     >
-                      {roleAlsoGeneral(p.role) && <Icon name="songs" size={17} strokeWidth={2} />}
-                      {p.role?.startsWith('offering') && <Icon name="offering" size={17} strokeWidth={2} />}
-                      {p.role?.startsWith('communion') && <Icon name="communion" size={17} strokeWidth={2} />}
+                      {roleAlsoGeneral(p.role) && <Icon name="songs" size={16} strokeWidth={2} />}
+                      {p.role?.startsWith('offering') && <Icon name="offering" size={16} strokeWidth={2} />}
+                      {p.role?.startsWith('communion') && <Icon name="communion" size={16} strokeWidth={2} />}
+                      <span className="text-[13px] font-semibold">{ROLE_CHIP[p.role ?? 'general']}</span>
+                      <Icon name="chevron" size={13} strokeWidth={2.4} className="opacity-60" />
                     </button>
                   )}
                 </div>
