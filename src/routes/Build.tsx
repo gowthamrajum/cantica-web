@@ -15,6 +15,7 @@ import { ServiceLinksEditor } from '../components/app/ServiceLinksEditor'
 import { usableLinks, type ServiceLink } from '../lib/links'
 import { ConfirmSheet } from '../components/app/ConfirmSheet'
 import { Sheet } from '../components/app/Sheet'
+import { ListGroup, ListRow } from '../components/app/List'
 import { PsalmFields } from '../components/app/PsalmFields'
 import { Collapsible } from '../components/app/Collapsible'
 import { useDisclosure } from '../components/app/useDisclosure'
@@ -54,7 +55,8 @@ import {
   type ServiceEnvelope,
   type ServiceItem,
   type ServiceLang,
-  type SongStructure
+  type SongStructure,
+  type SlideBackground
 } from '../lib/buildService'
 
 /**
@@ -199,6 +201,8 @@ export function Build(): JSX.Element {
   const [preview, setPreview] = useState<number | 'all' | null>(null)
   /** Which row's language is being set, if any. */
   const [langAt, setLangAtOpen] = useState<number | null>(null)
+  /** Which media sheet the "Add media" button opened, if any. */
+  const [mediaAdd, setMediaAdd] = useState<'upload' | 'link' | 'choose' | null>(null)
   const [note, setNote] = useState('')
   // Sections and items are closed by default; the setup opens on a fresh
   // service because there is nothing else to look at yet.
@@ -281,6 +285,7 @@ export function Build(): JSX.Element {
     }
     // The pick keeps resolved verses, not the range that produced them; the
     // ends of the list are that range.
+    if (p.type === 'media') return
     setEditingPsalm({
       at: i,
       chapter: p.chapter,
@@ -350,7 +355,11 @@ export function Build(): JSX.Element {
     if (replaceAt != null) {
       const at = replaceAt
       setPicks((p) =>
-        p.map((x, j) => (j === at ? { ...x, type: 'psalm', chapter: ch, verses, lang: x.lang } : x))
+        p.map((x, j) =>
+          j === at
+            ? { key: x.key, type: 'psalm', chapter: ch, verses, lang: x.type === 'media' ? 'both' : x.lang }
+            : x
+        )
       )
       setNote(`Changed to ${ref}`)
       return true
@@ -374,8 +383,9 @@ export function Build(): JSX.Element {
       }),
     'data-pick-row'
   )
+  // A clip has no language: it is a picture or a video, not words on a slide.
   const setLangAt = (i: number, l: ServiceLang): void =>
-    setPicks((p) => p.map((x, j) => (j === i ? { ...x, lang: l } : x)))
+    setPicks((p) => p.map((x, j) => (j === i && x.type !== 'media' ? { ...x, lang: l } : x)))
 
   const envelope = useMemo(() => buildService(name, picks, links), [name, picks, links])
   // What gets stored: the deck Cantica reads, plus a record of how it was
@@ -409,7 +419,7 @@ export function Build(): JSX.Element {
   const committed = picks.length > 0 && savedId !== null && !dirty
   const slides = countSlides(envelope)
   const labelOf = (p: Pick): string =>
-    p.type === 'song' ? p.song.song_name : `Psalm ${p.chapter}`
+    p.type === 'song' ? p.song.song_name : p.type === 'media' ? p.title : `Psalm ${p.chapter}`
 
   /**
    * Share the service as two files: a PDF to read from, one item per page, and
@@ -753,6 +763,20 @@ export function Build(): JSX.Element {
     const items = psalmToItems(ch, verses, lang)
     if (!items.length) return null
     return { items, label: `Psalm ${ch}${from.trim() && to.trim() ? `:${lo}-${hi}` : ''}` }
+  }
+
+  /**
+   * A clip or picture, added to the service being built.
+   *
+   * Appends a PICK rather than an item: the sheets below feed addToDeck, which
+   * edits the item list of a service already saved. Those are two different
+   * lists, and a clip added to the wrong one is invisible until the service is
+   * reopened — which is why "Add media" could not simply reuse them.
+   */
+  const addMediaPick = (title: string, background: SlideBackground): void => {
+    setPicks((p) => [...p, { key: `m-${Date.now()}`, type: 'media', title, background }])
+    setMediaAdd(null)
+    setNote(`Added ${title}.`)
   }
 
   /** Put freshly built items into the deck at the held position. */
@@ -1251,7 +1275,7 @@ export function Build(): JSX.Element {
                       {i + 1}. {labelOf(p)}
                     </span>
                     <span className="list-sub block">
-                      {p.type === 'song' ? 'Song' : 'Responsive reading'}
+                      {p.type === 'song' ? 'Song' : p.type === 'media' ? 'Video or picture' : 'Responsive reading'}
                       {p.type === 'song' && p.role ? ` · ${ROLE_LABEL[p.role]}` : ''}
                     </span>
                   </span>
@@ -1285,15 +1309,19 @@ export function Build(): JSX.Element {
                       set to. A select reading "Both" names one of its options
                       and hides the other two — on a row this narrow that was
                       the whole control, and nothing on it said "language". */}
-                  <button
-                    type="button"
-                    className="search-field flex flex-none items-center gap-1 px-2 text-[13px]"
-                    onClick={() => setLangAtOpen(i)}
-                    aria-label={`Language for ${labelOf(p)}`}
-                  >
-                    Language
-                    <Icon name="chevron" size={13} strokeWidth={2.4} className="text-ink-muted" />
-                  </button>
+                  {/* A clip is a picture or a video: it has no Telugu line and
+                      no transliteration, so there is nothing to choose. */}
+                  {p.type !== 'media' && (
+                    <button
+                      type="button"
+                      className="search-field flex flex-none items-center gap-1 px-2 text-[13px]"
+                      onClick={() => setLangAtOpen(i)}
+                      aria-label={`Language for ${labelOf(p)}`}
+                    >
+                      Language
+                      <Icon name="chevron" size={13} strokeWidth={2.4} className="text-ink-muted" />
+                    </button>
+                  )}
 
                   {/* The glyphs say what it is SET to — an offering plate, a
                       communion cup, a note for the worship set, two of them
@@ -1328,13 +1356,20 @@ export function Build(): JSX.Element {
                     psalm. A psalm has no arrangement, so its gear slot is held
                     open rather than collapsed. */}
                 <div className="flex w-full items-center justify-end gap-1.5">
-                  <button
-                    className="icon-btn"
-                    onClick={() => editPick(i)}
-                    aria-label={p.type === 'song' ? 'Edit arrangement' : 'Change the psalm'}
-                  >
-                    <Icon name="gear" size={17} />
-                  </button>
+                  {/* A clip has no arrangement and no reference to change, so
+                      its slot is held open rather than given a gear that would
+                      do nothing — the icons below stay in line across rows. */}
+                  {p.type === 'media' ? (
+                    <span className="icon-btn invisible" aria-hidden="true" />
+                  ) : (
+                    <button
+                      className="icon-btn"
+                      onClick={() => editPick(i)}
+                      aria-label={p.type === 'song' ? 'Edit arrangement' : 'Change the psalm'}
+                    >
+                      <Icon name="gear" size={17} />
+                    </button>
+                  )}
                   <button className="icon-btn" onClick={() => setPreview(i)} aria-label="Preview">
                     <Icon name="eye" size={17} />
                   </button>
@@ -1361,6 +1396,11 @@ export function Build(): JSX.Element {
               <Icon name="plus" size={17} strokeWidth={2.4} /> Add psalm
             </button>
           )}
+        </div>
+        <div className="mt-2 flex gap-2 px-[var(--gutter)]">
+          <button className="btn-app btn-app-quiet flex-1 text-[15px]" onClick={() => setMediaAdd('choose')}>
+            <Icon name="plus" size={17} strokeWidth={2.4} /> Add media
+          </button>
         </div>
 
         <div className="mt-3 px-[var(--gutter)]">
@@ -1582,9 +1622,55 @@ export function Build(): JSX.Element {
         onClose={() => setRolePick(null)}
       />
 
+      {/* Two ways in, because they are two different things: a file the church
+          owns and uploads, and a link to something already online. Offered as a
+          choice rather than guessed at, and the upload row goes away entirely
+          when no media store is configured. */}
+      <Sheet open={mediaAdd === 'choose'} title="Add media" onClose={() => setMediaAdd(null)}>
+        <ListGroup>
+          {media.enabled && (
+            <ListRow
+              icon="plus"
+              tint="navy"
+              title="Upload a file"
+              subtitle="A video or a picture from this phone"
+              onClick={() => setMediaAdd('upload')}
+            />
+          )}
+          <ListRow
+            icon="globe"
+            tint="gold"
+            title="Paste a link"
+            subtitle="YouTube, or a link to a video or photo"
+            onClick={() => setMediaAdd('link')}
+          />
+        </ListGroup>
+      </Sheet>
+
+      <Sheet open={mediaAdd === 'link'} title="Add media" onClose={() => setMediaAdd(null)}>
+        <MediaUrlFields
+          onAdd={(url, name) => {
+            const bg = backgroundForUrl(url)
+            if (bg) addMediaPick(name, bg)
+          }}
+          onCancel={() => setMediaAdd(null)}
+        />
+      </Sheet>
+
+      <Sheet open={mediaAdd === 'upload'} title="Add media" onClose={() => setMediaAdd(null)}>
+        <MediaUploadFields
+          maxBytes={media.maxBytes}
+          onUploaded={(url, nm) => {
+            const bg = backgroundForUrl(url)
+            if (bg) addMediaPick(nm, bg)
+          }}
+          onCancel={() => setMediaAdd(null)}
+        />
+      </Sheet>
+
       <SongLanguageSheet
         open={langAt !== null}
-        value={langAt !== null ? (picks[langAt]?.lang ?? 'both') : 'both'}
+        value={langAt !== null ? (picks[langAt]?.type === 'media' ? 'both' : (picks[langAt]?.lang ?? 'both')) : 'both'}
         onChange={(l) => langAt !== null && setLangAt(langAt, l)}
         onClose={() => setLangAtOpen(null)}
       />

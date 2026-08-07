@@ -1,7 +1,7 @@
 import { getSong } from './songs'
 import { loadBible } from './bible'
 import { usableLinks, type ServiceLink } from './links'
-import type { Pick, PsalmVerse, ServiceLang, SongRole, SongStructure } from './buildService'
+import type { Pick, PsalmVerse, ServiceLang, SlideBackground, SongRole, SongStructure } from './buildService'
 
 /**
  * A compact record of *how* a service was assembled, saved alongside the deck so
@@ -33,6 +33,16 @@ export type SavedPick =
        */
       offering?: 'only' | 'both' | boolean
       structure?: SongStructure | null
+    }
+  | {
+      /**
+       * A clip or a picture. The background carries the URL, so reopening the
+       * service finds the same file — nothing about it is re-derivable from the
+       * deck the way a song is from its id.
+       */
+      type: 'media'
+      title: string
+      background: SlideBackground
     }
   | {
       type: 'psalm'
@@ -75,6 +85,8 @@ export function toBuilderState(
             role: p.role,
             structure: p.structure ?? null
           }
+        : p.type === 'media'
+        ? { type: 'media', title: p.title, background: p.background }
         : {
             type: 'psalm',
             chapter: p.chapter,
@@ -171,6 +183,12 @@ export async function fromBuilderState(
         role: readRole(p),
         structure: p.structure ?? null
       })
+    } else if (p.type === 'media') {
+      // Nothing to look up: the file is wherever it was uploaded, and the
+      // background carries that address. A clip whose file has since been
+      // deleted still comes back as an item — better a broken picture the
+      // operator can see and replace than a silently shorter service.
+      picks.push({ key: `m-${i}`, type: 'media', title: p.title, background: p.background })
     } else {
       const teV = te?.byBook['Psalms']?.[p.chapter] ?? []
       const enByVerse = new Map((en?.byBook['Psalms']?.[p.chapter] ?? []).map((v) => [v.verse, v.text]))

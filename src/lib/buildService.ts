@@ -85,13 +85,18 @@ export interface ServiceEnvelope {
  */
 export const SLOT_WORSHIP = 'worship'
 export const SLOT_OFFERING = 'offering'
-/**
- * Communion, served on the month's first Sunday. Cantica's importer currently
- * routes only 'offering' to a slot of its own and files everything else into
- * the worship set, so a communion item lands there until lumen-presenter's
- * mergeImport learns this slot. The deck still carries the right answer.
- */
+/** Communion, served on the month's first Sunday — after the Sermon, before
+ *  the Offerings card. */
 export const SLOT_COMMUNION = 'communion'
+/**
+ * A video or a picture, filed just before the announcements.
+ *
+ * That is where a clip belongs in this church's order: the service is over, the
+ * room is being told things, and something on the screen holds it together. It
+ * is not worship and it is not the sermon, so it gets a slot of its own rather
+ * than landing wherever the end of the list happens to be.
+ */
+export const SLOT_MEDIA = 'media'
 
 let _uid = 0
 const uid = (): string =>
@@ -649,6 +654,7 @@ export type Pick =
       structure?: SongStructure | null
     }
   | { key: string; type: 'psalm'; chapter: number; verses: PsalmVerse[]; lang: ServiceLang }
+  | { key: string; type: 'media'; title: string; background: SlideBackground }
 
 /** Build the `cantica-service` envelope from an ordered selection. */
 export function buildService(
@@ -672,6 +678,19 @@ export function buildService(
         const extra = songToItem(p.song, p.lang ?? 'both', p.structure ?? null)
         if (extra) items.push({ ...extra, slot: special })
       }
+    } else if (p.type === 'media') {
+      // Written in Cantica's own shape — the same item deckItems.mediaItem
+      // makes — so a clip added here and one added at the projection machine
+      // are indistinguishable. Built inline rather than imported: deckItems
+      // reads its types from this file, and the other direction would be a
+      // cycle.
+      items.push({
+        id: uid(),
+        title: p.title,
+        kind: p.background.type === 'image' ? 'media' : 'video',
+        slides: [{ id: uid(), kind: 'media', label: p.title, lines: [], background: p.background }],
+        slot: SLOT_MEDIA
+      })
     } else {
       // A psalm is a reading, never the offering song.
       items.push(...psalmToItems(p.chapter, p.verses, p.lang ?? 'both').map((it) => ({ ...it, slot: SLOT_WORSHIP })))
