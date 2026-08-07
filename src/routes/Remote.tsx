@@ -271,6 +271,8 @@ function OperatorMirror({
    */
   const onSermon = !!state?.order?.some((it) => it.live && /sermon|వాక్యోపదేశం/i.test(it.title ?? ''))
   const [verseOpen, setVerseOpen] = useState(false)
+  /** The order of service, as a drawer over the operator's controls. */
+  const [orderOpen, setOrderOpen] = useState(false)
   // Only ever offered during the sermon, so leaving it closes the sheet rather
   // than leaving a way to put a verse over the next song.
   useEffect(() => {
@@ -510,6 +512,15 @@ function OperatorMirror({
               Verse
             </button>
           )}
+          {/* The whole service, one tap away. An operator who has to reach a
+              different section has been walking there with Next until now — past
+              every slide in between, all of them going out on the screen on the
+              way. */}
+          <button onClick={() => setOrderOpen(true)} className="op2-order-btn" title="Order of service">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
           <button onClick={() => setConfirmEnd(true)} className="op2-stop">
             End
           </button>
@@ -520,6 +531,44 @@ function OperatorMirror({
           </button>
         </div>
       </header>
+
+      {/* Sliding over rather than pushing the controls aside: the operator is
+          mid-service, and a layout that reflows under their thumb is how the
+          wrong thing gets tapped. */}
+      {orderOpen && (
+        <div className="op2-drawer-wrap" role="dialog" aria-label="Order of service">
+          <button className="op2-drawer-scrim" aria-label="Close" onClick={() => setOrderOpen(false)} />
+          <div className="op2-drawer">
+            <div className="op2-drawer-head">
+              <span>Order of service</span>
+              <button onClick={() => setOrderOpen(false)} aria-label="Close">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <div className="op2-drawer-list">
+              {(state?.order ?? []).map((it, i) => (
+                <button
+                  key={`${it.title}-${i}`}
+                  className={`op2-drawer-item${it.live ? ' is-live' : ''}`}
+                  onClick={() => {
+                    void run('goto', i)
+                    setOrderOpen(false)
+                  }}
+                >
+                  <span className="op2-drawer-n">{i + 1}</span>
+                  <span className="op2-drawer-title">{it.title}</span>
+                  {it.live && <span className="op2-drawer-now">NOW</span>}
+                </button>
+              ))}
+              {!(state?.order ?? []).length && (
+                <p className="op2-drawer-empty">The order will appear here once the service is live.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="op2-body">
         <section className="op2-section op2-section-current">
