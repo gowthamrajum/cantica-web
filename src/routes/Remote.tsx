@@ -273,6 +273,21 @@ function OperatorMirror({
   const [verseOpen, setVerseOpen] = useState(false)
   /** The order of service, as a drawer over the operator's controls. */
   const [orderOpen, setOrderOpen] = useState(false)
+  /**
+   * Whether the finger that is down has moved — i.e. is scrolling, not tapping.
+   *
+   * A touch that drags still delivers a click to whatever it started on, so
+   * flicking the drawer to find a section jumped the service to whichever row
+   * happened to be under the thumb. On a phone mid-service that is the worst
+   * possible false positive: the screen changes in front of the congregation
+   * and the operator did not ask for it.
+   *
+   * Held in a ref, not state: the click handler has to read it during the same
+   * gesture, and a re-render between move and click would be both too late and
+   * a re-render nobody needs while a list is being flung.
+   */
+  const scrolled = useRef(false)
+  const touchStartY = useRef(0)
   // Only ever offered during the sermon, so leaving it closes the sheet rather
   // than leaving a way to put a verse over the next song.
   useEffect(() => {
@@ -547,12 +562,34 @@ function OperatorMirror({
                 </svg>
               </button>
             </div>
-            <div className="op2-drawer-list">
+            {/* One guard for the whole list — the events bubble, so every row
+                is covered by it and no row can forget. */}
+            <div
+              className="op2-drawer-list"
+              onPointerDown={(e) => {
+                scrolled.current = false
+                touchStartY.current = e.clientY
+              }}
+              onPointerMove={(e) => {
+                // A few pixels is a thumb resting, not a scroll.
+                if (Math.abs(e.clientY - touchStartY.current) > 8) scrolled.current = true
+              }}
+              // The browser takes the gesture over once it decides this is a
+              // scroll, and stops sending moves — so the cancel is the only
+              // thing that says so on the platforms that do it that way.
+              onPointerCancel={() => {
+                scrolled.current = true
+              }}
+              onScroll={() => {
+                scrolled.current = true
+              }}
+            >
               {(state?.order ?? []).map((it, i) => (
                 <button
                   key={`${it.title}-${i}`}
                   className={`op2-drawer-item${it.live ? ' is-live' : ''}`}
                   onClick={() => {
+                    if (scrolled.current) return
                     void run('goto', i)
                     setOrderOpen(false)
                   }}
