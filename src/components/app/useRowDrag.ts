@@ -15,7 +15,7 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
  * quietly start behaving differently.
  */
 export interface RowDrag {
-  /** The row being carried, or null. */
+  /** The row being carried, or null. `to` is the row the mark sits ABOVE. */
   drag: { key: string; from: number; to: number } | null
   /** Spread onto the handle. */
   handleProps: (key: string, index: number) => {
@@ -110,7 +110,20 @@ export function useRowDrag(
         const d = live.current
         live.current = null
         setDrag(null)
-        if (d && d.to !== d.from) onMove(d.from, d.to)
+        if (!d || d.to === d.from) return
+        /*
+         * `to` is where the mark was drawn — an index into the list AS IT
+         * STILL IS, with the carried row in it. Every caller then removes that
+         * row before inserting, which shifts everything after it down by one,
+         * so a downward move landed one place too far: dropping the first row
+         * on the third put it AFTER the third, not above it.
+         *
+         * Corrected here rather than in each caller. This hook exists because
+         * "the second copy of this is where the two quietly start behaving
+         * differently" — and that is exactly what happened, twice, before a
+         * third list made it obvious.
+         */
+        onMove(d.from, d.to > d.from ? d.to - 1 : d.to)
       },
       onPointerCancel: () => {
         live.current = null

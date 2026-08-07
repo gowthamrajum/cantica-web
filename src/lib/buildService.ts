@@ -376,11 +376,18 @@ export interface SongStructure {
   /** section id -> the units' order, when the operator moved a line */
   order?: Record<string, number[]>
   /**
-   * Which units of the recurring section come BACK between the stanzas.
+   * What comes BACK between the stanzas, as a sequence.
    *
-   * A refrain is very often sung whole the first time and only in part after
-   * each stanza — the last two lines, the hook. Absent or empty means the whole
-   * thing comes back, which is what every arrangement made before this did.
+   * A refrain is very often sung whole the first time and differently after
+   * each stanza — the last two lines, the hook, the hook twice. So this is an
+   * ordered LIST of unit indices, not a set: its order is the order they are
+   * sung in, and the same unit may appear more than once. Absent or empty means
+   * the whole section comes back as written, which is what every arrangement
+   * made before this did.
+   *
+   * It used to be sorted and de-duplicated on the way through, which threw away
+   * both of those. An older arrangement is unaffected — it only ever held an
+   * ascending list of distinct units, which is exactly what it still means.
    *
    * Units, not lines: in a bilingual song a Telugu line and its transliteration
    * are one unit, and choosing half of a pair would put a line on the screen
@@ -424,8 +431,12 @@ export function songToItem(
   const recurringUnits = recurring
     ? sectionUnits(recurring.lines.filter((l) => l && l.trim()).map(formatLyricLine), both).length
     : 0
-  const heldBack = new Set((structure?.repeatUnits ?? []).filter((i) => i >= 0 && i < recurringUnits))
-  const trimmed = heldBack.size > 0 && heldBack.size < recurringUnits
+  const reprise = (structure?.repeatUnits ?? []).filter((i) => i >= 0 && i < recurringUnits)
+  // "Part of it comes back" has widened to "what comes back is not the section
+  // as written": a reordering or a repeated line differs from the full refrain
+  // just as a shorter list does, and each wants the same closing statement.
+  const asWritten = reprise.length === recurringUnits && reprise.every((v, i) => v === i)
+  const trimmed = reprise.length > 0 && !asWritten
   const order = structure?.includedIds?.length
     ? buildSongArrangement(all, structure.includedIds, structure.recurringId ?? null, {
         closeWithRefrain: trimmed && structure.repeatFullAtEnd !== false
@@ -460,11 +471,12 @@ export function songToItem(
     const natural = sectionUnits(lines, both)
     const moved = structure?.order?.[sec.id]
     const full = applyOrder(natural, moved)
-    // A reprise takes only the chosen units, in the order they are written —
-    // and only when those are a proper part of the refrain. With every unit
-    // ticked, `full` is passed through by identity, so the section groups and
-    // slices exactly as it does anywhere else it appears.
-    const units = isReprise && trimmed ? [...heldBack].sort((a, b) => a - b).map((i) => full[i]) : full
+    // A reprise is the chosen units in the CHOSEN order, a unit as many times
+    // as it was chosen — sorting or de-duplicating here is what used to make
+    // "the hook, then the hook again" impossible to ask for. When the sequence
+    // is the section as written, `full` is passed through by identity, so the
+    // section groups and slices exactly as it does anywhere else it appears.
+    const units = isReprise && trimmed ? reprise.map((i) => full[i]) : full
     const reordered = units !== natural
     // A grouping describes the WHOLE section, so it cannot describe a reprise
     // that is a few of its units — that falls through to the automatic split.

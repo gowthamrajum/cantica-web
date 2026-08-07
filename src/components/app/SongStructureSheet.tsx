@@ -179,6 +179,18 @@ export function SongStructureSheet({
    *  never be split apart or moved apart. */
   const unitsOf = (id: string): ReturnType<typeof sectionUnits> =>
     applyOrder(sectionUnits(linesOf(id), bilingual), lineOrder[id])
+
+  /**
+   * Does the reprise say the section exactly as written?
+   *
+   * Not just "are they all here" — the same lines reordered, or one of them
+   * twice, is a different thing coming back, and it is the answer to this that
+   * decides whether closing on the whole refrain has anything to add.
+   */
+  const repeatsWhole = (id: string): boolean => {
+    const n = unitsOf(id).length
+    return repeatUnits.length === n && repeatUnits.every((v, i) => v === i)
+  }
   const groupsOf = (id: string): number[] => {
     const chosen = groups[id]
     if (chosen?.length) return chosen
@@ -451,6 +463,24 @@ export function SongStructureSheet({
     'data-section-row'
   )
 
+  /**
+   * Dragging inside the reprise — its own list, its own attribute.
+   *
+   * The sheet already carries two draggable lists (the service's songs
+   * underneath, the sections here); a third sharing an attribute would let the
+   * aim fall through to whichever one the finger happened to be over.
+   */
+  const repeatDrag = useRowDrag(
+    (from, to) =>
+      setRepeatUnits((prev) => {
+        const next = prev.slice()
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        return next
+      }),
+    'data-repeat-row'
+  )
+
   /** Another go at the same section, dropped in right below this one and ready
    *  to be moved wherever it is actually wanted. */
   const duplicate = (key: string): void => {
@@ -646,11 +676,11 @@ export function SongStructureSheet({
                   aria-expanded={pickingRepeat}
                 >
                   <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-ink">
-                    Repeated lines{' '}
+                    What comes back{' '}
                     <span className="font-normal text-ink-muted">
-                      {repeatUnits.length === unitsOf(id).length
+                      {repeatsWhole(id)
                         ? '· all of it'
-                        : `· ${repeatUnits.length} of ${unitsOf(id).length}`}
+                        : `· ${repeatUnits.length} line${repeatUnits.length === 1 ? '' : 's'}`}
                     </span>
                   </span>
                   <Icon
@@ -663,38 +693,84 @@ export function SongStructureSheet({
                 {pickingRepeat && (
                 <>
                 <p className="mb-1.5 mt-1 text-[12px] leading-relaxed text-ink-muted">
-                  All of it comes back between the stanzas. Untick anything that shouldn’t.
-                  {bilingual && ' A Telugu line and its transliteration are one — they come and go together.'}
+                  This is the refrain as it comes back between the stanzas — the first time through is always
+                  the whole thing. Drag to reorder, copy a line to sing it twice, remove what shouldn’t return.
+                  {bilingual && ' A Telugu line and its transliteration are one — they move together.'}
                 </p>
-                {unitsOf(id).map((u, ui) => {
-                  const picked = repeatUnits.includes(ui)
-                  // The last ticked line cannot be unticked: a refrain of
-                  // nothing is not an arrangement, it is a mistake.
-                  const lastOne = picked && repeatUnits.length === 1
+
+                {repeatUnits.map((ui, at) => {
+                  const u = unitsOf(id)[ui]
+                  if (!u) return null
+                  // A refrain of nothing is not an arrangement, it is a mistake.
+                  const lastOne = repeatUnits.length === 1
+                  const aiming = repeatDrag.aimingAt(at)
+                  const aimingEnd = repeatDrag.aimingEnd(at, repeatUnits.length)
                   return (
-                    <button
-                      key={ui}
-                      className="flex w-full items-start gap-2 py-1 text-left disabled:opacity-100"
-                      disabled={lastOne}
-                      title={lastOne ? 'At least one line has to come back' : undefined}
-                      onClick={() =>
-                        setRepeatUnits((prev) =>
-                          prev.includes(ui) ? prev.filter((x) => x !== ui) : [...prev, ui].sort((a, b) => a - b)
-                        )
-                      }
+                    <div
+                      key={`${ui}-${at}`}
+                      data-repeat-row={at}
+                      className={`flex items-start gap-1.5 border-y-2 border-transparent py-1 ${
+                        aiming ? '!border-t-gold-500' : ''
+                      } ${aimingEnd ? '!border-b-gold-500' : ''} ${
+                        repeatDrag.carrying(`${ui}-${at}`) ? 'opacity-40' : ''
+                      }`}
                     >
                       <span
-                        className={`mt-[3px] grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border ${
-                          picked ? 'border-gold-500 bg-gold-500 text-white' : 'border-ink-muted/40 text-transparent'
-                        }`}
+                        className="-m-1 flex-none cursor-grab touch-none p-1 text-ink-muted"
+                        aria-label="Drag to reorder"
+                        {...repeatDrag.handleProps(`${ui}-${at}`, at)}
                       >
-                        <Icon name="check" size={12} strokeWidth={3.2} />
+                        <Icon name="grip" size={15} />
                       </span>
-                      <span
-                        className={`min-w-0 flex-1 text-[13px] leading-snug ${
-                          picked ? 'text-ink' : 'text-ink-muted line-through decoration-ink-muted/40'
-                        }`}
+                      <span className="min-w-0 flex-1 text-[13px] leading-snug text-ink">
+                        {unitLines(u).map((l, li) => (
+                          <span key={li} className="block truncate">
+                            {l}
+                          </span>
+                        ))}
+                      </span>
+                      {/* The copy lands directly under the line it came from,
+                          which is where "sing that again" belongs. */}
+                      <button
+                        className="-m-1 flex-none p-1 text-ink-muted"
+                        aria-label="Sing this line again"
+                        title="Sing this line again"
+                        onClick={() =>
+                          setRepeatUnits((prev) => {
+                            const next = prev.slice()
+                            next.splice(at + 1, 0, ui)
+                            return next
+                          })
+                        }
                       >
+                        <Icon name="copy" size={15} />
+                      </button>
+                      <button
+                        className="-m-1 flex-none p-1 text-ink-muted disabled:opacity-30"
+                        aria-label="Don’t bring this line back"
+                        disabled={lastOne}
+                        title={lastOne ? 'At least one line has to come back' : undefined}
+                        onClick={() => setRepeatUnits((prev) => prev.filter((_, i) => i !== at))}
+                      >
+                        <Icon name="close" size={15} />
+                      </button>
+                    </div>
+                  )
+                })}
+
+                {/* Every line of the section, always — a line already in the
+                    sequence can be added again, which is the whole point of
+                    letting one appear twice. */}
+                <div className="mt-1.5 border-t border-black/5 pt-1.5">
+                  <p className="mb-1 text-[12px] text-ink-muted">Add a line</p>
+                  {unitsOf(id).map((u, ui) => (
+                    <button
+                      key={ui}
+                      className="flex w-full items-start gap-1.5 py-1 text-left"
+                      onClick={() => setRepeatUnits((prev) => [...prev, ui])}
+                    >
+                      <Icon name="plus" size={14} className="mt-[3px] flex-none text-ink-muted" />
+                      <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink-muted">
                         {unitLines(u).map((l, li) => (
                           <span key={li} className="block truncate">
                             {l}
@@ -702,12 +778,12 @@ export function SongStructureSheet({
                         ))}
                       </span>
                     </button>
-                  )
-                })}
+                  ))}
+                </div>
 
                 {/* Only once something has been left out is there anything for a
                     full refrain at the end to be different from. */}
-                {repeatUnits.length < unitsOf(id).length && (
+                {!repeatsWhole(id) && (
                   <button
                     className="mt-2 flex w-full items-start gap-2 border-t border-black/5 pt-2 text-left"
                     onClick={() => setFullAtEnd((v) => !v)}
