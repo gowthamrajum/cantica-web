@@ -520,7 +520,37 @@ export function SongStructureSheet({
     repeatUnits,
     repeatFullAtEnd: fullAtEnd
   }
-  const playOrder = buildSongArrangement(sections, includedInOrder, recurring)
+  /**
+   * The running order exactly as it will play.
+   *
+   * Built with the SAME closing-refrain option songToItem computes, because it
+   * was built without one — so a song whose reprise is a few lines ended its
+   * summary a refrain early: the line said "… Stanza 4 → Stanza 1" while the
+   * slides went reprise, then the whole thing. The footer's slide count was
+   * right the whole time, which is what made the disagreement hard to see.
+   */
+  const repriseIsPart = !!recurring && repeatUnits.length > 0 && !repeatsWhole(recurring)
+  const playOrder = buildSongArrangement(sections, includedInOrder, recurring, {
+    closeWithRefrain: repriseIsPart && fullAtEnd
+  })
+  /**
+   * Which appearances are the shortened reprise rather than the whole refrain —
+   * the same rule the slides use: the first time is whole, and so is the last
+   * unless the operator turned that off.
+   */
+  const recurringAt = recurring ? playOrder.reduce<number[]>((a, id, i) => (id === recurring ? [...a, i] : a), []) : []
+  const lastWhole = fullAtEnd ? recurringAt[recurringAt.length - 1] ?? -1 : -1
+  const isPartAt = (i: number): boolean =>
+    repriseIsPart && playOrder[i] === recurring && i !== recurringAt[0] && i !== lastWhole
+  /**
+   * What to call a reprise that isn't the refrain as written.
+   *
+   * "part" is only true when it is fewer lines. Copy a line and the reprise is
+   * LONGER than the refrain, and reordering makes it neither longer nor shorter
+   * — calling either of those a part of the refrain is simply false.
+   */
+  const repriseNote = (): string =>
+    recurring && repeatUnits.length < unitsOf(recurring).length ? ' (part)' : ' (changed)'
   /** Sections of the song that no longer appear anywhere in the running order. */
   const missing = sections.filter((sec) => !includedInOrder.includes(sec.id))
   const slideCount = song ? (songToItem(song, lang, structure)?.slides.length ?? 0) : 0
@@ -698,6 +728,21 @@ export function SongStructureSheet({
                   {bilingual && ' A Telugu line and its transliteration are one — they move together.'}
                 </p>
 
+                {/* One way back, at the top, rather than a plus beside every
+                    line of the stanza. A list of every line to re-add is the
+                    same list again, twice as long, and it is only ever wanted
+                    after a removal that was not meant — so it appears only once
+                    something has actually gone. */}
+                {!repeatsWhole(id) && (
+                  <button
+                    className="mb-1.5 flex w-full items-center gap-1.5 rounded-lg bg-gold-500/10 px-2 py-1.5 text-left"
+                    onClick={() => setRepeatUnits(unitsOf(id).map((_, k) => k))}
+                  >
+                    <Icon name="back" size={14} strokeWidth={2.4} className="flex-none text-gold-600" />
+                    <span className="text-[12.5px] font-semibold text-gold-600">Put the whole refrain back</span>
+                  </button>
+                )}
+
                 {repeatUnits.map((ui, at) => {
                   const u = unitsOf(id)[ui]
                   if (!u) return null
@@ -757,29 +802,6 @@ export function SongStructureSheet({
                     </div>
                   )
                 })}
-
-                {/* Every line of the section, always — a line already in the
-                    sequence can be added again, which is the whole point of
-                    letting one appear twice. */}
-                <div className="mt-1.5 border-t border-black/5 pt-1.5">
-                  <p className="mb-1 text-[12px] text-ink-muted">Add a line</p>
-                  {unitsOf(id).map((u, ui) => (
-                    <button
-                      key={ui}
-                      className="flex w-full items-start gap-1.5 py-1 text-left"
-                      onClick={() => setRepeatUnits((prev) => [...prev, ui])}
-                    >
-                      <Icon name="plus" size={14} className="mt-[3px] flex-none text-ink-muted" />
-                      <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink-muted">
-                        {unitLines(u).map((l, li) => (
-                          <span key={li} className="block truncate">
-                            {l}
-                          </span>
-                        ))}
-                      </span>
-                    </button>
-                  ))}
-                </div>
 
                 {/* Only once something has been left out is there anything for a
                     full refrain at the end to be different from. */}
@@ -909,7 +931,9 @@ export function SongStructureSheet({
       <p className="mt-3 text-[13px] text-ink-muted">
         <b>Plays as:</b>{' '}
         {playOrder.length
-          ? playOrder.map((id) => byId.get(id)?.label ?? id).join(' → ')
+          ? playOrder
+              .map((id, i) => `${byId.get(id)?.label ?? id}${isPartAt(i) ? repriseNote() : ''}`)
+              .join(' → ')
           : 'nothing selected'}
       </p>
     </Sheet>
