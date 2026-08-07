@@ -4,6 +4,7 @@ import { Screen, Section } from '../components/app/Screen'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
 import { SlidePreview } from '../components/app/SlidePreview'
+import { SongLanguageSheet } from '../components/app/SongLanguageSheet'
 import { SongStructureSheet } from '../components/app/SongStructureSheet'
 import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
@@ -180,6 +181,8 @@ export function Build(): JSX.Element {
   const [source, setSource] = useState<PickSource>('songs')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [preview, setPreview] = useState<number | 'all' | null>(null)
+  /** Which row's language is being set, if any. */
+  const [langAt, setLangAtOpen] = useState<number | null>(null)
   const [note, setNote] = useState('')
   // Sections and items are closed by default; the setup opens on a fresh
   // service because there is nothing else to look at yet.
@@ -1237,18 +1240,19 @@ export function Build(): JSX.Element {
 
                 {/* Settings: variable width, and only a song has a role. */}
                 <div className="flex w-full min-w-0 items-center gap-1.5">
-                  <select
-                    className="search-field flex-none px-2 text-[13px]"
-                    value={p.lang}
-                    onChange={(e) => setLangAt(i, e.target.value as ServiceLang)}
-                    aria-label="Language"
+                  {/* The control says what it SETS, not what it is currently
+                      set to. A select reading "Both" names one of its options
+                      and hides the other two — on a row this narrow that was
+                      the whole control, and nothing on it said "language". */}
+                  <button
+                    type="button"
+                    className="search-field flex flex-none items-center gap-1 px-2 text-[13px]"
+                    onClick={() => setLangAtOpen(i)}
+                    aria-label={`Language for ${labelOf(p)}`}
                   >
-                    {LANGS.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.label}
-                      </option>
-                    ))}
-                  </select>
+                    Language
+                    <Icon name="chevron" size={13} strokeWidth={2.4} className="text-ink-muted" />
+                  </button>
 
                   {/* The role reads as symbols rather than a phrase: an offering
                       plate, a communion cup, and a note for the worship set —
@@ -1531,6 +1535,13 @@ export function Build(): JSX.Element {
         }
         onChange={(role) => rolePick !== null && setRoleAt(rolePick, role)}
         onClose={() => setRolePick(null)}
+      />
+
+      <SongLanguageSheet
+        open={langAt !== null}
+        value={langAt !== null ? (picks[langAt]?.lang ?? 'both') : 'both'}
+        onChange={(l) => langAt !== null && setLangAt(langAt, l)}
+        onClose={() => setLangAtOpen(null)}
       />
 
       <SlidePreview

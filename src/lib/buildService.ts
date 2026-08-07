@@ -395,6 +395,19 @@ export interface SongStructure {
    */
   repeatUnits?: number[]
   /**
+   * The recurring section's WHOLE appearances — the first time through and the
+   * close — as a sequence, on the same terms as repeatUnits.
+   *
+   * Separate from `order` because that is a strict permutation, and has to be:
+   * it is what notices a saved order no longer matching a song whose lyrics
+   * changed, and ignores it rather than mangling the words. A refrain that sings
+   * a line twice is not a permutation, so it cannot live there without giving
+   * that guard up.
+   *
+   * Absent or empty means the section as written, which is what it always was.
+   */
+  wholeUnits?: number[]
+  /**
    * Whether the song closes on the whole refrain, after the trimmed reprise.
    *
    * The ending a song usually wants is the hook once more and then the refrain
@@ -432,6 +445,9 @@ export function songToItem(
     ? sectionUnits(recurring.lines.filter((l) => l && l.trim()).map(formatLyricLine), both).length
     : 0
   const reprise = (structure?.repeatUnits ?? []).filter((i) => i >= 0 && i < recurringUnits)
+  const whole = (structure?.wholeUnits ?? []).filter((i) => i >= 0 && i < recurringUnits)
+  const wholeAsWritten = whole.length === recurringUnits && whole.every((v, i) => v === i)
+  const wholeCustom = whole.length > 0 && !wholeAsWritten
   // "Part of it comes back" has widened to "what comes back is not the section
   // as written": a reordering or a repeated line differs from the full refrain
   // just as a shorter list does, and each wants the same closing statement.
@@ -476,11 +492,19 @@ export function songToItem(
     // "the hook, then the hook again" impossible to ask for. When the sequence
     // is the section as written, `full` is passed through by identity, so the
     // section groups and slices exactly as it does anywhere else it appears.
-    const units = isReprise && trimmed ? reprise.map((i) => full[i]) : full
+    // Three shapes the recurring section can take: the reprise between the
+    // stanzas, the whole thing at the top and the close, and — for every other
+    // section — itself.
+    const units = isRecurring && wholeCustom && !isReprise
+      ? whole.map((i) => full[i])
+      : isReprise && trimmed
+        ? reprise.map((i) => full[i])
+        : full
     const reordered = units !== natural
-    // A grouping describes the WHOLE section, so it cannot describe a reprise
-    // that is a few of its units — that falls through to the automatic split.
-    const chosen = isReprise && units !== full ? undefined : structure?.groups?.[sec.id]
+    // A grouping describes the WHOLE section, so it cannot describe a sequence
+    // that is a few of its units, or one of them twice — that falls through to
+    // the automatic split, whichever of the shapes above produced it.
+    const chosen = units !== full ? undefined : structure?.groups?.[sec.id]
     // An operator grouping wins while it still accounts for every unit; a stale
     // one falls back to the automatic split rather than mis-slicing. Once lines
     // have been moved the fallback has to slice the moved order, not the written

@@ -90,6 +90,17 @@ export function SongStructureSheet({
    * it, which is what every arrangement did before this existed.
    */
   const [repeatUnits, setRepeatUnits] = useState<number[]>([])
+  /**
+   * The refrain's WHOLE appearances — the first time through and the close.
+   *
+   * A refrain often sings a line twice every time it is sung, not only when it
+   * comes back, and the section's own order cannot say so: that is a strict
+   * permutation, which is what lets it notice a saved order no longer matching
+   * the song. So the whole one gets a sequence of its own, edited by the same
+   * rows as the reprise with a switch above them.
+   */
+  const [wholeUnits, setWholeUnits] = useState<number[]>([])
+  const [editingSeq, setEditingSeq] = useState<'whole' | 'reprise'>('reprise')
   /** Whether the last time round is the whole refrain — how a song usually ends. */
   const [fullAtEnd, setFullAtEnd] = useState(true)
   /**
@@ -159,11 +170,10 @@ export function SongStructureSheet({
     const recUnits = recSec
       ? sectionUnits(recSec.lines.filter((l) => l && l.trim()), lang === 'both').length
       : 0
-    setRepeatUnits(
-      initial?.repeatUnits?.length
-        ? initial.repeatUnits
-        : Array.from({ length: recUnits }, (_, k) => k)
-    )
+    const written = Array.from({ length: recUnits }, (_, k) => k)
+    setRepeatUnits(initial?.repeatUnits?.length ? initial.repeatUnits : written)
+    setWholeUnits(initial?.wholeUnits?.length ? initial.wholeUnits : written)
+    setEditingSeq('reprise')
     setPickingRepeat(false)
     setFullAtEnd(initial?.repeatFullAtEnd !== false)
     setEditing(null)
@@ -179,6 +189,15 @@ export function SongStructureSheet({
    *  never be split apart or moved apart. */
   const unitsOf = (id: string): ReturnType<typeof sectionUnits> =>
     applyOrder(sectionUnits(linesOf(id), bilingual), lineOrder[id])
+
+  /** The sequence the rows are editing, and the way to change it. */
+  const seq = editingSeq === 'whole' ? wholeUnits : repeatUnits
+  const setSeq = editingSeq === 'whole' ? setWholeUnits : setRepeatUnits
+  /** Is `q` the section exactly as written — same lines, same order, no repeat? */
+  const asWritten = (id: string, q: number[]): boolean => {
+    const n = unitsOf(id).length
+    return q.length === n && q.every((v, i) => v === i)
+  }
 
   /**
    * Does the reprise say the section exactly as written?
@@ -470,9 +489,13 @@ export function SongStructureSheet({
    * underneath, the sections here); a third sharing an attribute would let the
    * aim fall through to whichever one the finger happened to be over.
    */
+  // Read through a ref so the drag that is already in flight moves the list the
+  // finger actually started on, not whichever one a re-render left behind.
+  const seqRef = useRef(editingSeq)
+  seqRef.current = editingSeq
   const repeatDrag = useRowDrag(
     (from, to) =>
-      setRepeatUnits((prev) => {
+      (seqRef.current === 'whole' ? setWholeUnits : setRepeatUnits)((prev) => {
         const next = prev.slice()
         const [moved] = next.splice(from, 1)
         next.splice(to, 0, moved)
@@ -518,6 +541,7 @@ export function SongStructureSheet({
     groups,
     order: lineOrder,
     repeatUnits,
+    wholeUnits,
     repeatFullAtEnd: fullAtEnd
   }
   /**
@@ -540,8 +564,23 @@ export function SongStructureSheet({
    */
   const recurringAt = recurring ? playOrder.reduce<number[]>((a, id, i) => (id === recurring ? [...a, i] : a), []) : []
   const lastWhole = fullAtEnd ? recurringAt[recurringAt.length - 1] ?? -1 : -1
-  const isPartAt = (i: number): boolean =>
-    repriseIsPart && playOrder[i] === recurring && i !== recurringAt[0] && i !== lastWhole
+  /**
+   * What to say about one appearance of the refrain — and it has to follow the
+   * builder's own rule, not an approximation of it.
+   *
+   * An earlier go marked every appearance the moment either sequence was
+   * touched, so copying a line into the FIRST-and-last shape labelled the
+   * reprises in between as changed when they were still the section as written.
+   * The two shapes are chosen per appearance, so the note is too.
+   */
+  const wholeIsCustom = !!recurring && wholeUnits.length > 0 && !asWritten(recurring, wholeUnits)
+  const noteAt = (i: number): string => {
+    if (!recurring || playOrder[i] !== recurring) return ''
+    const isWholeOne = i === recurringAt[0] || i === lastWhole
+    if (isWholeOne) return wholeIsCustom ? ' (changed)' : ''
+    return repriseIsPart ? repriseNote() : ''
+  }
+
   /**
    * What to call a reprise that isn't the refrain as written.
    *
@@ -651,7 +690,14 @@ export function SongStructureSheet({
                   // Marking a section as the refrain ticks all of its lines:
                   // the whole thing repeats until somebody says otherwise, and
                   // an empty list would read as "nothing repeats".
-                  setRepeatUnits(next ? unitsOf(next).map((_, k) => k) : [])
+                  // BOTH sequences, not just the reprise: a sequence left
+                  // over from the section that used to be the refrain has the
+                  // wrong number of lines in it, and every appearance then
+                  // reads as changed when nothing has been touched.
+                  const written = next ? unitsOf(next).map((_, k) => k) : []
+                  setRepeatUnits(written)
+                  setWholeUnits(written)
+                  setEditingSeq('reprise')
                   setFullAtEnd(true)
                   setPickingRepeat(false)
                 }}
@@ -706,11 +752,11 @@ export function SongStructureSheet({
                   aria-expanded={pickingRepeat}
                 >
                   <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-ink">
-                    What comes back{' '}
+                    How the refrain is sung{' '}
                     <span className="font-normal text-ink-muted">
-                      {repeatsWhole(id)
-                        ? '· all of it'
-                        : `· ${repeatUnits.length} line${repeatUnits.length === 1 ? '' : 's'}`}
+                      {asWritten(id, wholeUnits) && repeatsWhole(id)
+                        ? '· as written'
+                        : `· ${wholeUnits.length} then ${repeatUnits.length}`}
                     </span>
                   </span>
                   <Icon
@@ -722,9 +768,32 @@ export function SongStructureSheet({
                 </button>
                 {pickingRepeat && (
                 <>
-                <p className="mb-1.5 mt-1 text-[12px] leading-relaxed text-ink-muted">
-                  This is the refrain as it comes back between the stanzas — the first time through is always
-                  the whole thing. Drag to reorder, copy a line to sing it twice, remove what shouldn’t return.
+                {/* The refrain is sung in two shapes and they are edited by
+                    the same rows, because they are the same question asked of
+                    two moments. Two separate lists of identical controls, one
+                    above the other, would read as four times the work. */}
+                <div className="mb-1.5 mt-1 flex gap-1 rounded-lg bg-black/[0.04] p-0.5">
+                  {([
+                    ['whole', 'First & last'],
+                    ['reprise', 'Between stanzas']
+                  ] as const).map(([k, label]) => (
+                    <button
+                      key={k}
+                      className={`flex-1 rounded-md px-2 py-1 text-[12px] font-semibold ${
+                        editingSeq === k ? 'bg-white text-ink shadow-sm' : 'text-ink-muted'
+                      }`}
+                      onClick={() => setEditingSeq(k)}
+                      aria-pressed={editingSeq === k}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mb-1.5 text-[12px] leading-relaxed text-ink-muted">
+                  {editingSeq === 'whole'
+                    ? 'The refrain the first time through, and again to close.'
+                    : 'The refrain as it comes back after each stanza.'}{' '}
+                  Drag to reorder, copy a line to sing it twice, remove what shouldn’t be there.
                   {bilingual && ' A Telugu line and its transliteration are one — they move together.'}
                 </p>
 
@@ -733,23 +802,23 @@ export function SongStructureSheet({
                     same list again, twice as long, and it is only ever wanted
                     after a removal that was not meant — so it appears only once
                     something has actually gone. */}
-                {!repeatsWhole(id) && (
+                {!asWritten(id, seq) && (
                   <button
                     className="mb-1.5 flex w-full items-center gap-1.5 rounded-lg bg-gold-500/10 px-2 py-1.5 text-left"
-                    onClick={() => setRepeatUnits(unitsOf(id).map((_, k) => k))}
+                    onClick={() => setSeq(unitsOf(id).map((_, k) => k))}
                   >
                     <Icon name="back" size={14} strokeWidth={2.4} className="flex-none text-gold-600" />
                     <span className="text-[12.5px] font-semibold text-gold-600">Put the whole refrain back</span>
                   </button>
                 )}
 
-                {repeatUnits.map((ui, at) => {
+                {seq.map((ui, at) => {
                   const u = unitsOf(id)[ui]
                   if (!u) return null
                   // A refrain of nothing is not an arrangement, it is a mistake.
-                  const lastOne = repeatUnits.length === 1
+                  const lastOne = seq.length === 1
                   const aiming = repeatDrag.aimingAt(at)
-                  const aimingEnd = repeatDrag.aimingEnd(at, repeatUnits.length)
+                  const aimingEnd = repeatDrag.aimingEnd(at, seq.length)
                   return (
                     <div
                       key={`${ui}-${at}`}
@@ -781,7 +850,7 @@ export function SongStructureSheet({
                         aria-label="Sing this line again"
                         title="Sing this line again"
                         onClick={() =>
-                          setRepeatUnits((prev) => {
+                          setSeq((prev) => {
                             const next = prev.slice()
                             next.splice(at + 1, 0, ui)
                             return next
@@ -795,7 +864,7 @@ export function SongStructureSheet({
                         aria-label="Don’t bring this line back"
                         disabled={lastOne}
                         title={lastOne ? 'At least one line has to come back' : undefined}
-                        onClick={() => setRepeatUnits((prev) => prev.filter((_, i) => i !== at))}
+                        onClick={() => setSeq((prev) => prev.filter((_, i) => i !== at))}
                       >
                         <Icon name="close" size={15} />
                       </button>
@@ -932,7 +1001,7 @@ export function SongStructureSheet({
         <b>Plays as:</b>{' '}
         {playOrder.length
           ? playOrder
-              .map((id, i) => `${byId.get(id)?.label ?? id}${isPartAt(i) ? repriseNote() : ''}`)
+              .map((id, i) => `${byId.get(id)?.label ?? id}${noteAt(i)}`)
               .join(' → ')
           : 'nothing selected'}
       </p>
