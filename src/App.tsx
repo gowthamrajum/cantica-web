@@ -9,6 +9,7 @@ import { More } from './routes/More'
 import { Services } from './routes/Services'
 import { Give } from './routes/Give'
 import { Build } from './routes/Build'
+import { BuilderGate } from './components/app/BuilderGate'
 import { Install } from './routes/Install'
 import { Notifications } from './routes/Notifications'
 import { Notify } from './routes/Notify'
@@ -41,7 +42,14 @@ export default function App(): JSX.Element {
         <Route path="/more" element={<More />} />
         <Route path="/services" element={<Services />} />
         <Route path="/give" element={<Give />} />
-        <Route path="/build" element={<Build />} />
+        <Route
+          path="/build"
+          element={
+            <BuilderGate>
+              <Build />
+            </BuilderGate>
+          }
+        />
         <Route path="/install" element={<Install />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/notify" element={<Notify />} />

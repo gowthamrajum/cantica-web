@@ -5,6 +5,8 @@ import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
 import { SlidePreview } from '../components/app/SlidePreview'
 import { SongLanguageSheet } from '../components/app/SongLanguageSheet'
+import { ServiceHeldSheet } from '../components/app/ServiceHeldSheet'
+import { holdService, releaseService, type LockState } from '../lib/access'
 import { SongStructureSheet } from '../components/app/SongStructureSheet'
 import { ServiceSlotSheet } from '../components/app/ServiceSlotSheet'
 import { ServiceExistsSheet } from '../components/app/ServiceExistsSheet'
@@ -145,6 +147,8 @@ export function Build(): JSX.Element {
   const [savedOpen, setSavedOpen] = useState(false)
   const [openingId, setOpeningId] = useState<number | null>(null)
   const [viewing, setViewing] = useState<{
+    /** Somebody else is editing it, so this is a look and nothing more. */
+    locked?: boolean
     id: number
     day: string
     date: string
@@ -203,6 +207,8 @@ export function Build(): JSX.Element {
   const [langAt, setLangAtOpen] = useState<number | null>(null)
   /** Which media sheet the "Add media" button opened, if any. */
   const [mediaAdd, setMediaAdd] = useState<'upload' | 'link' | 'choose' | null>(null)
+  /** Someone else has the service we tried to open; null when nobody has. */
+  const [heldBy, setHeldBy] = useState<{ lock: LockState; open: () => Promise<void> } | null>(null)
   const [note, setNote] = useState('')
   // Sections and items are closed by default; the setup opens on a fresh
   // service because there is nothing else to look at yet.
@@ -582,6 +588,33 @@ export function Build(): JSX.Element {
    * slot. One the presenter published carries no such record, so it opens for
    * reading: SavedServiceView says what that means and why.
    */
+  /** Open a service to look at, never to change — what View offers when
+   *  somebody else is holding it. */
+  const openViewOnly = async (
+    s: { id: number; serviceDay: string; serviceDate: string },
+    full?: { serviceData: unknown } | null,
+    locked = false
+  ): Promise<void> => {
+    const doc = full ?? (await getService(s.id))
+    const env = doc ? readEnvelope(doc.serviceData) : null
+    if (!env) {
+      setNote('That service couldn’t be opened.')
+      return
+    }
+    setViewItems(env.service.items ?? [])
+    setViewing({
+      id: s.id,
+      day: s.serviceDay,
+      date: s.serviceDate,
+      envelope: env,
+      origin: isFromPresenter(doc!.serviceData) ? 'presenter' : 'unknown',
+      locked
+    })
+    setHeldBy(null)
+    setSavedOpen(false)
+    setNote('')
+  }
+
   const openSaved = async (s: { id: number; serviceDay: string; serviceDate: string }): Promise<void> => {
     setOpeningId(s.id)
     try {
@@ -592,6 +625,15 @@ export function Build(): JSX.Element {
       }
       const state = readBuilderState(full.serviceData)
       if (state) {
+        // Ask for the hold BEFORE anything on screen changes. Loading the
+        // service and then saying "actually you can't change this" is the same
+        // dead end as no dialog at all — the builder would already be sitting
+        // on an order it cannot save.
+        const claim = await holdService(s.id, 'Someone on the team')
+        if (!claim.ok) {
+          setHeldBy({ lock: claim.lock, open: () => openViewOnly(s, full, true) })
+          return
+        }
         const { picks: restored, skipped } = await fromBuilderState(state)
         const restoredLinks = state.links ?? []
         // serviceDay is free text on the relay — anything could have written it.
@@ -706,6 +748,13 @@ export function Build(): JSX.Element {
    */
   const saveViewOrder = async (): Promise<void> => {
     if (!viewing) return
+    // The last line of defence rather than the only one: the buttons are gone
+    // too. A view opened while somebody else holds the service must not be able
+    // to write, or the dialog was decoration.
+    if (viewing.locked) {
+      setNote('Someone else is editing this service, so it can’t be saved from here.')
+      return
+    }
     setViewSaving(true)
     try {
       const next = {
@@ -889,6 +938,37 @@ export function Build(): JSX.Element {
     // derived from, so the timer restarts on the edit rather than on a render.
   }, [stateKey, editing, savedId, dirty, saving, exists, picks.length])
 
+  /**
+   * Keep the hold alive while this service is being edited, and let it go on
+   * the way out.
+   *
+   * Refreshed well inside the fifteen minutes rather than near it: a phone that
+   * sleeps for a moment must not lose a service it is still holding, and the
+   * cost of asking again is one small request.
+   *
+   * The release fires on unmount and on the tab closing — the second because a
+   * phone closed mid-service never unmounts anything, and a hold nobody
+   * released still costs the next person a quarter of an hour.
+   */
+  useEffect(() => {
+    if (!editing || savedId === null) return
+    const id = savedId
+    const beat = (): void => void holdService(id, 'Someone on the team')
+    // Straight away, not on the first tick. Claiming only on the interval left
+    // a service nobody held for the first five minutes of editing it — which
+    // is most of the time anyone spends in here, and exactly when a second
+    // person is most likely to open the same one.
+    beat()
+    const timer = setInterval(beat, 5 * 60 * 1000)
+    const bye = (): void => void releaseService(id)
+    window.addEventListener('pagehide', bye)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('pagehide', bye)
+      bye()
+    }
+  }, [editing, savedId])
+
   // The relay purges a service once its date is more than a week past.
   const stale = daysPast(slot.date) > 7
 
@@ -965,7 +1045,11 @@ export function Build(): JSX.Element {
     return (
       <Screen
         title="Service Builder"
-        subtitle={`${viewing.day} · ${prettyDate(viewing.date)} — reorder it, or add to it.`}
+        subtitle={
+          viewing.locked
+            ? `${viewing.day} · ${prettyDate(viewing.date)} — someone else is editing, so this is a look only.`
+            : `${viewing.day} · ${prettyDate(viewing.date)} — reorder it, or add to it.`
+        }
       >
         <Section>
           <SavedServiceView
@@ -984,8 +1068,9 @@ export function Build(): JSX.Element {
                 return out
               })
             }
-            dirty={viewDirty}
+            dirty={viewDirty && !viewing.locked}
             saving={viewSaving}
+            readOnly={!!viewing.locked}
             onSaveOrder={() => void saveViewOrder()}
             onAdd={(at) => {
               setAddAt(at)
@@ -1667,6 +1752,13 @@ export function Build(): JSX.Element {
           onCancel={() => setMediaAdd(null)}
         />
       </Sheet>
+
+      <ServiceHeldSheet
+        open={heldBy !== null}
+        lock={heldBy?.lock ?? null}
+        onView={() => void heldBy?.open()}
+        onClose={() => setHeldBy(null)}
+      />
 
       <SongLanguageSheet
         open={langAt !== null}

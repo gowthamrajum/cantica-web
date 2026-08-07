@@ -76,6 +76,7 @@ export function SavedServiceView({
   onResetOrder,
   onAdd,
   onRemove,
+  readOnly = false,
   onPreviewAll,
   onPreviewItem,
   onShare,
@@ -105,6 +106,14 @@ export function SavedServiceView({
   onResetOrder: () => void
   /** Put something new in at this index. */
   onAdd?: (at: number) => void
+  /**
+   * Somebody else is editing this service, so it can be read and nothing more.
+   *
+   * The controls go rather than being disabled: a row of greyed-out buttons
+   * reads as something broken, and this is not broken — it is somebody else's
+   * turn.
+   */
+  readOnly?: boolean
   onRemove?: (index: number) => void
   onClose: () => void
 }): JSX.Element {
@@ -137,12 +146,17 @@ export function SavedServiceView({
             <Icon name="close" size={17} />
           </button>
         </div>
-        <p className="mt-3 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-muted">
+        {readOnly && (
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-[13px] leading-relaxed text-amber-900">
+          Someone else is editing this service, so nothing here can be changed. You’re seeing it as it stands.
+        </p>
+      )}
+      <p className="mt-3 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-muted">
           {origin === 'presenter'
             ? 'Put together on the presenter computer. Reorder it, take things out, and add songs, readings, links or files — every slide it already has is written back exactly as it was.'
             : 'Saved before the builder kept a record of how it was assembled. Reorder it, take things out, and add songs, readings, links or files — every slide it already has is written back exactly as it was.'}
         </p>
-        {onRebuild && (
+        {onRebuild && !readOnly && (
           <button
             className="btn-app btn-app-quiet btn-block mt-3 text-[15px]"
             onClick={onRebuild}
@@ -151,7 +165,7 @@ export function SavedServiceView({
             {rebuilding ? 'Looking…' : 'Rebuild its songs as picks'}
           </button>
         )}
-        {onRebuild && (
+        {onRebuild && !readOnly && (
           <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
             Only if you want a song's stanzas and repeats back under the builder's control — that rebuilds the
             service from its songs alone and drops everything else, and it says what it would drop first.
@@ -199,24 +213,28 @@ export function SavedServiceView({
               {/* Moving an item needs nothing the deck doesn't already hold, so
                   it is the one edit that can be made here without loss — the
                   slides travel exactly as the presenter built them. */}
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => onMove(i, -1)}
-                disabled={i === 0 || saving}
-                aria-label={`Move ${it.title} up`}
-              >
-                <Icon name="chevron" size={17} className="-rotate-90" />
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => onMove(i, 1)}
-                disabled={i === items.length - 1 || saving}
-                aria-label={`Move ${it.title} down`}
-              >
-                <Icon name="chevron" size={17} className="rotate-90" />
-              </button>
+              {!readOnly && (
+                <>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => onMove(i, -1)}
+                    disabled={i === 0 || saving}
+                    aria-label={`Move ${it.title} up`}
+                  >
+                    <Icon name="chevron" size={17} className="-rotate-90" />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => onMove(i, 1)}
+                    disabled={i === items.length - 1 || saving}
+                    aria-label={`Move ${it.title} down`}
+                  >
+                    <Icon name="chevron" size={17} className="rotate-90" />
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className="icon-btn"
@@ -226,7 +244,7 @@ export function SavedServiceView({
               >
                 <Icon name="eye" size={17} />
               </button>
-              {onRemove && (
+              {onRemove && !readOnly && (
                 <button
                   type="button"
                   className="icon-btn"
@@ -238,7 +256,7 @@ export function SavedServiceView({
                 </button>
               )}
             </div>
-            {onAdd && <InsertHere at={i + 1} onAdd={onAdd} disabled={saving} />}
+            {onAdd && !readOnly && <InsertHere at={i + 1} onAdd={onAdd} disabled={saving} />}
             </Fragment>
           )
         })}
