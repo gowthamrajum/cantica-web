@@ -65,7 +65,29 @@ export function SermonVerseSheet({
    * what anybody without a Telugu keyboard types.
    */
   const typingBook = /^[^0-9]*$/.test(query.trim())
-  const books = typingBook && ready ? suggestBooks(query, order).slice(0, 6) : []
+  const books = typingBook && ready ? suggestBooks(query, order).slice(0, 8) : []
+
+  /**
+   * What is about to go on the screen, worked out as it is typed.
+   *
+   * The same parse the send does, so this cannot promise one thing and put up
+   * another. Worth the work on every keystroke because the alternative is
+   * finding out by looking at the wall — and by then the congregation has seen
+   * it too. Silent while the reference is half-typed; there is nothing useful
+   * to say about "Joh".
+   */
+  const preview =
+    ready && !typingBook && query.trim()
+      ? (() => {
+          const ref = parseReference(query, order)
+          if (!ref) return null
+          const passage = versesFor(ref, te, en, lang)
+          if (!passage) return null
+          // A slide per verse is how the passage is built, so the slide count
+          // IS the verse count — no second source to fall out of step with it.
+          return { label: passage.label, n: passage.slides?.length ?? 1 }
+        })()
+      : null
 
   const go = async (): Promise<void> => {
     if (!ready) return
@@ -96,8 +118,8 @@ export function SermonVerseSheet({
 
   return (
     <Sheet open={open} title="Verse on screen" onClose={onClose}>
-      <div className="px-[var(--gutter)] pb-1">
-        <div className="mb-3">
+      <div className="verse-sheet px-[var(--gutter)] pb-1">
+        <div className="verse-langs">
           <Segmented options={LANGS} value={lang} onChange={setLang} ariaLabel="Verse language" />
         </div>
 
@@ -124,20 +146,35 @@ export function SermonVerseSheet({
             }}
             disabled={!ready}
           />
-          <button className="btn-app btn-app-primary btn-block mt-3" type="submit" disabled={!ready || !query.trim()}>
+          {/* Reserves its line whether or not it has anything to say, so the
+              button never jumps out from under a thumb that is already moving
+              towards it. */}
+          <p className={`verse-preview${preview ? ' is-on' : ''}`} aria-live="polite">
+            {preview ? (
+              <>
+                <span className="verse-preview-ref">{preview.label}</span>
+                <span className="verse-preview-n">
+                  {preview.n} verse{preview.n === 1 ? '' : 's'}
+                </span>
+              </>
+            ) : (
+              '\u00a0'
+            )}
+          </p>
+          <button className="btn-app btn-app-primary btn-block" type="submit" disabled={!ready || !query.trim()}>
             {ready ? 'Put it on screen' : 'Loading the bible…'}
           </button>
         </form>
 
         {books.length > 0 && (
-          <div className="book-suggest mt-2" role="listbox">
+          <div className="book-chips" role="listbox">
             {books.map((b) => (
               <button
                 key={b}
                 type="button"
                 role="option"
                 aria-selected={false}
-                className="book-suggest-item"
+                className="book-chip"
                 // The Telugu name goes in the box, not the English key: it is
                 // what was asked for and what the reader is thinking in, and the
                 // parser matches it exactly. A trailing space because a chapter
@@ -148,17 +185,17 @@ export function SermonVerseSheet({
                   input.current?.focus()
                 }}
               >
-                <span className="book-suggest-name">{teBook(b)}</span>
-                {teBook(b) !== b && <span className="book-suggest-key">{b}</span>}
+                <span className="book-chip-name">{teBook(b)}</span>
+                {teBook(b) !== b && <span className="book-chip-key">{b}</span>}
               </button>
             ))}
           </div>
         )}
 
         {error ? (
-          <p className="mt-2 text-[13px] leading-relaxed text-amber-700">{error}</p>
+          <p className="verse-note is-error">{error}</p>
         ) : (
-          <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+          <p className="verse-note">
             It stays up until you move on — no timer. Back to sermon and Next section are on the operator screen.
           </p>
         )}

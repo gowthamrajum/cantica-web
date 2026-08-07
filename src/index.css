@@ -1365,27 +1365,73 @@ html.channel-open #root {
 
 /* The book list under the reference field: the Telugu name is the name, and
    the English key sits under it for anyone who reads that faster. */
-.book-suggest {
-  border: 1px solid theme('colors.line');
-  border-radius: 12px;
-  overflow: hidden;
-  background: theme('colors.card');
-  max-height: 216px;
-  overflow-y: auto;
-}
-.book-suggest-item {
+/* ---------- putting a verse on the screen, from a phone ----------
+   Used one-handed, mid-sermon, often in landscape where a phone has barely
+   300px of height and the keyboard takes half of it. Everything here is about
+   that: nothing grows, nothing reflows, and the two things that matter — the
+   field and the button — never leave the screen. */
+.verse-langs { margin-bottom: 12px; }
+
+/* What is about to go up. Holds its line even when empty so the button below
+   never moves out from under a thumb already travelling towards it. */
+.verse-preview {
   display: flex;
-  width: 100%;
   align-items: baseline;
+  justify-content: center;
   gap: 8px;
-  padding: 10px 12px;
-  text-align: left;
-  border-bottom: 1px solid theme('colors.line');
+  margin: 10px 0;
+  min-height: 20px;
+  font-size: 13.5px;
+  opacity: 0;
+  transition: opacity 0.14s ease-out;
 }
-.book-suggest-item:last-child { border-bottom: 0; }
-.book-suggest-item:active { background: theme('colors.paper'); }
-.book-suggest-name { font-size: 16px; font-weight: 600; color: theme('colors.ink.DEFAULT'); }
-.book-suggest-key { font-size: 12.5px; color: theme('colors.ink.muted'); }
+.verse-preview.is-on { opacity: 1; }
+.verse-preview-ref { font-weight: 700; color: theme('colors.ink.DEFAULT'); }
+.verse-preview-n { color: theme('colors.ink.muted'); }
+
+/* Books as one scrolling row, not a stack. The old list stood up to 216px tall
+   — in landscape that is most of the sheet, and it pushed the button off the
+   bottom exactly when the reference was still being typed. */
+.book-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.book-chips::-webkit-scrollbar { display: none; }
+.book-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid theme('colors.line');
+  border-radius: 999px;
+  background: theme('colors.card');
+  white-space: nowrap;
+}
+.book-chip:active { background: theme('colors.paper'); transform: scale(0.97); }
+.book-chip-name { font-size: 15px; font-weight: 600; color: theme('colors.ink.DEFAULT'); }
+.book-chip-key { font-size: 11.5px; color: theme('colors.ink.muted'); }
+
+.verse-note { margin-top: 10px; font-size: 13px; line-height: 1.5; color: theme('colors.ink.muted'); }
+.verse-note.is-error { color: theme('colors.amber.700', #b45309); }
+
+/* Landscape on a phone: short and wide. The language row and the field share a
+   line, the standing note goes (it is guidance, not instruction), and the sheet
+   takes the height it needs rather than the height it would like. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .sheet { max-height: 96dvh; }
+  .verse-sheet .verse-langs { margin-bottom: 8px; }
+  .verse-preview { margin: 6px 0; }
+  .book-chips { margin-top: 6px; }
+  .verse-note { display: none; }
+  .verse-note.is-error { display: block; margin-top: 6px; }
+}
 
 .op2-verse { padding: 5px 11px; border-radius: 8px; background: rgba(245, 195, 96, 0.18); color: #f5c360; font-size: 12px; font-weight: 700; }
 .op2-stop:active { transform: scale(0.94); }
