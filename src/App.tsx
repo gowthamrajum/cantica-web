@@ -10,6 +10,8 @@ import { Services } from './routes/Services'
 import { Give } from './routes/Give'
 import { Build } from './routes/Build'
 import { Install } from './routes/Install'
+import { Notifications } from './routes/Notifications'
+import { Notify } from './routes/Notify'
 import { Visit } from './routes/Visit'
 import { About } from './routes/About'
 import { Channel } from './routes/Channel'
@@ -41,6 +43,8 @@ export default function App(): JSX.Element {
         <Route path="/give" element={<Give />} />
         <Route path="/build" element={<Build />} />
         <Route path="/install" element={<Install />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/notify" element={<Notify />} />
         <Route path="/visit" element={<Visit />} />
         <Route path="/about" element={<About />} />
       </Route>

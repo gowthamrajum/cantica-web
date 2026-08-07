@@ -31,9 +31,17 @@ export default defineConfig({
       injectRegister: null, // registered manually in main.tsx (polls for updates)
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       workbox: {
+        /*
+         * The push and notificationclick listeners, pulled into the generated
+         * worker rather than replacing it with a hand-written one. Switching to
+         * injectManifest to add two listeners would mean re-implementing the
+         * runtimeCaching below by hand, and those rules are the whole reason
+         * 4,517 songs and the Bible work with no signal.
+         */
+        importScripts: ['push-sw.js'],
         // Precache the app shell only; the large data-*.js chunks are runtime-cached.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/data-*.js', '**/songs.worker-*.js'],
+        globIgnores: ['**/data-*.js', '**/songs.worker-*.js', 'push-sw.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {

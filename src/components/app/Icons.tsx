@@ -39,6 +39,7 @@ export type IconName =
   | 'broadcast'
   | 'grip'
   | 'copy'
+  | 'bell'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
 
@@ -203,6 +204,15 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   // Signal radiating from a point. Two arcs a side rather than three: the outer
   // pair carries the "going out" and a third only thickens the silhouette.
+  // A bell, for notifications: the body as one stroke over a straight lip, and
+  // the clapper as a small arc under it. Same 24x24 box and stroke weight as
+  // the rest, so it sits level beside them in a list row.
+  bell: (
+    <>
+      <path d="M18 15.5V11a6 6 0 1 0-12 0v4.5L4.5 18h15L18 15.5Z" />
+      <path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+    </>
+  ),
   broadcast: (
     <>
       <circle cx="12" cy="12" r="2.1" />

@@ -10,6 +10,7 @@ export function More(): JSX.Element {
         <ListRow icon="pin" tint="green" title="Plan your visit" subtitle="Where we are, what to expect" to="/visit" />
         <ListRow icon="people" tint="plum" title="About us" subtitle="Who we are as a family" to="/about" />
         <ListRow icon="give" tint="red" title="Give" subtitle="Support the ministry" to="/give" />
+        <ListRow icon="bell" tint="gold" title="Notifications" subtitle="Hear when the service goes live" to="/notifications" />
         <ListRow icon="plus" tint="gold" title="Add to your phone" subtitle="Install the app, or share it with your group" to="/install" />
       </ListGroup>
 
@@ -32,6 +33,13 @@ export function More(): JSX.Element {
           title="Operator remote"
           subtitle="Drive the live slides from your phone"
           to="/remote"
+        />
+        <ListRow
+          icon="bell"
+          tint="navy"
+          title="Send a notification"
+          subtitle="Tell the church something — needs the PIN"
+          to="/notify"
         />
       </ListGroup>
       <ListNote>
