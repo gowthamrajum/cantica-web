@@ -46,6 +46,7 @@ import {
 } from '../lib/serviceSlot'
 import { buildServicePdf } from '../lib/servicePdf'
 import { shareFiles } from '../lib/shareFiles'
+import { attachToPdf } from '../lib/attachToPdf'
 import {
   buildService,
   countSlides,
@@ -428,9 +429,9 @@ export function Build(): JSX.Element {
     p.type === 'song' ? p.song.song_name : p.type === 'media' ? p.title : `Psalm ${p.chapter}`
 
   /**
-   * Share the service as two files: a PDF to read from, one item per page, and
-   * the .cantica.json Cantica imports. The PDF is built by rendering and
-   * capturing pages, so it takes a moment on a long service.
+   * Share the service as ONE file: a PDF to read from, one item per page, with
+   * the .cantica.json Cantica imports attached inside it. The PDF is built by
+   * rendering and capturing pages, so it takes a moment on a long service.
    */
   const [sharing, setSharing] = useState(false)
   /** Share any built envelope under a given name — the one being assembled, or
@@ -442,20 +443,24 @@ export function Build(): JSX.Element {
     try {
       // The label already carries the day and the date, so it is the filename.
       const safe = label.replace(/[\\/:*?"<>|]+/g, ' ').trim()
-      const json = new File([JSON.stringify(env, null, 2)], `${safe}.cantica.json`, {
-        type: 'application/json'
+      // One file, not two. The service file rides inside the PDF as an
+      // attachment — the sheet is still just a sheet, and the thing the
+      // projection machine needs travels with it instead of beside it, where
+      // it used to get lost.
+      const sheet = await buildServicePdf(env, label)
+      const withFile = await attachToPdf(sheet, {
+        name: `${safe}.cantica.json`,
+        bytes: new TextEncoder().encode(JSON.stringify(env, null, 2))
       })
-      const pdf = new File([await buildServicePdf(env, label)], `${safe}.pdf`, {
-        type: 'application/pdf'
-      })
+      const pdf = new File([withFile], `${safe}.pdf`, { type: 'application/pdf' })
       const count = env.service.items.length
-      const outcome = await shareFiles([pdf, json], label, `${label} — ${count} part${count === 1 ? '' : 's'}`)
+      const outcome = await shareFiles([pdf], label, `${label} — ${count} part${count === 1 ? '' : 's'}`)
       setNote(
         outcome === 'shared'
-          ? 'Shared the PDF and the Cantica file.'
+          ? 'Shared the service sheet.'
           : outcome === 'cancelled'
             ? 'Sharing cancelled.'
-            : 'Saved the PDF and the Cantica file. Import the .cantica.json via Sessions ▸ ⋯ ▸ Import service.'
+            : 'Saved the service sheet. The Cantica file is attached inside it — open the PDF and drag it out of the attachments panel.'
       )
     } catch (e) {
       setNote(e instanceof Error ? `Couldn’t build the PDF: ${e.message}` : 'Couldn’t build the PDF.')
