@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "favicons": "node scripts/make-favicons.mjs",
     "search-audit": "node scripts/search-audit.mjs",
     "arrangement-audit": "npx --yes tsx scripts/arrangement-audit.mjs"
   },

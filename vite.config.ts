@@ -29,7 +29,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: null, // registered manually in main.tsx (polls for updates)
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
+      // No `includeAssets`. It adds publicDir files to the precache, but
+      // globPatterns below already sweeps every svg/png in the build output —
+      // which is where those files land — so each icon was being listed twice.
+      // Harmless but not free, and it grew every time an icon was added.
       workbox: {
         /*
          * The push and notificationclick listeners, pulled into the generated
