@@ -3,6 +3,7 @@ import { Screen, Section } from '../components/app/Screen'
 import { ListGroup, ListRow } from '../components/app/List'
 import { Icon } from '../components/app/Icons'
 import { CHURCH } from '../lib/church'
+import { SITE_ORIGIN } from '../lib/site'
 
 /**
  * Getting the app onto a phone.
@@ -14,7 +15,9 @@ import { CHURCH } from '../lib/church'
  * QR for the projector, and tells each visitor the steps their own phone needs.
  */
 
-const APP_URL = 'https://cantica-web.onrender.com'
+/** The one place the domain is written down. The QR image beside this on the
+ *  screen is generated from the same constant — see lib/site. */
+const APP_URL = SITE_ORIGIN
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>

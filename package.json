@@ -5,16 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node --experimental-strip-types scripts/make-sitemap.mjs",
+    "prebuild": "node --experimental-strip-types scripts/make-crawl-files.mjs",
     "build": "tsc -b && vite build",
     "og": "node scripts/make-og.mjs",
-    "sitemap": "node --experimental-strip-types scripts/make-sitemap.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "favicons": "node scripts/make-favicons.mjs",
-    "seo-audit": "node scripts/seo-audit.mjs",
+    "seo-audit": "node --experimental-strip-types scripts/seo-audit.mjs",
     "search-audit": "node scripts/search-audit.mjs",
-    "arrangement-audit": "npx --yes tsx scripts/arrangement-audit.mjs"
+    "arrangement-audit": "npx --yes tsx scripts/arrangement-audit.mjs",
+    "crawl-files": "node --experimental-strip-types scripts/make-crawl-files.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
@@ -36,6 +36,7 @@
     "oxlint": "^1.71.0",
     "postcss": "^8.5.19",
     "puppeteer-core": "^25.3.0",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^3.4.17",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",

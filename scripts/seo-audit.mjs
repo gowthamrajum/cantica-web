@@ -24,6 +24,7 @@ import { spawn } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import puppeteer from 'puppeteer-core'
+import { SITE_ORIGIN } from '../src/lib/site.ts'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(HERE, '..')
@@ -33,8 +34,13 @@ const OWN_SERVER = !process.env.SEO_BASE
 const WARN_ONLY = process.argv.includes('--warn-only')
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
-/** The canonical origin the site is served from, for canonical/OG assertions. */
-const ORIGIN = process.env.SEO_ORIGIN || 'https://cantica-web.onrender.com'
+/**
+ * The canonical origin, read from the one place that declares it. Overridable
+ * only to audit a staging host; if it is ever set by hand to something other
+ * than lib/site.ts, this stops being a check on a domain move and becomes a way
+ * of agreeing with whatever the site currently says.
+ */
+const ORIGIN = (process.env.SEO_ORIGIN || SITE_ORIGIN).replace(/\/$/, '')
 
 /**
  * Routes a stranger can arrive at from a search result.
@@ -123,8 +129,13 @@ async function auditStatic() {
       err(G, 'robots.txt', '—', 'does not block the site', 'contains a bare `Disallow: /`')
     else ok(G, 'robots.txt', '—', 'does not block the site')
 
-    if (/Sitemap:\s*http/i.test(body)) ok(G, 'robots.txt', '—', 'points at a sitemap')
-    else warn(G, 'robots.txt', '—', 'points at a sitemap', 'no `Sitemap:` line')
+    // Not just "there is a Sitemap: line" — that it names THIS origin. After a
+    // domain move, a robots.txt still pointing at the old host is the failure
+    // that looks like everything worked.
+    const line = body.match(/^\s*Sitemap:\s*(\S+)/im)?.[1]
+    if (!line) warn(G, 'robots.txt', '—', 'points at a sitemap', 'no `Sitemap:` line')
+    else if (line === `${ORIGIN}/sitemap.xml`) ok(G, 'robots.txt', '—', 'points at this origin’s sitemap')
+    else err(G, 'robots.txt', '—', 'points at this origin’s sitemap', `says ${line}, expected ${ORIGIN}/sitemap.xml`)
   }
 
   const sm = await fetch(`${BASE}/sitemap.xml`)
@@ -152,10 +163,25 @@ async function auditStatic() {
       err(G, 'sitemap.xml', '—', `omits ${r.path}`, `operator route ${r.path} is advertised to crawlers`)
     else ok(G, 'sitemap.xml', '—', `omits ${r.path}`)
   }
-  for (const u of locs) {
-    if (u.startsWith('http')) continue
-    err(G, 'sitemap.xml', '—', 'urls are absolute', `<loc>${u}</loc> is not an absolute URL`)
-  }
+  // Every <loc> has the domain written into it, so a stale sitemap is 4,528
+  // links to a host that may no longer answer. Checked in bulk, reported once.
+  const foreign = [...new Set(locs.filter((u) => !u.startsWith(`${ORIGIN}/`) && u !== ORIGIN))]
+  if (foreign.length)
+    err(
+      G,
+      'sitemap.xml',
+      '—',
+      'every url is on this origin',
+      `${foreign.length} elsewhere, e.g. ${foreign[0]} — regenerate with \`npm run crawl-files\``
+    )
+  else ok(G, 'sitemap.xml', '—', 'every url is on this origin')
+
+  // The QR on the install screen encodes the origin as pixels; nothing else in
+  // the build can notice it going stale, so at least assert it is being served.
+  const qr = await fetch(`${BASE}/install-qr.png`)
+  const qrType = qr.headers.get('content-type') || ''
+  if (qr.ok && qrType.includes('image/png')) ok(G, 'install-qr.png', '—', 'is served as an image')
+  else err(G, 'install-qr.png', '—', 'is served as an image', `HTTP ${qr.status}, content-type ${qrType}`)
 }
 
 // ------------------------------------------------------- per-page contract --
