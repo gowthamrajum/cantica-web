@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "favicons": "node scripts/make-favicons.mjs",
+    "seo-audit": "node scripts/seo-audit.mjs",
     "search-audit": "node scripts/search-audit.mjs",
     "arrangement-audit": "npx --yes tsx scripts/arrangement-audit.mjs"
   },
