@@ -10,6 +10,8 @@
  * The library is vendored rather than fetched: the builder has to work in a
  * church hall with no signal. See scripts/refresh-songs.mjs.
  */
+import { buildSlugIndex, isLegacyRef, type SlugIndex } from './songSlug'
+
 export interface Stanza {
   stanza_number?: number
   telugu?: string[]
@@ -24,6 +26,8 @@ export interface Song {
 export interface SongMeta {
   song_id: number
   song_name: string
+  /** The song's URL segment. See songSlug — required so a list cannot link by id. */
+  slug: string
   /** The lyric line a search matched on, when the title wasn't what matched. */
   snippet?: string
 }
@@ -42,6 +46,38 @@ function loadAll(): Promise<Song[]> {
  *  that shows the number should carry its own copy of it. */
 export async function countSongs(): Promise<number> {
   return (await loadAll()).length
+}
+
+// ----------------------------------------------------------------- slugs ---
+/** Built once per environment, off the same library everything else reads. */
+let slugIndex: Promise<SlugIndex> | null = null
+function loadSlugs(): Promise<SlugIndex> {
+  if (!slugIndex) slugIndex = loadAll().then(buildSlugIndex)
+  return slugIndex
+}
+
+/** Every song's slug, for anything that needs the whole map (the sitemap). */
+export async function allSlugs(): Promise<{ song_id: number; slug: string; song_name: string }[]> {
+  const [songs, ix] = await Promise.all([loadAll(), loadSlugs()])
+  return songs.map((s) => ({ song_id: s.song_id, song_name: s.song_name, slug: ix.byId.get(s.song_id)! }))
+}
+
+/**
+ * Turn whatever is in the URL into a song, and say what that song's URL should
+ * have been.
+ *
+ * Takes the slug or the old numeric id, because every `/songs/1697` ever shared
+ * or bookmarked has to keep working. The caller compares the returned slug with
+ * what it was given and redirects when they differ, so a song is reachable by
+ * two addresses but only ever settles on one.
+ */
+export async function resolveSong(ref: string): Promise<{ song: Song; slug: string } | undefined> {
+  const [songs, ix] = await Promise.all([loadAll(), loadSlugs()])
+  const id = isLegacyRef(ref) ? Number(ref) : ix.bySlug.get(ref)
+  if (id === undefined) return undefined
+  const song = songs.find((s) => s.song_id === id)
+  if (!song) return undefined
+  return { song, slug: ix.byId.get(id) ?? String(id) }
 }
 
 // ---------------------------------------------------------------- searching
@@ -348,10 +384,14 @@ function bestLine(e: Indexed, terms: string[], sounds: string[]): string | undef
 /** Name-only list for the index, filtered by an optional search term. */
 export async function listSongs(search = ''): Promise<SongMeta[]> {
   const { entries, vocabulary } = await loadIndex()
+  const slugs = await loadSlugs()
+  const slugOf = (id: number): string => slugs.byId.get(id) ?? String(id)
   const query = normalize(search)
   const byName = (a: SongMeta, b: SongMeta): number => a.song_name.localeCompare(b.song_name)
   if (!query) {
-    return entries.map((e) => ({ song_id: e.song_id, song_name: e.song_name })).sort(byName)
+    return entries
+      .map((e) => ({ song_id: e.song_id, song_name: e.song_name, slug: slugOf(e.song_id) }))
+      .sort(byName)
   }
 
   const terms = query.split(' ').filter(Boolean)
@@ -481,6 +521,7 @@ export async function listSongs(search = ''): Promise<SongMeta[]> {
         meta: {
           song_id: e.song_id,
           song_name: e.song_name,
+          slug: slugOf(e.song_id),
           // Only worth showing when the title alone doesn't explain the match.
           snippet: m.lyric ? bestLine(e, terms, sounds) : undefined
         },

@@ -122,7 +122,7 @@ export function Songs(): JSX.Element {
           {sec.key && <div className="index-head">{sec.key}</div>}
           <div className="list-group mt-2">
             {sec.items.map((s) => (
-              <Link key={s.song_id} to={`/songs/${s.song_id}`} className="list-row has-ico">
+              <Link key={s.song_id} to={`/songs/${s.slug}`} className="list-row has-ico">
                 <span className="list-ico bg-gold-500 font-serif text-[15px] font-bold">♪</span>
                 <span className="min-w-0 flex-1">
                   <span className="list-title block truncate">{s.song_name}</span>

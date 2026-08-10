@@ -1,10 +1,10 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../components/app/Screen'
 import { Sheet } from '../components/app/Sheet'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
-import { getSong, type Song, type Stanza } from '../lib/songs'
+import { resolveSong, type Song, type Stanza } from '../lib/songs'
 import { READ_SIZES, usePref, useReadSize } from '../lib/prefs'
 
 type SLang = 'both' | 'te' | 'en'
@@ -16,6 +16,7 @@ const LANGS: { id: SLang; label: string }[] = [
 
 export function SongDetail(): JSX.Element {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const [song, setSong] = useState<Song | null | undefined>(undefined)
   const [lang, setLang] = usePref<SLang>('tcc-song-lang', 'both')
   const [settings, setSettings] = useState(false)
@@ -24,20 +25,36 @@ export function SongDetail(): JSX.Element {
   useEffect(() => {
     let alive = true
     setSong(undefined)
-    getSong(Number(id))
-      .then((s) => alive && setSong(s ?? null))
+    resolveSong(id)
+      .then((found) => {
+        if (!alive) return
+        if (!found) {
+          setSong(null)
+          return
+        }
+        // A song has one address. Arrive by the old numeric id — a bookmark, a
+        // link shared before this changed — and the URL is corrected under you,
+        // with `replace` so Back still goes where it came from rather than
+        // bouncing off the id and straight back here.
+        if (found.slug !== id) navigate(`/songs/${found.slug}`, { replace: true })
+        setSong(found.song)
+      })
       .catch(() => alive && setSong(null))
     return () => {
       alive = false
     }
-  }, [id])
+  }, [id, navigate])
 
   const stanzas = song?.stanzas ?? []
+  // Loading and not-found are different answers and used to look identical: an
+  // ellipsis that never resolved. Now that the URL carries a title, a mistyped
+  // or stale one is a thing that will actually happen, and it has to say so.
+  const heading = song ? song.song_name : song === null ? 'Song not found' : '…'
 
   return (
     <Screen
       variant="push"
-      title={song?.song_name ?? 'Song'}
+      title={song ? song.song_name : song === null ? 'Song not found' : 'Song'}
       back={{ to: '/songs', label: 'Songs' }}
       trailing={
         <button type="button" className="icon-btn" onClick={() => setSettings(true)} aria-label="Reading settings">
@@ -47,7 +64,7 @@ export function SongDetail(): JSX.Element {
       hero={
         <div className="screen-hero">
           <span className="screen-eyebrow">Songbook · కీర్తన</span>
-          <h1 className="screen-title">{song?.song_name ?? '…'}</h1>
+          <h1 className="screen-title">{heading}</h1>
           {song && (
             <p className="screen-sub">
               {song.main_stanza ? 'Pallavi · ' : ''}

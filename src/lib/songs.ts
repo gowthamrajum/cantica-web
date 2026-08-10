@@ -118,6 +118,15 @@ export function getSong(id: number): Promise<Song | undefined> {
 }
 
 /**
+ * The song at a URL, whichever form the URL is in, plus the slug it should be
+ * showing. Answered by the worker because it owns the library; see
+ * songSearch.resolveSong for why the caller gets the slug back.
+ */
+export function resolveSong(ref: string): Promise<{ song: Song; slug: string } | undefined> {
+  return run({ op: 'resolve', ref }, (m) => m.resolveSong(ref))
+}
+
+/**
  * Start indexing now, without waiting to be asked.
  *
  * The first search pays for the index. Called when a screen that will obviously
