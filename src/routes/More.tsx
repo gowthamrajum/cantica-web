@@ -1,8 +1,15 @@
 import { Screen } from '../components/app/Screen'
 import { ListGroup, ListNote, ListRow } from '../components/app/List'
 import { CHURCH } from '../lib/church'
+import { useDesktopCapable, useViewPref } from '../lib/useDevice'
 
 export function More(): JSX.Element {
+  // The way back to the desktop version, shown only where there is one to go
+  // to. The desktop footer offers the reverse; without this the switch there
+  // would be a one-way door.
+  const capable = useDesktopCapable()
+  const [, setView] = useViewPref()
+
   return (
     <Screen title="More" eyebrow={CHURCH.nameTe} subtitle={`${CHURCH.tagline} · ${CHURCH.city}`}>
       <ListGroup label="Our church">
@@ -45,6 +52,18 @@ export function More(): JSX.Element {
       <ListNote>
         The operator remote needs the control PIN shown in the Broadcast panel on the presenter computer.
       </ListNote>
+
+      {capable && (
+        <ListGroup label="This device">
+          <ListRow
+            icon="globe"
+            tint="navy"
+            title="Desktop version"
+            subtitle="The full site, laid out for a big screen"
+            onClick={() => setView('desktop')}
+          />
+        </ListGroup>
+      )}
 
       <div className="px-[var(--gutter)] pb-2 pt-9 text-center">
         <p className="font-serif text-[15px] font-semibold text-ink">{CHURCH.name}</p>

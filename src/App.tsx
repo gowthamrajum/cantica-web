@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { AppShell } from './components/app/AppShell'
+import { AppShell } from './layouts/AppShell'
 import { Home } from './routes/Home'
 import { Watch } from './routes/Watch'
 import { Bible } from './routes/Bible'

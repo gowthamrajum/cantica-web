@@ -1,0 +1,701 @@
+/* ===========================================================================
+   THE DESKTOP VERSION.
+   The phone version (index.css) is a native app shell: one viewport tall, a
+   bottom tab bar, screens that own their scroll and hand a large title off to a
+   compact one. None of that is right on a 1440px display, so desktop is a
+   different thing entirely — a two-row masthead over a page built from
+   full-bleed, colour-blocked bands, closed by a site footer.
+   Everything here is prefixed `dk-` and is only ever mounted by DesktopShell,
+   so the two versions cannot style each other by accident.
+   ========================================================================= */
+
+:root {
+  --dk-mast-h: 74px;
+  --dk-strip-h: 46px;
+  --dk-wrap: 1280px;
+  --dk-pad: 40px;
+}
+
+/* ---------------------------------------------------------------- shell ---- */
+.dk-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--mvh, 100dvh);
+  overflow: hidden;
+  background: theme('colors.paper');
+}
+.dk-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The one measured container. Bands are edge-to-edge; their contents are not. */
+.dk-wrap {
+  width: 100%;
+  max-width: var(--dk-wrap);
+  margin: 0 auto;
+  padding-left: var(--dk-pad);
+  padding-right: var(--dk-pad);
+}
+
+/* -------------------------------------------------------------- masthead --- */
+.dk-mast {
+  position: relative;
+  z-index: 40;
+  flex: none;
+  background: rgba(var(--chrome), 0.92);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid theme('colors.line');
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dk-mast { background: rgba(var(--chrome), 0.99); }
+}
+.dk-mast-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  height: var(--dk-mast-h);
+}
+
+.dk-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  min-width: 0;
+}
+.dk-brand-text { display: flex; flex-direction: column; min-width: 0; }
+.dk-brand-name {
+  font-family: theme('fontFamily.serif');
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: theme('colors.ink.DEFAULT');
+  white-space: nowrap;
+}
+.dk-brand-sub {
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: theme('colors.gold.600');
+  white-space: nowrap;
+}
+
+.dk-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.dk-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: theme('colors.ink.soft');
+  transition: color 0.16s ease, background 0.16s ease;
+}
+.dk-nav-link:hover { color: theme('colors.navy.700'); background: rgba(255, 253, 249, 0.9); }
+.dk-nav-link.is-active { color: theme('colors.navy.700'); }
+/* The lit rule under the current section — a nav bar's job is to say where you
+   are, and a background pill alone reads as hover, not as location. */
+.dk-nav-link.is-active::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: -1px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: theme('colors.gold.500');
+}
+
+.dk-mast-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.dk-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: #fef2f2;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  white-space: nowrap;
+  transition: background 0.16s ease;
+}
+.dk-live:hover { background: #fee2e2; }
+.dk-live-name {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  color: theme('colors.ink.soft');
+}
+
+/* ------------------------------------------------------- gatherings strip -- */
+/* The week at a glance, pinned in the chrome. This is the question most people
+   come to a church site to answer, so it does not wait until they scroll. */
+.dk-strip {
+  border-top: 1px solid rgba(232, 221, 201, 0.7);
+  background: rgba(243, 236, 224, 0.75);
+}
+.dk-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: var(--dk-strip-h);
+}
+.dk-strip-label {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: theme('colors.gold.600');
+}
+.dk-strip-items {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.dk-strip-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: background 0.16s ease;
+}
+.dk-strip-item:hover { background: rgba(255, 253, 249, 0.95); }
+.dk-strip-name { font-size: 14px; font-weight: 600; color: theme('colors.ink.DEFAULT'); }
+.dk-strip-when { font-size: 13px; color: theme('colors.ink.muted'); }
+.dk-strip-all {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: theme('colors.navy.700');
+  white-space: nowrap;
+}
+.dk-strip-all:hover { color: theme('colors.gold.600'); }
+
+/* ------------------------------------------------------------ more menu ---- */
+.dk-more { position: relative; }
+.dk-more-btn.is-open { background: rgba(255, 253, 249, 0.9); color: theme('colors.navy.700'); }
+.dk-more-btn svg { transition: transform 0.18s ease; }
+.dk-more-btn.is-open svg { transform: rotate(-90deg); }
+.dk-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 340px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid theme('colors.line');
+  background: theme('colors.card');
+  box-shadow: theme('boxShadow.lift');
+  animation: dk-menu-in 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes dk-menu-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.dk-menu-label {
+  padding: 8px 10px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: theme('colors.ink.muted');
+}
+.dk-menu-label-2 { margin-top: 6px; border-top: 1px solid theme('colors.line'); padding-top: 12px; }
+.dk-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  transition: background 0.14s ease;
+}
+.dk-menu-item:hover { background: theme('colors.panel'); }
+.dk-menu-ico {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  width: 34px;
+  flex: none;
+  border-radius: 10px;
+  background: theme('colors.navy.700');
+  color: theme('colors.gold.200');
+}
+.dk-menu-title { display: block; font-size: 14.5px; font-weight: 600; color: theme('colors.ink.DEFAULT'); }
+.dk-menu-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: theme('colors.ink.muted');
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------- page ---- */
+.dk-page { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.dk-page-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  background: theme('colors.paper');
+}
+
+/* ---------------------------------------------------------------- bands ---- */
+.dk-band { position: relative; padding: clamp(48px, 5vw, 84px) 0; }
+.dk-band-paper { background: theme('colors.paper'); }
+.dk-band-panel { background: theme('colors.panel'); }
+.dk-band-gold {
+  background: linear-gradient(180deg, #fbf5e7 0%, #f4e6c4 100%);
+}
+.dk-band-navy {
+  background: radial-gradient(120% 120% at 15% 0%, #22345c 0%, #151f38 55%, #0f1728 100%);
+  color: theme('colors.paper');
+}
+/* Colour-blocked neighbours need no rule between them; same-tone neighbours do. */
+.dk-band-paper + .dk-band-paper { padding-top: 0; }
+
+.dk-bandhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: clamp(28px, 3vw, 44px);
+}
+.dk-eyebrow {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: theme('colors.gold.600');
+}
+.dk-bandhead.is-dark .dk-eyebrow { color: theme('colors.gold.300'); }
+.dk-band-title {
+  font-family: theme('fontFamily.serif');
+  font-size: clamp(28px, 3.1vw, 44px);
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  color: theme('colors.ink.DEFAULT');
+  text-wrap: balance;
+}
+.dk-bandhead.is-dark .dk-band-title { color: theme('colors.paper'); }
+.dk-band-sub {
+  margin-top: 12px;
+  max-width: 62ch;
+  font-size: 17px;
+  line-height: 1.6;
+  color: theme('colors.ink.soft');
+}
+.dk-bandhead.is-dark .dk-band-sub { color: rgba(250, 246, 238, 0.7); }
+.dk-viewall {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme('colors.navy.700');
+  white-space: nowrap;
+  transition: gap 0.16s ease, color 0.16s ease;
+}
+.dk-viewall:hover { gap: 9px; color: theme('colors.gold.600'); }
+.dk-bandhead.is-dark .dk-viewall { color: theme('colors.gold.200'); }
+
+/* ----------------------------------------------------------------- grid ---- */
+.dk-grid { display: grid; gap: clamp(16px, 1.6vw, 26px); }
+.dk-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dk-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dk-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1180px) {
+  .dk-grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1000px) {
+  .dk-grid-3, .dk-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------------------------------------------------------------- cards ---- */
+.dk-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 26px;
+  border-radius: 20px;
+  border: 1px solid theme('colors.line');
+  background: theme('colors.card');
+  box-shadow: theme('boxShadow.soft');
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.dk-card-service { min-height: 100%; }
+.dk-card-expect { padding-top: 30px; }
+.dk-card-num {
+  font-family: theme('fontFamily.serif');
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: theme('colors.gold.500');
+}
+.dk-card-ico {
+  display: grid;
+  place-items: center;
+  height: 46px;
+  width: 46px;
+  border-radius: 14px;
+  color: #fff;
+}
+.dk-card-explore { padding-right: 46px; }
+.dk-card-explore:hover {
+  transform: translateY(-3px);
+  box-shadow: theme('boxShadow.lift');
+  border-color: rgba(184, 137, 63, 0.42);
+}
+.dk-card-go {
+  position: absolute;
+  right: 20px;
+  bottom: 22px;
+  display: grid;
+  place-items: center;
+  height: 28px;
+  width: 28px;
+  border-radius: 999px;
+  color: theme('colors.ink.muted');
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.dk-card-explore:hover .dk-card-go {
+  background: theme('colors.gold.500');
+  color: #fff;
+  transform: translateX(3px);
+}
+
+/* --------------------------------------------------------------- buttons --- */
+.dk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform 0.12s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+.dk-btn:active { transform: scale(0.97); }
+.dk-btn-lg { height: 50px; padding: 0 28px; font-size: 16.5px; border-radius: 14px; }
+.dk-btn-gold {
+  background: theme('colors.gold.500');
+  color: #fff;
+  box-shadow: theme('boxShadow.gold');
+}
+.dk-btn-gold:hover { background: theme('colors.gold.600'); }
+.dk-btn-navy { background: theme('colors.navy.700'); color: theme('colors.paper'); }
+.dk-btn-navy:hover { background: theme('colors.navy.800'); }
+.dk-btn-quiet {
+  background: rgba(255, 253, 249, 0.9);
+  border: 1px solid theme('colors.line');
+  color: theme('colors.navy.700');
+}
+.dk-btn-quiet:hover { background: #fff; border-color: rgba(184, 137, 63, 0.45); }
+.dk-btn-ghost-light {
+  border: 1px solid rgba(250, 246, 238, 0.32);
+  color: theme('colors.paper');
+}
+.dk-btn-ghost-light:hover { background: rgba(250, 246, 238, 0.12); }
+
+/* ----------------------------------------------------------------- hero ---- */
+/* The one full-bleed moment at the top of a page. Two columns: the words on the
+   left at a reading width, an image or ornament holding the right. */
+.dk-hero {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(120% 120% at 12% 0%, #22345c 0%, #151f38 52%, #0f1728 100%);
+  color: theme('colors.paper');
+}
+.dk-hero-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(32px, 4vw, 72px);
+  padding: clamp(56px, 6vw, 96px) 0;
+}
+.dk-hero-row.is-single { grid-template-columns: minmax(0, 1fr); max-width: 46rem; }
+@media (max-width: 1000px) {
+  .dk-hero-row { grid-template-columns: minmax(0, 1fr); }
+  .dk-hero-art { display: none; }
+}
+.dk-hero-title {
+  font-family: theme('fontFamily.serif');
+  font-size: clamp(38px, 4.6vw, 66px);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.dk-hero-lede {
+  margin-top: 20px;
+  max-width: 54ch;
+  font-size: clamp(17px, 1.25vw, 19px);
+  line-height: 1.62;
+  color: rgba(250, 246, 238, 0.72);
+}
+.dk-hero-te {
+  margin-top: 22px;
+  font-family: theme('fontFamily.serif');
+  font-size: clamp(19px, 1.6vw, 24px);
+  font-style: italic;
+  color: rgba(232, 205, 140, 0.9);
+}
+.dk-hero-cta { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* A light hero, for the pages that shouldn't open on navy twice in a row. */
+.dk-hero-light {
+  background: linear-gradient(180deg, #fffdf9 0%, #faf6ee 60%, theme('colors.paper') 100%);
+  color: theme('colors.ink.DEFAULT');
+  border-bottom: 1px solid theme('colors.line');
+}
+.dk-hero-light .dk-hero-lede { color: theme('colors.ink.soft'); }
+.dk-hero-light .dk-hero-te { color: theme('colors.gold.600'); }
+
+/* ------------------------------------------------------------ when/times --- */
+/* The week as rows rather than cards — a fixtures table, which is what people
+   are actually scanning for when they open a church site. */
+.dk-when-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 20px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(250, 246, 238, 0.14);
+}
+.dk-when-row:last-child { border-bottom: 1px solid rgba(250, 246, 238, 0.14); }
+.dk-when-name {
+  font-family: theme('fontFamily.serif');
+  font-size: 19px;
+  font-weight: 600;
+  color: theme('colors.paper');
+}
+.dk-when-te { margin-left: 10px; font-family: theme('fontFamily.sans'); font-size: 14.5px; font-weight: 500; color: rgba(232, 205, 140, 0.85); }
+.dk-when-time { font-size: 15.5px; font-weight: 600; color: theme('colors.gold.200'); white-space: nowrap; }
+.dk-when-where { grid-column: 1 / -1; font-size: 14.5px; color: rgba(250, 246, 238, 0.6); }
+
+.dk-times { display: flex; flex-direction: column; }
+.dk-time-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  padding: 30px 0;
+  border-bottom: 1px solid theme('colors.line');
+}
+.dk-time-row:first-child { border-top: 1px solid theme('colors.line'); }
+.dk-time-act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+@media (max-width: 1100px) {
+  .dk-time-row { grid-template-columns: auto minmax(0, 1fr); }
+  .dk-time-when, .dk-time-act { grid-column: 2; }
+  .dk-time-act { justify-content: flex-start; }
+}
+
+/* ------------------------------------------------------------------ q&a ---- */
+.dk-qa { padding-top: 20px; border-top: 2px solid rgba(184, 137, 63, 0.35); }
+.dk-qa-q {
+  font-family: theme('fontFamily.serif');
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: theme('colors.ink.DEFAULT');
+  text-wrap: balance;
+}
+.dk-qa-a { margin-top: 9px; font-size: 15.5px; line-height: 1.65; color: theme('colors.ink.soft'); }
+
+/* -------------------------------------------------------------- purpose ---- */
+/* "What we are for", on the navy band — no card, just a rule and the words, so
+   three statements of purpose don't read as three products. */
+.dk-purpose { padding-top: 26px; border-top: 2px solid rgba(232, 205, 140, 0.35); }
+.dk-purpose-ico {
+  display: grid;
+  place-items: center;
+  height: 48px;
+  width: 48px;
+  border-radius: 14px;
+  background: rgba(250, 246, 238, 0.09);
+  color: theme('colors.gold.200');
+}
+.dk-purpose-te {
+  margin-top: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(232, 205, 140, 0.85);
+}
+.dk-purpose-title {
+  margin-top: 6px;
+  font-family: theme('fontFamily.serif');
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  color: theme('colors.paper');
+  text-wrap: balance;
+}
+.dk-purpose-body {
+  margin-top: 12px;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: rgba(250, 246, 238, 0.68);
+}
+
+/* --------------------------------------------------------------- status ---- */
+/* The slim strip under the hero — what is on now, or what is on next. */
+.dk-band-slim { padding: 18px 0; }
+.dk-status {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  text-align: left;
+}
+.dk-status-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: theme('colors.gold.600');
+}
+.dk-status.is-live .dk-status-key { color: #b91c1c; }
+.dk-status-main {
+  font-family: theme('fontFamily.serif');
+  font-size: 19px;
+  font-weight: 600;
+  color: theme('colors.ink.DEFAULT');
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dk-status-meta { flex: 1; min-width: 0; font-size: 14.5px; color: theme('colors.ink.muted'); }
+.dk-status-go {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: theme('colors.navy.700');
+  transition: gap 0.16s ease, color 0.16s ease;
+}
+.dk-status:hover .dk-status-go, .dk-status-go:hover { gap: 9px; color: theme('colors.gold.600'); }
+
+/* --------------------------------------------------------------- invite ---- */
+.dk-invite { text-align: center; padding: clamp(8px, 1vw, 20px) 0; }
+
+/* --------------------------------------------------------------- footer ---- */
+.dk-footer {
+  position: relative;
+  padding: clamp(48px, 4.5vw, 76px) 0 32px;
+  background: radial-gradient(120% 130% at 85% 0%, #22345c 0%, #151f38 55%, #0f1728 100%);
+  color: theme('colors.paper');
+}
+.dk-footer-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 3vw, 56px);
+}
+@media (max-width: 1000px) {
+  .dk-footer-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.dk-footer-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: theme('colors.gold.300');
+}
+.dk-footer-link {
+  font-size: 14px;
+  color: rgba(250, 246, 238, 0.72);
+  transition: color 0.16s ease;
+}
+.dk-footer-link:hover { color: theme('colors.gold.200'); }
+.dk-footer-team {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  margin-top: clamp(36px, 3.5vw, 56px);
+  padding-top: 22px;
+  border-top: 1px solid rgba(250, 246, 238, 0.12);
+}
+.dk-footer-team-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(250, 246, 238, 0.4);
+}
+.dk-footer-base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(250, 246, 238, 0.12);
+}
+
+/* ------------------------------------------------------------------ misc --- */
+.dk-prose p {
+  font-size: 17px;
+  line-height: 1.72;
+  color: theme('colors.ink.soft');
+}
+.dk-prose p + p { margin-top: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dk-menu { animation: none; }
+  .dk-card, .dk-card-go, .dk-viewall, .dk-btn { transition: none; }
+  .dk-card-explore:hover { transform: none; }
+}

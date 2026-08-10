@@ -2,7 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
+// index.css is the phone version's stylesheet; desktop.css is the desktop
+// version's. Both ship in one bundle — only one shell mounts at a time, and
+// every desktop rule is `dk-`-prefixed, so they never reach into each other.
 import './index.css'
+import './desktop.css'
 import App from './App.tsx'
 
 // Self-updating PWA: check for new deploys periodically, on focus, and on reconnect.

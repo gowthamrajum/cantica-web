@@ -1,10 +1,9 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Icon, type IconName } from './Icons'
-import { useScreenVars } from '../../lib/screenVars'
-import { InstallBanner } from './InstallBanner'
-import { Logo } from '../Logo'
-import { CHURCH } from '../../lib/church'
-import { useSessions } from '../../lib/useSessions'
+import { Icon, type IconName } from '../components/app/Icons'
+import { InstallBanner } from '../components/app/InstallBanner'
+import { Logo } from '../components/Logo'
+import { CHURCH } from '../lib/church'
+import { useSessions } from '../lib/useSessions'
 
 interface Tab {
   to: string
@@ -29,22 +28,26 @@ function isTabActive(tab: Tab, path: string): boolean {
 }
 
 /**
- * The persistent app frame: a bottom tab bar on phones, a left rail on desktop
- * (same markup, re-laid-out in CSS), wrapping the routed screen.
+ * The phone version's persistent frame: a bottom tab bar wrapping the routed
+ * screen.
  *
  * The bar lives outside the routed <Outlet/>, so it never re-mounts and never
  * animates when you switch tabs — the thing that separates an app shell from a
  * page that happens to have nav at the bottom.
+ *
+ * The `brand-rail` block and the `@media (min-width: 1024px)` rules in index.css
+ * still turn this into a left rail, which is what you get if you force the
+ * mobile version on a wide screen. The real desktop version is DesktopShell.
  */
-export function AppShell(): JSX.Element {
+export function MobileShell(): JSX.Element {
   const { pathname } = useLocation()
   const { sessions } = useSessions()
   const liveCount = sessions?.filter((s) => !s.waiting).length ?? 0
 
-  // The shell is sized from the measured screen, not 100dvh: an installed iOS
-  // PWA reports a layout viewport shorter than the physical screen, which left
-  // the tab bar floating above a dead band at the bottom.
-  useScreenVars()
+  // `.app-shell` is sized from the measured screen (--mvh), not 100dvh: an
+  // installed iOS PWA reports a layout viewport shorter than the physical
+  // screen, which left the tab bar floating above a dead band at the bottom.
+  // AppShell publishes those vars for both versions.
 
   return (
     <div className="app-shell">
