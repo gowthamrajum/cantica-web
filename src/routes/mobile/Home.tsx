@@ -4,6 +4,7 @@ import { ListGroup, ListRow } from '../../components/app/List'
 import { Icon, type IconName } from '../../components/app/Icons'
 import { Logo, LogoBadge } from '../../components/Logo'
 import { Lancet } from '../../components/Lancet'
+import { Te } from '../../components/Te'
 import { CHURCH, nextGathering } from '../../lib/church'
 import { useSessions } from '../../lib/useSessions'
 import { prettyServiceName } from '../../lib/format'
@@ -41,11 +42,15 @@ export function Home(): JSX.Element {
               <h1 className="mt-4 font-serif text-[27px] font-semibold leading-[1.12] tracking-[-0.02em]">
                 {CHURCH.name}
               </h1>
-              <p className="mt-1 text-[15px] text-gold-200/90">{CHURCH.nameTe}</p>
+              <Te as="p" className="mt-1 text-[15px] text-gold-200/90">
+                {CHURCH.nameTe}
+              </Te>
               <p className="mt-3 max-w-sm text-[14.5px] leading-relaxed text-paper/70">
                 {CHURCH.tagline}. A Telugu Christian family in {CHURCH.city}.
               </p>
-              <p className="mt-4 font-serif text-[17px] italic text-gold-200/85">{CHURCH.taglineTe}</p>
+              <Te as="p" className="mt-4 font-serif text-[17px] italic text-gold-200/85">
+                {CHURCH.taglineTe}
+              </Te>
             </div>
           </div>
         </div>
@@ -133,7 +138,17 @@ export function Home(): JSX.Element {
 
       <ListGroup label="This week">
         {CHURCH.services.map((s) => (
-          <ListRow key={s.name} title={s.name} subtitle={`${s.te} · ${s.where}`} value={s.short} chevron={false} />
+          <ListRow
+            key={s.name}
+            title={s.name}
+            subtitle={
+              <>
+                <Te>{s.te}</Te> · {s.where}
+              </>
+            }
+            value={s.short}
+            chevron={false}
+          />
         ))}
       </ListGroup>
 

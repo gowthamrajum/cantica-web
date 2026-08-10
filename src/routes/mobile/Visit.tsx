@@ -1,6 +1,7 @@
 import { Screen, Section } from '../../components/app/Screen'
 import { ListGroup, ListRow } from '../../components/app/List'
 import { Icon } from '../../components/app/Icons'
+import { Te } from '../../components/Te'
 import { CHURCH } from '../../lib/church'
 
 export function Visit(): JSX.Element {
@@ -47,7 +48,17 @@ export function Visit(): JSX.Element {
 
       <ListGroup label="When we gather">
         {CHURCH.services.map((s) => (
-          <ListRow key={s.name} title={s.name} subtitle={`${s.te} · ${s.where}`} value={s.short} chevron={false} />
+          <ListRow
+            key={s.name}
+            title={s.name}
+            subtitle={
+              <>
+                <Te>{s.te}</Te> · {s.where}
+              </>
+            }
+            value={s.short}
+            chevron={false}
+          />
         ))}
       </ListGroup>
 

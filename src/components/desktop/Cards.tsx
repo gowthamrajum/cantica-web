@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Icon, type IconName } from '../app/Icons'
 import { Logo } from '../Logo'
+import { Te } from '../Te'
 import { CHURCH, usableLinks, type ServiceTime } from '../../lib/church'
 
 /** One gathering, as a card in a row of three. */
@@ -12,7 +13,9 @@ export function ServiceCard({ service }: { service: ServiceTime }): JSX.Element 
         <Logo className="h-14 w-12 flex-none" />
         <div className="min-w-0 flex-1">
           <h3 className="font-serif text-[21px] font-semibold leading-tight text-ink">{service.name}</h3>
-          <p className="mt-1 text-[16px] font-medium text-gold-600">{service.te}</p>
+          <Te as="p" className="mt-1 text-[16px] font-medium text-gold-600">
+            {service.te}
+          </Te>
         </div>
       </div>
 
@@ -93,9 +96,9 @@ export function ExploreCard({ item }: { item: ExploreItem }): JSX.Element {
 export function InviteBand(): JSX.Element {
   return (
     <div className="dk-invite">
-      <p className="font-serif text-[clamp(26px,2.6vw,38px)] italic leading-tight text-gold-700">
+      <Te as="p" className="font-serif text-[clamp(26px,2.6vw,38px)] italic leading-tight text-gold-700">
         {CHURCH.taglineTe}
-      </p>
+      </Te>
       <p className="mt-3 text-[17px] text-ink-soft">
         {CHURCH.tagline} — we gather {CHURCH.liveTime.replace(' · ', ' at ')}, and there is a seat saved for you.
       </p>

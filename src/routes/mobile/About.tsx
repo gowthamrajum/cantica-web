@@ -4,6 +4,7 @@ import { ListGroup, ListRow } from '../../components/app/List'
 import { Icon } from '../../components/app/Icons'
 import { Logo } from '../../components/Logo'
 import { PhotoFrame } from '../../components/PhotoFrame'
+import { Te } from '../../components/Te'
 import { CHURCH } from '../../lib/church'
 
 export function About(): JSX.Element {
@@ -23,7 +24,9 @@ export function About(): JSX.Element {
         <div className="app-card p-5">
           <div className="flex items-center gap-2.5">
             <Logo className="h-7 w-6 flex-none" />
-            <p className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-gold-600">{CHURCH.nameTe}</p>
+            <Te as="p" className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-gold-600">
+              {CHURCH.nameTe}
+            </Te>
           </div>
           {CHURCH.about.map((p, i) => (
             <p key={i} className={`text-[15.5px] leading-relaxed text-ink-soft ${i === 0 ? 'mt-3.5' : 'mt-3'}`}>
@@ -47,7 +50,9 @@ export function About(): JSX.Element {
         <div className="app-card-dark px-5 py-7 text-center">
           <div className="grain absolute inset-0 opacity-40" />
           <div className="relative">
-            <p className="font-serif text-[19px] italic leading-snug text-gold-200/90">{CHURCH.taglineTe}</p>
+            <Te as="p" className="font-serif text-[19px] italic leading-snug text-gold-200/90">
+              {CHURCH.taglineTe}
+            </Te>
             <p className="mt-2.5 text-[14.5px] text-paper/70">{CHURCH.tagline}</p>
             <Link to="/give" className="btn-app btn-app-ghost-light mt-5 inline-flex text-[15px]">
               Support the ministry <Icon name="chevron" size={16} strokeWidth={2.4} />

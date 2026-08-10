@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Screen, Section } from '../../components/app/Screen'
 import { Icon } from '../../components/app/Icons'
 import { Logo } from '../../components/Logo'
+import { Te } from '../../components/Te'
 import { CHURCH, usableLinks } from '../../lib/church'
 
 export function Services(): JSX.Element {
@@ -22,7 +23,9 @@ export function Services(): JSX.Element {
               <Logo className="h-14 w-12 flex-none" />
               <div className="min-w-0 flex-1">
                 <h2 className="font-serif text-[19px] font-semibold leading-tight text-ink">{s.name}</h2>
-                <p className="mt-0.5 text-[15px] font-medium text-gold-600">{s.te}</p>
+                <Te as="p" className="mt-0.5 text-[15px] font-medium text-gold-600">
+                  {s.te}
+                </Te>
               </div>
             </div>
             <div className="mt-4 space-y-1 border-t border-line pt-3.5">

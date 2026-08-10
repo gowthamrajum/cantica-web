@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
+import { RouteSeo } from './components/Seo'
 import { Home } from './routes/Home'
 import { Watch } from './routes/Watch'
 import { Bible } from './routes/Bible'
@@ -32,36 +33,41 @@ import { Live } from './routes/Live'
  */
 export default function App(): JSX.Element {
   return (
-    <Routes>
-      <Route element={<AppShell />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/watch" element={<Watch />} />
-        <Route path="/bible" element={<Bible />} />
-        <Route path="/songs" element={<Songs />} />
-        <Route path="/songs/:id" element={<SongDetail />} />
-        <Route path="/more" element={<More />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/give" element={<Give />} />
-        <Route
-          path="/build"
-          element={
-            <BuilderGate>
-              <Build />
-            </BuilderGate>
-          }
-        />
-        <Route path="/install" element={<Install />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/notify" element={<Notify />} />
-        <Route path="/visit" element={<Visit />} />
-        <Route path="/about" element={<About />} />
-      </Route>
+    <>
+      {/* Outside <Routes/> so it also covers the full-screen live surfaces,
+          which render outside both shells. */}
+      <RouteSeo />
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/watch" element={<Watch />} />
+          <Route path="/bible" element={<Bible />} />
+          <Route path="/songs" element={<Songs />} />
+          <Route path="/songs/:id" element={<SongDetail />} />
+          <Route path="/more" element={<More />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/give" element={<Give />} />
+          <Route
+            path="/build"
+            element={
+              <BuilderGate>
+                <Build />
+              </BuilderGate>
+            }
+          />
+          <Route path="/install" element={<Install />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/notify" element={<Notify />} />
+          <Route path="/visit" element={<Visit />} />
+          <Route path="/about" element={<About />} />
+        </Route>
 
-      <Route path="/c/:room" element={<Channel />} />
-      <Route path="/remote" element={<Remote />} />
-      <Route path="/live/:id" element={<Live />} />
+        <Route path="/c/:room" element={<Channel />} />
+        <Route path="/remote" element={<Remote />} />
+        <Route path="/live/:id" element={<Live />} />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }

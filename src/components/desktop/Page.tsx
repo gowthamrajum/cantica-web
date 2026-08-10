@@ -44,9 +44,9 @@ export function Page({
     }
   }, [pathname])
 
-  useEffect(() => {
-    document.title = title
-  }, [title])
+  // The title is not set here. Both shells render the same routes, so the head
+  // is owned by one place that watches the URL — see lib/seo and components/Seo.
+  void title
 
   return (
     <div className="dk-page">

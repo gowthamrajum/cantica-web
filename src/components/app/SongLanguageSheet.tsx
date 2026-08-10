@@ -33,10 +33,11 @@ export function SongLanguageSheet({
     onChange(te && en ? 'both' : te ? 'telugu' : 'english')
   }
 
-  const rows: { on: boolean; title: string; sub: string; toggle: () => void }[] = [
+  const rows: { on: boolean; title: string; lang?: string; sub: string; toggle: () => void }[] = [
     {
       on: telugu,
       title: 'తెలుగు',
+      lang: 'te',
       sub: 'The Telugu lines',
       toggle: () => set(!telugu, english)
     },
@@ -64,7 +65,9 @@ export function SongLanguageSheet({
               title={lastOne ? 'A song has to be in at least one language' : undefined}
             >
               <span className="min-w-0 flex-1">
-                <span className="list-title block">{r.title}</span>
+                <span className="list-title block" lang={r.lang}>
+                  {r.title}
+                </span>
                 <span className="list-sub block">{r.sub}</span>
               </span>
               <span

@@ -11,7 +11,9 @@ export function Segmented<T extends string>({
   className = '',
   ariaLabel
 }: {
-  options: { id: T; label: string }[]
+  /** `lang` marks an option whose label is not in the page's language — the
+   *  Telugu/English switches, where తెలుగు is otherwise read as English. */
+  options: { id: T; label: string; lang?: string }[]
   value: T
   onChange: (id: T) => void
   className?: string
@@ -36,6 +38,7 @@ export function Segmented<T extends string>({
           role="tab"
           aria-selected={o.id === value}
           onClick={() => onChange(o.id)}
+          lang={o.lang}
           className={`segmented-opt${o.id === value ? ' is-active' : ''}`}
         >
           {o.label}

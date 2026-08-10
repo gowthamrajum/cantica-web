@@ -4,6 +4,7 @@ import { Screen, Section } from '../components/app/Screen'
 import { ListGroup, ListRow } from '../components/app/List'
 import { Sheet } from '../components/app/Sheet'
 import { Icon } from '../components/app/Icons'
+import { Te } from '../components/Te'
 import { Logo } from '../components/Logo'
 import { CHURCH, usableLinks } from '../lib/church'
 import { prettyServiceName } from '../lib/format'
@@ -80,7 +81,17 @@ export function Watch(): JSX.Element {
 
           <ListGroup label="Service times">
             {CHURCH.services.map((s) => (
-              <ListRow key={s.name} title={s.name} subtitle={`${s.te} · ${s.where}`} value={s.short} chevron={false} />
+              <ListRow
+                key={s.name}
+                title={s.name}
+                subtitle={
+                  <>
+                    <Te>{s.te}</Te> · {s.where}
+                  </>
+                }
+                value={s.short}
+                chevron={false}
+              />
             ))}
           </ListGroup>
 

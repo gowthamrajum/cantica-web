@@ -236,7 +236,21 @@ async function auditPage(browser, route, view, seen) {
   })
 
   const resp = await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle2', timeout: 60000 })
-  await new Promise((r) => setTimeout(r, 700))
+
+  /*
+   * Wait for the page to have said something, rather than for a fixed beat.
+   *
+   * The songbook is answered by a worker that has to index four and a half
+   * thousand songs, which takes well over a second on a cold load — a flat
+   * delay reported /songs as an empty page, which is a bug in the audit, not in
+   * the app. Polling means a genuinely empty page still fails, just at the far
+   * end of the window instead of immediately.
+   */
+  for (let i = 0; i < 40; i++) {
+    const chars = await page.evaluate(() => (document.body.textContent || '').trim().length)
+    if (chars > 200) break
+    await new Promise((r) => setTimeout(r, 150))
+  }
 
   const G = 'page'
   const R = route.path
@@ -253,8 +267,12 @@ async function auditPage(browser, route, view, seen) {
   const indexable = !PRIVATE.some((p) => p.path === route.path)
 
   // -- the page rendered at all -------------------------------------------
-  if (d.bodyText > 200) ok(G, R, V, 'renders content')
-  else err(G, R, V, 'renders content', `only ${d.bodyText} chars of text — page looks empty`)
+  // Only asked of pages meant to be read by a stranger. The operator routes
+  // open on a PIN prompt and are supposed to be thin — that is the feature.
+  if (indexable) {
+    if (d.bodyText > 200) ok(G, R, V, 'renders content')
+    else err(G, R, V, 'renders content', `only ${d.bodyText} chars of text — page looks empty`)
+  }
 
   // -- title ---------------------------------------------------------------
   if (!d.title) err(G, R, V, 'has a title', 'document.title is empty')
@@ -430,10 +448,16 @@ async function auditSongUrls(browser) {
   await page.setViewport({ width: 1440, height: 900 })
 
   await page.goto(`${BASE}/songs`, { waitUntil: 'networkidle2', timeout: 60000 })
-  await new Promise((r) => setTimeout(r, 2500))
-  const hrefs = await page.evaluate(() =>
-    [...document.querySelectorAll('a[href^="/songs/"]')].map((a) => a.getAttribute('href'))
-  )
+  // The list arrives from a worker that indexes 4,517 songs first. A fixed wait
+  // is a coin toss on a cold cache — poll until the links exist.
+  const links = () =>
+    page.evaluate(() => [...document.querySelectorAll('a[href^="/songs/"]')].map((a) => a.getAttribute('href')))
+  let hrefs = []
+  for (let i = 0; i < 60; i++) {
+    hrefs = await links()
+    if (hrefs.length) break
+    await new Promise((r) => setTimeout(r, 250))
+  }
   await page.close()
 
   if (!hrefs.length) {

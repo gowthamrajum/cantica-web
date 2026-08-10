@@ -3,6 +3,7 @@ import { Band, BandHead, CardGrid, Page } from '../../components/desktop/Page'
 import { ExpectCard, ExploreCard, InviteBand, ServiceCard, type ExploreItem } from '../../components/desktop/Cards'
 import { Icon } from '../../components/app/Icons'
 import { Lancet } from '../../components/Lancet'
+import { Te } from '../../components/Te'
 import { PhotoFrame } from '../../components/PhotoFrame'
 import { CHURCH, nextGathering } from '../../lib/church'
 import { useSessions } from '../../lib/useSessions'
@@ -104,13 +105,15 @@ function Hero(): JSX.Element {
         <div className="dk-hero-row">
           <div>
             <span className="dk-eyebrow text-gold-300">
-              {CHURCH.nameTe} · {CHURCH.city}
+              <Te>{CHURCH.nameTe}</Te> · {CHURCH.city}
             </span>
             <h1 className="dk-hero-title">
               A Telugu Christian family in the heart of <span className="text-gold-200">Dallas–Fort Worth.</span>
             </h1>
             <p className="dk-hero-lede">{CHURCH.welcome}</p>
-            <p className="dk-hero-te">{CHURCH.taglineTe}</p>
+            <Te as="p" className="dk-hero-te">
+              {CHURCH.taglineTe}
+            </Te>
             <div className="dk-hero-cta">
               <Link to="/visit" className="dk-btn dk-btn-gold dk-btn-lg">
                 Plan your visit

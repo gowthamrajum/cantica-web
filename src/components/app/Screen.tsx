@@ -9,7 +9,9 @@ const scrollMemory = new Map<string, number>()
 
 export interface ScreenProps {
   title: string
-  eyebrow?: string
+  /** ReactNode, not string: most eyebrows carry a Telugu phrase that has to be
+   *  wrapped in <Te/> so it isn't announced or indexed as English. */
+  eyebrow?: ReactNode
   subtitle?: ReactNode
   /** Back affordance. `label` is the previous screen's title, iOS-style. */
   back?: { to: string; label: string }
@@ -132,9 +134,16 @@ export function Screen({
               <Icon name="chevron" size={13} strokeWidth={2.4} className="rotate-90 opacity-55" />
             </button>
           ) : (
-            <h2 className="appbar-title" aria-hidden={!scrolled}>
+            /*
+             * Not a heading. It is the large title restated in the bar once you
+             * have scrolled past it — the same words twice, for the eye, at a
+             * point in the DOM that comes BEFORE the <h1> it duplicates. As an
+             * <h2> it made every screen open on a second-level heading and
+             * report a broken outline to anything reading structure.
+             */
+            <span className="appbar-title" aria-hidden={!scrolled}>
               {title}
-            </h2>
+            </span>
           )}
           <div className="appbar-slot is-end">{trailing}</div>
         </header>

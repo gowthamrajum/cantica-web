@@ -164,7 +164,9 @@ function Connect({
         <div className="mb-8 flex items-center gap-3">
           <LogoBadge className="h-11 w-11" />
           <div>
-            <div className="font-serif text-lg font-semibold">Operator</div>
+            {/* The page had no h1 at all — this line was its title in every
+                sense except the one a screen reader can use. */}
+            <h1 className="font-serif text-lg font-semibold">Operator</h1>
             <div className="text-[13px] text-white/55">Move the live slides from your phone — one phone at a time</div>
           </div>
         </div>
@@ -509,7 +511,7 @@ function OperatorMirror({
     <div className="op2-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="op2-head">
         <div className="op2-headmain">
-          <div className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</div>
+          <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
         </div>
         <div className="op2-badges">
           {typeof viewers === 'number' && viewers >= 0 && (

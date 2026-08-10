@@ -22,9 +22,9 @@ import type { VersePayload } from '../../lib/relay'
  * person who knows how long a verse is wanted is the one preaching, and a
  * countdown takes it away mid-sentence.
  */
-const LANGS: { id: VerseLang; label: string }[] = [
+const LANGS: { id: VerseLang; label: string; lang?: string }[] = [
   { id: 'both', label: 'Both' },
-  { id: 'telugu', label: 'తెలుగు' },
+  { id: 'telugu', label: 'తెలుగు', lang: 'te' },
   { id: 'english', label: 'English' }
 ]
 

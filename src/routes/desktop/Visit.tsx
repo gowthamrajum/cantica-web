@@ -3,6 +3,7 @@ import { Band, BandHead, CardGrid, Page } from '../../components/desktop/Page'
 import { ExpectCard, InviteBand } from '../../components/desktop/Cards'
 import { Icon } from '../../components/app/Icons'
 import { PhotoFrame } from '../../components/PhotoFrame'
+import { Te } from '../../components/Te'
 import { CHURCH } from '../../lib/church'
 
 /** The practical questions, answered in the order a first-time visitor asks them. */
@@ -75,7 +76,7 @@ export function Visit(): JSX.Element {
               <div key={s.name} className="dk-when-row">
                 <span className="dk-when-name">
                   {s.name}
-                  <span className="dk-when-te">{s.te}</span>
+                  <Te className="dk-when-te">{s.te}</Te>
                 </span>
                 <span className="dk-when-time">{s.short}</span>
                 <span className="dk-when-where">{s.where}</span>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icon, type IconName } from '../components/app/Icons'
 import { Logo } from '../components/Logo'
+import { Te } from '../components/Te'
 import { CHURCH } from '../lib/church'
 import { useSessions } from '../lib/useSessions'
 import { prettyServiceName } from '../lib/format'
@@ -72,7 +73,7 @@ export function DesktopShell(): JSX.Element {
             <Logo className="h-11 w-10 flex-none" />
             <span className="dk-brand-text">
               <span className="dk-brand-name">{CHURCH.name}</span>
-              <span className="dk-brand-sub">{CHURCH.nameTe}</span>
+              <Te className="dk-brand-sub">{CHURCH.nameTe}</Te>
             </span>
           </Link>
 

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Icon } from '../app/Icons'
 import { Logo } from '../Logo'
+import { Te } from '../Te'
 import { CHURCH } from '../../lib/church'
 import { useViewPref } from '../../lib/useDevice'
 
@@ -41,7 +42,9 @@ export function SiteFooter(): JSX.Element {
           <div className="dk-footer-brand">
             <Logo className="h-14 w-12" />
             <p className="mt-4 font-serif text-[20px] font-semibold leading-tight text-paper">{CHURCH.name}</p>
-            <p className="mt-1 text-[15px] text-gold-200/90">{CHURCH.nameTe}</p>
+            <Te as="p" className="mt-1 text-[15px] text-gold-200/90">
+              {CHURCH.nameTe}
+            </Te>
             <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-paper/60">{CHURCH.welcome}</p>
           </div>
 

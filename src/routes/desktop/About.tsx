@@ -3,6 +3,7 @@ import { Band, BandHead, CardGrid, Page } from '../../components/desktop/Page'
 import { ExpectCard, InviteBand, ServiceCard } from '../../components/desktop/Cards'
 import { Icon, type IconName } from '../../components/app/Icons'
 import { Logo } from '../../components/Logo'
+import { Te } from '../../components/Te'
 import { PhotoFrame } from '../../components/PhotoFrame'
 import { CHURCH } from '../../lib/church'
 
@@ -45,7 +46,9 @@ export function About(): JSX.Element {
                   Come as you are — <span className="text-gold-600">there’s a place for you.</span>
                 </h1>
                 <p className="dk-hero-lede">{CHURCH.welcome}</p>
-                <p className="dk-hero-te">{CHURCH.taglineTe}</p>
+                <Te as="p" className="dk-hero-te">
+                  {CHURCH.taglineTe}
+                </Te>
                 <div className="dk-hero-cta">
                   <Link to="/visit" className="dk-btn dk-btn-gold dk-btn-lg">
                     Plan your visit
@@ -68,7 +71,9 @@ export function About(): JSX.Element {
         <div className="grid gap-[clamp(32px,4vw,72px)] lg:grid-cols-[minmax(0,0.62fr)_minmax(0,1fr)]">
           <div>
             <span className="dk-eyebrow">Who we are</span>
-            <h2 className="dk-band-title">{CHURCH.nameTe}</h2>
+            <h2 className="dk-band-title" lang="te">
+              {CHURCH.nameTe}
+            </h2>
             <div className="mt-6 flex items-center gap-3.5">
               <Logo className="h-16 w-14 flex-none" />
               <div>
@@ -107,7 +112,9 @@ export function About(): JSX.Element {
               <span className="dk-purpose-ico">
                 <Icon name={p.icon} size={24} strokeWidth={1.9} />
               </span>
-              <p className="dk-purpose-te">{p.te}</p>
+              <Te as="p" className="dk-purpose-te">
+                {p.te}
+              </Te>
               <h3 className="dk-purpose-title">{p.title}</h3>
               <p className="dk-purpose-body">{p.body}</p>
             </article>

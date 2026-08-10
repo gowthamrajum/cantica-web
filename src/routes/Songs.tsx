@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Screen } from '../components/app/Screen'
 import { useScreenScroll } from '../components/app/screenScroll'
 import { Icon } from '../components/app/Icons'
+import { Te } from '../components/Te'
 import { SearchField } from '../components/app/SearchField'
 import { searchSongs, type SongMeta } from '../lib/songs'
 
@@ -92,7 +93,11 @@ export function Songs(): JSX.Element {
   return (
     <Screen
       title="Songs"
-      eyebrow="Worship songbook · కీర్తనలు"
+      eyebrow={
+        <>
+          Worship songbook · <Te>కీర్తనలు</Te>
+        </>
+      }
       subtitle={
         !songs
           ? 'Our worship songbook'

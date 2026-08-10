@@ -1,6 +1,7 @@
 import { Screen } from '../components/app/Screen'
 import { ListGroup, ListNote, ListRow } from '../components/app/List'
 import { CHURCH } from '../lib/church'
+import { Te } from '../components/Te'
 import { useDesktopCapable, useViewPref } from '../lib/useDevice'
 
 export function More(): JSX.Element {
@@ -11,7 +12,11 @@ export function More(): JSX.Element {
   const [, setView] = useViewPref()
 
   return (
-    <Screen title="More" eyebrow={CHURCH.nameTe} subtitle={`${CHURCH.tagline} · ${CHURCH.city}`}>
+    <Screen
+      title="More"
+      eyebrow={<Te>{CHURCH.nameTe}</Te>}
+      subtitle={`${CHURCH.tagline} · ${CHURCH.city}`}
+    >
       <ListGroup label="Our church">
         <ListRow icon="calendar" tint="navy" title="Service times" subtitle="Worship, Bible study & prayer" to="/services" />
         <ListRow icon="pin" tint="green" title="Plan your visit" subtitle="Where we are, what to expect" to="/visit" />
@@ -67,7 +72,9 @@ export function More(): JSX.Element {
 
       <div className="px-[var(--gutter)] pb-2 pt-9 text-center">
         <p className="font-serif text-[15px] font-semibold text-ink">{CHURCH.name}</p>
-        <p className="mt-0.5 text-[13px] text-gold-600">{CHURCH.nameTe}</p>
+        <Te as="p" className="mt-0.5 text-[13px] text-gold-600">
+          {CHURCH.nameTe}
+        </Te>
         <p className="mt-2 text-[12.5px] text-ink-muted">{CHURCH.address}</p>
         <p className="mt-3 text-[12.5px] text-ink-muted">Made with care for our church family.</p>
       </div>

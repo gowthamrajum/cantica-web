@@ -3,6 +3,7 @@ import { Band, BandHead, CardGrid, Page } from '../../components/desktop/Page'
 import { ExploreCard, InviteBand, type ExploreItem } from '../../components/desktop/Cards'
 import { Icon } from '../../components/app/Icons'
 import { Logo } from '../../components/Logo'
+import { Te } from '../../components/Te'
 import { CHURCH, usableLinks } from '../../lib/church'
 
 /** The three ways to be at a service without being in the room. */
@@ -69,7 +70,9 @@ export function Services(): JSX.Element {
                 <Logo className="h-16 w-14 flex-none" />
                 <div className="dk-time-name">
                   <h2 className="font-serif text-[24px] font-semibold leading-tight text-ink">{s.name}</h2>
-                  <p className="mt-1 text-[16px] font-medium text-gold-600">{s.te}</p>
+                  <Te as="p" className="mt-1 text-[16px] font-medium text-gold-600">
+                    {s.te}
+                  </Te>
                   {s.note && <p className="mt-2 text-[14.5px] italic text-ink-muted">{s.note}</p>}
                 </div>
                 <div className="dk-time-when">

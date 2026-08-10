@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node --experimental-strip-types scripts/make-sitemap.mjs",
     "build": "tsc -b && vite build",
+    "og": "node scripts/make-og.mjs",
+    "sitemap": "node --experimental-strip-types scripts/make-sitemap.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "favicons": "node scripts/make-favicons.mjs",

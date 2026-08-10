@@ -96,9 +96,9 @@ const ROLE_LABEL: Record<string, string> = {
   'communion+general': 'General + communion'
 }
 
-const LANGS: { id: ServiceLang; label: string }[] = [
+const LANGS: { id: ServiceLang; label: string; lang?: string }[] = [
   { id: 'both', label: 'Both' },
-  { id: 'telugu', label: 'తెలుగు' },
+  { id: 'telugu', label: 'తెలుగు', lang: 'te' },
   { id: 'english', label: 'English' }
 ]
 

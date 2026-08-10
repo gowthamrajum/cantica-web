@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Screen } from '../components/app/Screen'
+import { Te } from '../components/Te'
 import { useScreenScroll } from '../components/app/screenScroll'
 import { Sheet } from '../components/app/Sheet'
 import { Segmented } from '../components/app/Segmented'
@@ -8,8 +9,8 @@ import { SearchField } from '../components/app/SearchField'
 import { loadBible, teBook, type IndexedBible, type Lang } from '../lib/bible'
 import { READ_SIZES, useBiblePlace, usePref, useReadSize, useSwipe } from '../lib/prefs'
 
-const LANGS: { id: Lang; label: string }[] = [
-  { id: 'te', label: 'తెలుగు' },
+const LANGS: { id: Lang; label: string; lang?: string }[] = [
+  { id: 'te', label: 'తెలుగు', lang: 'te' },
   { id: 'en', label: 'English' },
   { id: 'both', label: 'Both' }
 ]
@@ -113,15 +114,23 @@ export function Bible(): JSX.Element {
       }
       hero={
         <div className="screen-hero">
-          <span className="screen-eyebrow">Holy Bible · పరిశుద్ధ గ్రంథము</span>
-          <button type="button" onClick={openBooks} className="mt-1 flex items-center gap-2 text-left pressable">
-            <span className="screen-title">
-              {mainName} {chapter}
-            </span>
-            <Icon name="chevron" size={19} strokeWidth={2.4} className="mt-1.5 flex-none rotate-90 text-ink-muted" />
-          </button>
+          <span className="screen-eyebrow">
+            Holy Bible · <Te>పరిశుద్ధ గ్రంథము</Te>
+          </span>
+          {/* The book and chapter IS this page's heading, and it had none —
+              the title lived in a span inside the picker button. Wrapped rather
+              than promoted, because a button may only contain phrasing content
+              and an <h1> inside one is invalid. */}
+          <h1 className="screen-title mt-1">
+            <button type="button" onClick={openBooks} className="inline-flex items-center gap-2 text-left pressable">
+              <span lang={lang === 'te' ? 'te' : undefined}>
+                {mainName} {chapter}
+              </span>
+              <Icon name="chevron" size={19} strokeWidth={2.4} className="mt-1.5 flex-none rotate-90 text-ink-muted" />
+            </button>
+          </h1>
           {subName && (
-            <p className="mt-1 font-serif text-[17px] italic text-gold-600">
+            <p className="mt-1 font-serif text-[17px] italic text-gold-600" lang={lang === 'te' ? undefined : 'te'}>
               {subName} {chapter}
             </p>
           )}
@@ -148,7 +157,11 @@ export function Bible(): JSX.Element {
               return (
                 <p key={n} className="verse-body">
                   <span className="mr-1.5 align-super font-serif text-[12px] font-bold text-gold-500">{n}</span>
-                  {needTe && t && <span className="verse-te text-ink">{t} </span>}
+                  {needTe && t && (
+                    <span lang="te" className="verse-te text-ink">
+                      {t}{' '}
+                    </span>
+                  )}
                   {needEn && e && (
                     <span className={`verse-en ${lang === 'both' ? 'text-ink-soft' : 'text-ink'}`}>{e}</span>
                   )}
@@ -281,7 +294,7 @@ export function Bible(): JSX.Element {
             style={{ fontSize: `${read.size}px`, lineHeight: 1.7 }}
           >
             <span className="mr-1.5 align-super font-serif text-[12px] font-bold text-gold-500">1</span>
-            ఆదియందు దేవుడు భూమ్యాకాశములను సృజించెను.
+            <Te>ఆదియందు దేవుడు భూమ్యాకాశములను సృజించెను.</Te>
           </p>
           <p className="pb-2 pt-3 text-[13px] leading-relaxed text-ink-muted">
             Swipe left or right anywhere on the page to turn the chapter. Your place, language and text size are

@@ -1,15 +1,17 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../components/app/Screen'
 import { Sheet } from '../components/app/Sheet'
 import { Segmented } from '../components/app/Segmented'
 import { Icon } from '../components/app/Icons'
 import { resolveSong, type Song, type Stanza } from '../lib/songs'
+import { useSeo } from '../lib/useSeo'
+import { Te } from '../components/Te'
 import { READ_SIZES, usePref, useReadSize } from '../lib/prefs'
 
 type SLang = 'both' | 'te' | 'en'
-const LANGS: { id: SLang; label: string }[] = [
-  { id: 'te', label: 'తెలుగు' },
+const LANGS: { id: SLang; label: string; lang?: string }[] = [
+  { id: 'te', label: 'తెలుగు', lang: 'te' },
   { id: 'en', label: 'English' },
   { id: 'both', label: 'Both' }
 ]
@@ -46,6 +48,21 @@ export function SongDetail(): JSX.Element {
   }, [id, navigate])
 
   const stanzas = song?.stanzas ?? []
+
+  // The songbook is the long tail: four and a half thousand pages, each the
+  // only place a particular Telugu lyric is written down. They are worth
+  // describing individually, and the first line is what someone half-remembering
+  // the song would have typed.
+  useSeo(
+    song
+      ? {
+          title: song.song_name,
+          description: `${song.song_name} — Telugu worship song lyrics${
+            song.main_stanza?.telugu?.[0] ? `: ${song.main_stanza.telugu[0]}` : ''
+          }`.slice(0, 160)
+        }
+      : null
+  )
   // Loading and not-found are different answers and used to look identical: an
   // ellipsis that never resolved. Now that the URL carries a title, a mistyped
   // or stale one is a thing that will actually happen, and it has to say so.
@@ -63,7 +80,9 @@ export function SongDetail(): JSX.Element {
       }
       hero={
         <div className="screen-hero">
-          <span className="screen-eyebrow">Songbook · కీర్తన</span>
+          <span className="screen-eyebrow">
+            Songbook · <Te>కీర్తన</Te>
+          </span>
           <h1 className="screen-title">{heading}</h1>
           {song && (
             <p className="screen-sub">
@@ -83,7 +102,18 @@ export function SongDetail(): JSX.Element {
 
       {song && (
         <div className="mt-2 space-y-3 px-[var(--gutter)]" style={{ '--read-size': `${read.size}px` } as CSSProperties}>
-          {song.main_stanza && <Block label="Pallavi · పల్లవి" stanza={song.main_stanza} lang={lang} accent />}
+          {song.main_stanza && (
+            <Block
+              label={
+                <>
+                  Pallavi · <Te>పల్లవి</Te>
+                </>
+              }
+              stanza={song.main_stanza}
+              lang={lang}
+              accent
+            />
+          )}
           {stanzas.map((st, i) => (
             <Block key={i} label={`Stanza ${st.stanza_number ?? i + 1}`} stanza={st} lang={lang} />
           ))}
@@ -134,7 +164,7 @@ function Block({
   lang,
   accent = false
 }: {
-  label: string
+  label: ReactNode
   stanza: Stanza
   lang: SLang
   accent?: boolean
@@ -149,7 +179,7 @@ function Block({
       <div className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.15em] text-gold-600">{label}</div>
       {showTe &&
         te.map((l, i) => (
-          <div key={`t${i}`} className="verse-te font-medium text-ink">
+          <div key={`t${i}`} lang="te" className="verse-te font-medium text-ink">
             {l}
           </div>
         ))}
