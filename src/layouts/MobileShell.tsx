@@ -71,17 +71,24 @@ export function MobileShell(): JSX.Element {
 
   return (
     <div className="app-shell">
-      {forcedOnDesktop && (
-        <div className="view-switch-bar">
-          <span>You’re on the mobile version</span>
-          <button type="button" onClick={() => setView('desktop')}>
-            Switch to desktop
-          </button>
-        </div>
-      )}
-      <main className="app-main">
-        <Outlet />
-      </main>
+      {/* Content and its footer as one column.
+          The shell itself turns into a ROW at 1024px so the tab bar can become
+          a left rail — which means any direct child of it becomes a column too.
+          The switch, added as one, stood up as a strip down the middle of the
+          page. Wrapped here it is the foot of the content in both layouts. */}
+      <div className="app-body">
+        <main className="app-main">
+          <Outlet />
+        </main>
+        {forcedOnDesktop && (
+          <footer className="view-switch-foot">
+            <span>You’re on the mobile version of this site.</span>
+            <button type="button" onClick={() => setView('desktop')}>
+              Switch to desktop
+            </button>
+          </footer>
+        )}
+      </div>
 
       <InstallBanner />
 

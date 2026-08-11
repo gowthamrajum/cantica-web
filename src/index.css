@@ -358,27 +358,41 @@
   animation: ch-pulse 1.8s ease-in-out infinite;
 }
 
-/* Shown only when a desktop-capable screen is on the phone version by choice.
-   Slim, above everything, and gone the moment the choice is undone. */
-.view-switch-bar {
+/* The content column: the routed screen, with the version footer under it.
+   A column in its own right, because .app-shell becomes a ROW at 1024px to seat
+   the tab bar as a rail. */
+.app-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The way back to the desktop version. A footer — quiet, at the end of the
+   page, where a site's version switch lives — shown only when a desktop-capable
+   screen is on the phone version by choice. */
+.view-switch-foot {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 8px 14px;
-  background: theme('colors.navy.700');
-  color: rgba(255, 255, 255, 0.82);
+  padding: 10px 14px;
+  border-top: 1px solid theme('colors.line');
+  background: theme('colors.panel');
+  color: theme('colors.ink.muted');
   font-size: 13px;
 }
-.view-switch-bar button {
-  padding: 4px 12px;
+.view-switch-foot button {
+  padding: 5px 14px;
+  border: 1px solid theme('colors.line');
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: theme('colors.card');
+  color: theme('colors.ink.DEFAULT');
   font-weight: 600;
 }
-.view-switch-bar button:hover { background: rgba(255, 255, 255, 0.24); }
+.view-switch-foot button:hover { background: theme('colors.paper'); }
 
 .brand-rail { display: none; }
 
