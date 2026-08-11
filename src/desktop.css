@@ -699,3 +699,82 @@
   .dk-card, .dk-card-go, .dk-viewall, .dk-btn { transition: none; }
   .dk-card-explore:hover { transform: none; }
 }
+
+/* ---------- the songbook, as a page ----------
+   The phone stacks one column; here the same paged results run in columns so a
+   1280px window shows sixty songs instead of a strip of twenty down the middle. */
+.dk-songs-search { margin-top: 22px; max-width: 520px; }
+.dk-songs-note {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 64px 0; color: theme('colors.ink.muted'); font-size: 15px;
+}
+.dk-songs-section { margin-bottom: 26px; }
+.dk-songs-letter {
+  margin: 0 0 10px;
+  font-family: theme('fontFamily.serif');
+  font-size: 20px;
+  font-weight: 600;
+  color: theme('colors.gold.600');
+}
+/* Three columns where there is room, two on a small laptop, one when the window
+   is narrow enough that a second column would be a pair of truncated titles. */
+.dk-songs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 4px 20px;
+}
+.dk-song {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  transition: background 0.12s;
+}
+.dk-song:hover { background: theme('colors.card'); }
+.dk-song-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  background: theme('colors.gold.500');
+  color: #fff;
+  font-family: theme('fontFamily.serif');
+  font-size: 15px;
+  font-weight: 700;
+}
+.dk-song-text { min-width: 0; flex: 1; }
+.dk-song-name {
+  display: block;
+  font-size: 15.5px;
+  color: theme('colors.ink.DEFAULT');
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dk-song-snippet {
+  display: block;
+  font-size: 13px;
+  color: theme('colors.ink.muted');
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dk-song-chev { flex: none; color: theme('colors.ink.muted'); opacity: 0; transition: opacity 0.12s; }
+.dk-song:hover .dk-song-chev { opacity: 1; }
+
+.dk-songs-pager {
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  margin-top: 30px; padding-top: 22px;
+  border-top: 1px solid theme('colors.line');
+}
+.dk-pager-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px;
+  border: 1px solid theme('colors.line');
+  border-radius: 999px;
+  background: theme('colors.card');
+  font-size: 14.5px; font-weight: 600;
+  color: theme('colors.ink.DEFAULT');
+}
+.dk-pager-btn:hover:not(:disabled) { background: theme('colors.paper'); }
+.dk-pager-btn:disabled { opacity: 0.4; }
+.dk-pager-count { font-size: 14px; font-variant-numeric: tabular-nums; color: theme('colors.ink.muted'); }
