@@ -4,6 +4,7 @@ import { InstallBanner } from '../components/app/InstallBanner'
 import { Logo } from '../components/Logo'
 import { CHURCH } from '../lib/church'
 import { useSessions } from '../lib/useSessions'
+import { useDesktopCapable, useViewPref } from '../lib/useDevice'
 
 interface Tab {
   to: string
@@ -43,6 +44,25 @@ export function MobileShell(): JSX.Element {
   const { pathname } = useLocation()
   const { sessions } = useSessions()
   const liveCount = sessions?.filter((s) => !s.waiting).length ?? 0
+  /**
+   * The way back, where the way out was.
+   *
+   * Switching to the phone version is one visible link in the desktop footer.
+   * Switching back was a row at the foot of More — reachable, but only if you
+   * knew to look there and then scrolled past everything else, which is the
+   * same as not being there. A door you can only open from one side is the
+   * complaint, not the layout.
+   *
+   * Shown ONLY when the phone version is being used by choice on a screen that
+   * could do desktop. On an actual phone there is nothing to go back to, and a
+   * bar offering it would be a permanent strip of nonsense.
+   */
+  const [pref, setView] = useViewPref()
+  // Called unconditionally, then combined — `pref === 'mobile' && useX()` reads
+  // fine and is a hook that stops being called the moment the preference is
+  // anything else, which is the one thing a hook may never do.
+  const capable = useDesktopCapable()
+  const forcedOnDesktop = pref === 'mobile' && capable
 
   // `.app-shell` is sized from the measured screen (--mvh), not 100dvh: an
   // installed iOS PWA reports a layout viewport shorter than the physical
@@ -51,6 +71,14 @@ export function MobileShell(): JSX.Element {
 
   return (
     <div className="app-shell">
+      {forcedOnDesktop && (
+        <div className="view-switch-bar">
+          <span>You’re on the mobile version</span>
+          <button type="button" onClick={() => setView('desktop')}>
+            Switch to desktop
+          </button>
+        </div>
+      )}
       <main className="app-main">
         <Outlet />
       </main>
