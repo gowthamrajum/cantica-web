@@ -653,6 +653,14 @@ function OperatorMirror({
                 >
                   <span className="op2-drawer-n">{i + 1}</span>
                   <span className="op2-drawer-title">{it.title}</span>
+                  {/* How far through, on the section being played; how much
+                      there is, on the rest. An operator deciding whether to
+                      jump wants the size of what they are jumping into. */}
+                  {it.count ? (
+                    <span className="op2-drawer-count">
+                      {it.live && it.nth ? `${it.nth}/${it.count}` : it.count}
+                    </span>
+                  ) : null}
                   {it.live && <span className="op2-drawer-now">NOW</span>}
                 </button>
               ))}

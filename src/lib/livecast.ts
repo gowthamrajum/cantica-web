@@ -45,14 +45,20 @@ const toSlide = (s: ServiceSlide): Slide => ({
 })
 
 /**
- * The items flattened into the one linear run the operator moves through.
- * Slides with nothing on them are dropped here rather than being skipped over
- * later — an empty slide is a blank screen nobody meant to show.
+ * The slides an item actually plays.
+ *
+ * Empty ones are dropped rather than skipped over later — an empty slide is a
+ * blank screen nobody meant to show. Shared with the outline below so a count
+ * shown to the operator can never disagree with what Next walks through.
  */
+const playable = (it: ServiceItem): ServiceSlide[] =>
+  (it.slides ?? []).filter((s) => (s.lines ?? []).some((l) => l && l.trim()))
+
+/** The items flattened into the one linear run the operator moves through. */
 export function flattenDeck(items: ServiceItem[]): DeckEntry[] {
   const out: DeckEntry[] = []
   items.forEach((it, item) => {
-    const slides = (it.slides ?? []).filter((s) => (s.lines ?? []).some((l) => l && l.trim()))
+    const slides = playable(it)
     slides.forEach((s, i) => {
       out.push({
         item,
@@ -69,11 +75,22 @@ export function flattenDeck(items: ServiceItem[]): DeckEntry[] {
 }
 
 /**
- * The lyric-free outline the audience page shows under "Order" — titles only,
- * with the item currently on screen marked. Same shape the desktop publishes.
+ * The lyric-free outline the audience page shows under "Order", and the list
+ * the operator's drawer navigates by.
+ *
+ * Carries how many slides each item plays, and how far into the live one we
+ * are, so the drawer can say "3/10" — an operator deciding whether to jump
+ * ahead wants to know how much of a section is left, and the titles alone
+ * never said. Still lyric-free: counts, not words.
  */
-export const outlineOf = (items: ServiceItem[], liveItem: number): OrderItem[] =>
-  items.map((it, i) => ({ title: it.title, kind: it.kind, live: i === liveItem }))
+export const outlineOf = (items: ServiceItem[], liveItem: number, liveNth?: number): OrderItem[] =>
+  items.map((it, i) => ({
+    title: it.title,
+    kind: it.kind,
+    live: i === liveItem,
+    count: playable(it).length,
+    ...(i === liveItem && liveNth ? { nth: liveNth } : {})
+  }))
 
 /** A stored service's deck, if what came back really is one. */
 export function readEnvelope(data: unknown): ServiceEnvelope | null {

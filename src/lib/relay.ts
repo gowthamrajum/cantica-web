@@ -47,6 +47,11 @@ export interface OrderItem {
   title: string
   kind?: string
   live?: boolean
+  /** How many slides this item plays. Counts what the deck actually steps
+   *  through, so it agrees with what Next does — see flattenDeck. */
+  count?: number
+  /** Which of those is on screen, 1-based. Only on the live item. */
+  nth?: number
 }
 export interface LiveState {
   slide?: Slide | null

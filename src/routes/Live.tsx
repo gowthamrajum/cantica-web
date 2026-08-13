@@ -119,7 +119,7 @@ export function Live(): JSX.Element {
       name,
       theme,
       background,
-      order: outlineOf(items, live?.item ?? -1),
+      order: outlineOf(items, live?.item ?? -1, live?.nth),
       blackout,
       clearText,
       showLogo,
