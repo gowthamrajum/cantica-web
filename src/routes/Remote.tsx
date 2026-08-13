@@ -276,6 +276,18 @@ function OperatorMirror({
   /** The order of service, as a drawer over the operator's controls. */
   const [orderOpen, setOrderOpen] = useState(false)
   /**
+   * A passage is on the lower third and can be taken off it.
+   *
+   * Set when a verse is sent, cleared when it is taken off — or when the
+   * service leaves the sermon, because a button that removes "the last quote"
+   * is nonsense once nobody is quoting anything.
+   *
+   * One reference can be several verses and therefore several slides; the
+   * presenter remembers them as a group, so this is one button whether the
+   * operator sent John 3:16 or Romans 8:28-30.
+   */
+  const [quoteOnStream, setQuoteOnStream] = useState(false)
+  /**
    * Whether the finger that is down has moved — i.e. is scrolling, not tapping.
    *
    * A touch that drags still delivers a click to whatever it started on, so
@@ -495,6 +507,12 @@ function OperatorMirror({
     return () => clearTimeout(t)
   }, [flash])
 
+  // Off the sermon, there is no "last quote" to take down — and a button that
+  // acts on nothing is worse than one that is missing.
+  useEffect(() => {
+    if (!onSermon) setQuoteOnStream(false)
+  }, [onSermon])
+
   const status = liveShowing
     ? { label: 'LIVE', cls: 'bg-red-500 text-white' }
     : connected
@@ -635,6 +653,22 @@ function OperatorMirror({
             <button onClick={() => void jumpToNextSection()}>Next section</button>
           </div>
         )}
+        {/* Only once something is up there to take down. The room and the
+            church's phones keep the passage — those people are reading it; this
+            is the strip over the camera, and only the operator knows when it has
+            stopped being what the preacher is on. */}
+        {quoteOnStream && !ended && (
+          <button
+            className="op2-verseoff"
+            onClick={() => {
+              void run('verseoff')
+              setQuoteOnStream(false)
+            }}
+          >
+            Remove from live stream
+            <span>The passage stays on the screens and phones</span>
+          </button>
+        )}
       </div>
 
       {feedback && (
@@ -647,7 +681,10 @@ function OperatorMirror({
       <SermonVerseSheet
         open={verseOpen}
         onClose={() => setVerseOpen(false)}
-        onSend={(payload) => run('verse', payload)}
+        onSend={async (payload) => {
+          await run('verse', payload)
+          setQuoteOnStream(true)
+        }}
       />
 
       {/* The seat went elsewhere: stop pretending this phone still drives the

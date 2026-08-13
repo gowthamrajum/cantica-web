@@ -86,7 +86,17 @@ export const streamUrl = (room: string, view: LiveView = 'users'): string =>
 // lines rather than a reference: the operator's phone has both bibles bundled,
 // so it resolves the reference there and neither the relay nor the presenter
 // needs to know anything about scripture.
-export type ControlCmd = 'next' | 'prev' | 'goto' | 'blackout' | 'clear' | 'logo' | 'end' | 'verse'
+export type ControlCmd =
+  | 'next'
+  | 'prev'
+  | 'goto'
+  | 'blackout'
+  | 'clear'
+  | 'logo'
+  | 'end'
+  | 'verse'
+  /** take the last quoted passage off the OBS lower third — see Remote */
+  | 'verseoff'
 
 /**
  * What a `verse` command carries.

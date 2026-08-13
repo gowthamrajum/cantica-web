@@ -1349,6 +1349,31 @@ html.channel-open #root {
    how the wrong thing gets tapped. */
 .op2-order-btn { display: inline-flex; padding: 7px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.72); }
 .op2-order-btn:active { transform: scale(0.94); }
+/* Take the last quoted passage off the OBS strip. Sits under the sermon nav,
+   appears only while something is up there, and says what it does NOT do —
+   the screens and phones keep the passage. */
+.op2-verseoff {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+  font-size: 14.5px;
+  font-weight: 700;
+  text-align: center;
+}
+.op2-verseoff span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+}
+.op2-verseoff:active { transform: scale(0.99); }
+
 .op2-drawer-wrap { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end; }
 .op2-drawer-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55); }
 .op2-drawer {
