@@ -473,6 +473,31 @@ function OperatorMirror({
    */
   const OVERLAY = '.op2-drawer-wrap, .op2-ask, .sheet, .sheet-backdrop, .book-chips'
 
+  /**
+   * Off the deck and onto the viewer.
+   *
+   * A phone that has lost the seat is not an operator any more, and leaving it
+   * on a dead remote is the worst of the options — it is somebody standing at
+   * the back who now cannot see the service at all. The viewer for this same
+   * room is one route away and shows exactly what the congregation sees.
+   *
+   * Automatic after a moment, so nobody has to read a dialog to get out of a
+   * screen that no longer does anything, but with a button too for whoever is
+   * already looking at it.
+   */
+  const toViewer = useCallback(() => {
+    // The seat is already gone; onDisconnect clears the stored connection so
+    // this phone does not come back as an operator on the next launch.
+    onDisconnect()
+    navigate(`/c/${encodeURIComponent(conn.room)}`, { replace: true })
+  }, [conn.room, onDisconnect, navigate])
+
+  useEffect(() => {
+    if (!lostSeat || ended) return
+    const t = setTimeout(toViewer, 6000)
+    return () => clearTimeout(t)
+  }, [lostSeat, ended, toViewer])
+
   const onTouchStart = (e: TouchEvent): void => {
     // A swipe must not move slides from under the confirmation.
     if (confirmEnd || ending || ended || lostSeat) return
@@ -549,11 +574,6 @@ function OperatorMirror({
           <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
         </div>
         <div className="op2-badges">
-          {typeof viewers === 'number' && viewers >= 0 && (
-            <span className="op2-viewers">
-              <EyeGlyph /> {viewers}
-            </span>
-          )}
           <span className={`op2-status ${status.cls}`}>{status.label}</span>
           {/* Ending is the operator's, not just the presenter's: they are the one
               who knows the service is over. */}
@@ -709,14 +729,20 @@ function OperatorMirror({
           somebody's hand. */}
       {lostSeat && !ended && (
         <div className="op2-ask" role="dialog" aria-label="Another phone is operating">
-          <p className="op2-ask-title">Another device has taken over</p>
+          <p className="op2-ask-title">Someone else is driving now</p>
           <p className="op2-ask-body">
-            Only one device operates a service at a time, and this one lost its turn — either it was asleep or out of
-            signal long enough to give the seat up, or whoever started the broadcast took it back.
+            One device operates a service at a time. Either this one was asleep or out of signal long enough to give
+            the seat up, or somebody with the master PIN took it.
+          </p>
+          <p className="op2-ask-body">
+            You’re being moved to the viewer, so you can still follow the service.
           </p>
           <div className="op2-ask-row">
+            <button className="op2-ask-yes" onClick={toViewer}>
+              Watch the service
+            </button>
             <button className="op2-ask-no" onClick={exit}>
-              Leave operator
+              Leave
             </button>
           </div>
         </div>
@@ -757,11 +783,3 @@ function OperatorMirror({
   )
 }
 
-function EyeGlyph(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
