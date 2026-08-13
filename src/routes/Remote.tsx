@@ -460,9 +460,24 @@ function OperatorMirror({
     }
   }, [conn.room, conn.pin, me, exit])
 
+  /**
+   * Anything laid over the deck — the order drawer, a sheet, a confirmation.
+   *
+   * A touch that begins inside one of these is doing that thing, not driving
+   * the service. Scrolling the drawer to find a section is a swipe UP, and a
+   * swipe up is Next: reading the order moved the slide on the wall, once per
+   * flick, in front of everybody.
+   *
+   * Asked of the ELEMENT rather than of the open/closed state, so an overlay
+   * added later is covered without anyone remembering to come back here.
+   */
+  const OVERLAY = '.op2-drawer-wrap, .op2-ask, .sheet, .sheet-backdrop, .book-chips'
+
   const onTouchStart = (e: TouchEvent): void => {
     // A swipe must not move slides from under the confirmation.
     if (confirmEnd || ending || ended || lostSeat) return
+    const target = e.target as Element | null
+    if (target?.closest?.(OVERLAY)) return
     const t = e.touches[0]
     startRef.current = { x: t.clientX, y: t.clientY }
   }
@@ -481,7 +496,9 @@ function OperatorMirror({
 
   // Desktop: arrow / page keys and space drive the deck.
   useEffect(() => {
-    if (confirmEnd || ending || ended || lostSeat) return
+    // …but not while something is open over it. Arrow keys scroll the drawer,
+    // and scrolling it should not also walk the service.
+    if (confirmEnd || ending || ended || lostSeat || orderOpen || verseOpen) return
     const onKey = (e: KeyboardEvent): void => {
       // Not while something is being typed. Space is both "next slide" and the
       // commonest character in a reference, so without this, typing "John 3:16"
@@ -499,7 +516,7 @@ function OperatorMirror({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [run, confirmEnd, ending, ended, lostSeat])
+  }, [run, confirmEnd, ending, ended, lostSeat, orderOpen, verseOpen])
 
   useEffect(() => {
     if (!flash) return
