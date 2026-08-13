@@ -6,10 +6,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 // or the Capacitor native build uses '/'.
 const base = process.env.BASE_PATH || '/'
 
+/**
+ * The songbook is emitted as a .json asset rather than imported into a chunk
+ * (see songSearch.ts). Named with the same `data-` prefix as the vendored Bible
+ * chunks so one runtime-caching rule covers everything large and vendored.
+ *
+ * Shared with the worker build below, which is a separate rollup run and does
+ * not inherit this. Without it there the worker emitted its own identically
+ * hashed copy under a different name — one file on disk twice, and worse, the
+ * worker and the main thread fetching different URLs for the same songs and
+ * each caching their own. Same name from both builds means one asset.
+ */
+const assetFileNames = (info: { names?: readonly string[] }): string => {
+  const name = info.names?.[0] ?? ''
+  return name.endsWith('.json') ? 'assets/data-[hash][extname]' : 'assets/[name]-[hash][extname]'
+}
+
 export default defineConfig({
   base,
-  // Emit JSON as `JSON.parse("…")` so the bundled Bible/Songs data parses fast
-  // and ships inside a JS chunk rather than as a fetchable .json response.
+  // Emit imported JSON as `JSON.parse("…")` so the vendored Bible parses fast
+  // rather than being walked as an object literal. Applies to the Bible only
+  // now — the songbook is imported `?url` and fetched, so it never becomes JS.
   json: { stringify: true },
   build: {
     chunkSizeWarningLimit: 20000,
@@ -20,10 +37,12 @@ export default defineConfig({
         chunkFileNames(info) {
           const id = info.facadeModuleId || ''
           return id.includes('/src/data/') ? 'assets/data-[hash].js' : 'assets/[name]-[hash].js'
-        }
+        },
+        assetFileNames
       }
     }
   },
+  worker: { rollupOptions: { output: { assetFileNames } } },
   plugins: [
     react(),
     VitePWA({
@@ -42,20 +61,20 @@ export default defineConfig({
          * 4,517 songs and the Bible work with no signal.
          */
         importScripts: ['push-sw.js'],
-        // Precache the app shell only; the large data-*.js chunks are runtime-cached.
+        // Precache the app shell only; the large data-* files are runtime-cached.
+        // The search worker is back in the precache now that it is just the
+        // matching code — it was excluded when it weighed eleven megabytes.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/data-*.js', '**/songs.worker-*.js', 'push-sw.js'],
+        globIgnores: ['**/data-*.js', 'push-sw.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
-            // Vendored Bible + Songs ship as lazy chunks, too big for the
-            // precache — cached on first use so they are there offline. The
-            // search worker carries the songbook inside it and is the same kind
-            // of thing: without it here, the songs would be missing offline
-            // exactly on the screen that exists to search them.
-            urlPattern: ({ url, sameOrigin }) =>
-              sameOrigin &&
-              (url.pathname.includes('/assets/data-') || url.pathname.includes('/assets/songs.worker-')),
+            // Vendored Bible chunks and the songbook .json, too big for the
+            // precache — cached on first use so they are there offline. Both
+            // are named `data-*` (see assetFileNames above), so one pattern
+            // covers them. The search worker no longer needs listing: it used
+            // to carry the songbook inside it, and now fetches this instead.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.includes('/assets/data-'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'tcc-data',

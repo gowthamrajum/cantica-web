@@ -110,8 +110,11 @@ try {
       reportCompressedSize: false
     }
   })
-  const { listSongs } = await import(pathToFileURL(join(dir, 'songs.js')).href)
+  const { listSongs, setLibrarySource } = await import(pathToFileURL(join(dir, 'songs.js')).href)
   const songs = JSON.parse(await readFile(join(ROOT, 'src/data/songsData.json'), 'utf8'))
+  // In the browser the module fetches the songbook; here there is nothing to
+  // fetch it from, and we have the file open already.
+  setLibrarySource(async () => songs)
 
   const longest = (text) => {
     const words = String(text).split(/[^A-Za-z]+/).filter((w) => w.length >= 4)

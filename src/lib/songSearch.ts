@@ -7,9 +7,11 @@
  * when a worker cannot be had, and under node in scripts/search-audit.mjs,
  * which is the only reason the accuracy figures mean anything.
  *
- * The library is vendored rather than fetched: the builder has to work in a
- * church hall with no signal. See scripts/refresh-songs.mjs.
+ * The library is vendored rather than pulled from the relay: the builder has to
+ * work in a church hall with no signal, so it ships with the app and is cached
+ * on first use. See scripts/refresh-songs.mjs and `source` below.
  */
+import songsUrl from '../data/songsData.json?url'
 import { buildSlugIndex, isLegacyRef, type SlugIndex } from './songSlug'
 
 export interface Stanza {
@@ -34,11 +36,31 @@ export interface SongMeta {
 
 let all: Promise<Song[]> | null = null
 
-// Loaded via dynamic import → a lazy, hashed JS chunk (no .json network request).
+/**
+ * The songbook, fetched as a file rather than imported.
+ *
+ * An import welds the library into whatever bundle imports it, and this module
+ * is imported by the search worker — so eleven megabytes of songs were sitting
+ * inside the worker's chunk, sharing its content hash with the matching code
+ * below. Every edit to that code minted a new worker, and a new worker meant
+ * four and a half thousand songs downloaded again by everyone who already had
+ * them. The two change on completely different schedules: songs when songs are
+ * added, this code whenever search is touched. They have no business sharing a
+ * cache entry.
+ *
+ * As its own asset it is fetched once and kept (see the CacheFirst rule in
+ * vite.config.ts), and a release that does not touch the songbook costs nobody
+ * anything. It also means the worker and the main-thread fallback below read
+ * the same URL, so the library is stored once no matter which one runs.
+ */
+let source = async (): Promise<Song[]> => {
+  const res = await fetch(songsUrl)
+  if (!res.ok) throw new Error(`songbook: ${res.status}`)
+  return (await res.json()) as Song[]
+}
+
 function loadAll(): Promise<Song[]> {
-  if (!all) {
-    all = import('../data/songsData.json').then((m) => m.default as Song[])
-  }
+  if (!all) all = source()
   return all
 }
 
@@ -54,6 +76,20 @@ let slugIndex: Promise<SlugIndex> | null = null
 function loadSlugs(): Promise<SlugIndex> {
   if (!slugIndex) slugIndex = loadAll().then(buildSlugIndex)
   return slugIndex
+}
+
+/**
+ * Read the songbook from somewhere other than the network.
+ *
+ * There is one caller: scripts/search-audit.mjs, which runs this module under
+ * node where `songsUrl` points at nothing. It already has the file open, so it
+ * hands the parsed songs straight over. Declared here, below both caches,
+ * because switching the source has to invalidate them.
+ */
+export function setLibrarySource(fn: () => Promise<Song[]>): void {
+  source = fn
+  all = null
+  slugIndex = null
 }
 
 /** Every song's slug, for anything that needs the whole map (the sitemap). */
