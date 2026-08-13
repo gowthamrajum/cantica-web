@@ -1454,6 +1454,38 @@ html.channel-open #root {
 .book-chip-name { font-size: 15px; font-weight: 600; color: theme('colors.ink.DEFAULT'); }
 .book-chip-key { font-size: 11.5px; color: theme('colors.ink.muted'); }
 
+/* Also-on-the-stream, decided per verse. A row rather than a checkbox in a
+   settings sheet: the answer changes with what the preacher is doing, and it is
+   worth seeing before the button above is pressed. */
+.verse-stream {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1px solid theme('colors.line');
+  border-radius: 12px;
+  background: theme('colors.card');
+  text-align: left;
+}
+.verse-stream-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1px solid theme('colors.ink.muted');
+  color: transparent;
+}
+.verse-stream.is-on .verse-stream-box {
+  border-color: theme('colors.gold.500');
+  background: theme('colors.gold.500');
+  color: #fff;
+}
+.verse-stream-text { min-width: 0; font-size: 14px; font-weight: 600; color: theme('colors.ink.DEFAULT'); }
+.verse-stream-text span { display: block; font-size: 12.5px; font-weight: 400; color: theme('colors.ink.muted'); }
+
 .verse-note { margin-top: 10px; font-size: 13px; line-height: 1.5; color: theme('colors.ink.muted'); }
 .verse-note.is-error { color: theme('colors.amber.700', #b45309); }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Sheet } from './Sheet'
+import { Icon } from './Icons'
 import { Segmented } from './Segmented'
 import { loadBible, teBook, type IndexedBible } from '../../lib/bible'
 import { parseReference, suggestBooks, versesFor, type VerseLang } from '../../lib/reference'
@@ -42,6 +43,16 @@ export function SermonVerseSheet({
   const [lang, setLang] = useState<VerseLang>('both')
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
+  /**
+   * Whether this verse also goes on the stream's lower third.
+   *
+   * On by default — a viewer at home is the person who most needs the reference
+   * they cannot see. But a verse already on the preacher's own slide, or one
+   * being read rather than shown, becomes a strip covering the camera with
+   * something the room can already see. Remembered across sends, because a
+   * service tends to want the same answer all the way through.
+   */
+  const [onStream, setOnStream] = useState(true)
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -108,7 +119,7 @@ export function SermonVerseSheet({
       return
     }
     setError('')
-    await onSend(passage)
+    await onSend({ ...passage, stream: onStream })
     setQuery('')
     // Out of the way: the verse is on the screen and the operator wants to see
     // it, not the box that sent it. Back to sermon and Next section live on the
@@ -163,6 +174,22 @@ export function SermonVerseSheet({
           </p>
           <button className="btn-app btn-app-primary btn-block" type="submit" disabled={!ready || !query.trim()}>
             {ready ? 'Put it on screen' : 'Loading the bible…'}
+          </button>
+          {/* A row, not a checkbox in a settings sheet: it is decided per verse
+              and the answer is worth seeing before pressing the button above. */}
+          <button
+            type="button"
+            className={`verse-stream${onStream ? ' is-on' : ''}`}
+            onClick={() => setOnStream((v) => !v)}
+            aria-pressed={onStream}
+          >
+            <span className="verse-stream-box">
+              <Icon name="check" size={12} strokeWidth={3.2} />
+            </span>
+            <span className="verse-stream-text">
+              Also on the stream
+              <span>{onStream ? 'Shown over the camera on the live stream' : 'Church screens and phones only'}</span>
+            </span>
           </button>
         </form>
 
