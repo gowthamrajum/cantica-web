@@ -100,14 +100,6 @@ export interface VersePayload {
   label: string
   lines: string[]
   slides?: { label: string; lines: string[] }[]
-  /**
-   * Whether this verse also goes out on the OBS lower third.
-   *
-   * Absent means yes, which is what it always did — a presenter that predates
-   * the choice reads nothing and behaves as before. It reaches the church's own
-   * phones either way; this is only the strip over the camera on the stream.
-   */
-  stream?: boolean
 }
 
 export interface ControlStatus {
