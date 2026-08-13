@@ -513,33 +513,6 @@ function OperatorMirror({
     if (!onSermon) setQuoteOnStream(false)
   }, [onSermon])
 
-  /**
-   * How far through the service we are.
-   *
-   * The order has always been on the wire and nobody could see it without
-   * opening the drawer — so "are we nearly at the sermon?" meant leaving the
-   * controls to find out. It is two numbers and a bar; it costs nothing and it
-   * answers the question every glance is really asking.
-   */
-  const order = state?.order ?? []
-  const atIndex = order.findIndex((o) => o.live)
-  const position = atIndex >= 0 && order.length ? { at: atIndex + 1, of: order.length } : null
-  const progress = position ? Math.round((position.at / position.of) * 100) : 0
-  const liveTitle = atIndex >= 0 ? order[atIndex]?.title : null
-
-  /**
-   * What the next slide is, in one line.
-   *
-   * Its caption if it has one — a scripture reference names itself better than
-   * its first line does — otherwise the first line with words on it. The slide
-   * carries no title of its own; the ORDER does, and that names a whole item
-   * rather than the slide about to go up.
-   */
-  const nextLabel =
-    state?.next?.caption?.trim() ||
-    (state?.next?.lines ?? []).find((l) => l && l.trim())?.trim().slice(0, 80) ||
-    'Next slide'
-
   const status = liveShowing
     ? { label: 'LIVE', cls: 'bg-red-500 text-white' }
     : connected
@@ -555,47 +528,43 @@ function OperatorMirror({
   return (
     <div className="op2-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="op2-head">
-        <div className="op2-headrow">
-          <div className="op2-headmain">
-            <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
-          </div>
-          <div className="op2-badges">
-            {typeof viewers === 'number' && viewers >= 0 && (
-              <span className="op2-viewers">
-                <EyeGlyph /> {viewers}
-              </span>
-            )}
-            <span className={`op2-status ${status.cls}`}>{status.label}</span>
-            {/* The whole service, one tap away — and End now lives inside it.
-                Ending happens once and was sitting a thumb-width from the
-                controls pressed a hundred times. */}
-            <button onClick={() => setOrderOpen(true)} className="op2-order-btn" title="Order of service">
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M4 7h16M4 12h16M4 17h16" />
-              </svg>
-            </button>
-            <button onClick={exit} aria-label="Exit operator" className="op2-exit">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
+        <div className="op2-headmain">
+          <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
         </div>
-
-        {/* Where we are, always. */}
-        {position && (
-          <div className="op2-progress">
-            <div className="op2-progress-text">
-              <span className="op2-progress-now">{liveTitle}</span>
-              <span className="op2-progress-count">
-                {position.at} of {position.of}
-              </span>
-            </div>
-            <div className="op2-progress-track">
-              <div className="op2-progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-        )}
+        <div className="op2-badges">
+          {typeof viewers === 'number' && viewers >= 0 && (
+            <span className="op2-viewers">
+              <EyeGlyph /> {viewers}
+            </span>
+          )}
+          <span className={`op2-status ${status.cls}`}>{status.label}</span>
+          {/* Ending is the operator's, not just the presenter's: they are the one
+              who knows the service is over. */}
+          {/* Only during the sermon. Everywhere else there is nothing for a
+              verse to be appended to that would make sense of it. */}
+          {onSermon && !ended && (
+            <button onClick={() => setVerseOpen(true)} className="op2-verse" title="Put a verse on screen">
+              Verse
+            </button>
+          )}
+          {/* The whole service, one tap away. An operator who has to reach a
+              different section has been walking there with Next until now — past
+              every slide in between, all of them going out on the screen on the
+              way. */}
+          <button onClick={() => setOrderOpen(true)} className="op2-order-btn" title="Order of service">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+          <button onClick={() => setConfirmEnd(true)} className="op2-stop">
+            End
+          </button>
+          <button onClick={exit} aria-label="Exit operator" className="op2-exit">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Sliding over rather than pushing the controls aside: the operator is
@@ -654,55 +623,36 @@ function OperatorMirror({
                 <p className="op2-drawer-empty">The order will appear here once the service is live.</p>
               )}
             </div>
-            {/* Ending is done once, by the person who knows the service is over.
-                It sat in the header a thumb-width from Next; here it takes a
-                deliberate trip to reach. */}
-            {!ended && (
-              <button
-                className="op2-drawer-end"
-                onClick={() => {
-                  setOrderOpen(false)
-                  setConfirmEnd(true)
-                }}
-              >
-                End the broadcast
-              </button>
-            )}
           </div>
         </div>
       )}
 
-      {/* Content and controls side by side.
-          This screen is ALWAYS landscape-shaped — a portrait phone is rotated
-          90° into it — so it is about 390px tall and wide as a hand. Vertical
-          space is the scarce thing, so the controls take a column on the right,
-          where a thumb rests when the phone is held sideways, and give their
-          height back to the slide. */}
-      <div className="op2-mainrow">
       <div className="op2-body">
-        {/* The slide on the wall, at the size it deserves. An operator glances
-            up from a phone in a dark room to confirm what the congregation is
-            looking at — that is the whole job of this screen, and it used to be
-            one of two equal cards you had to read to tell apart. */}
-        <section className="op2-now">
-          <div className="op2-now-label">
-            <span className="op2-now-dot" />
-            On screen
-          </div>
-          <div className="op2-now-card">
+        <section className="op2-section op2-section-current">
+          <div className="op2-label">Current</div>
+          <div className="op2-card">
             <ConfidenceCard state={state} />
           </div>
         </section>
-
-        {/* Next, as one quiet line. It answers "what am I about to put up?" and
-            nothing more; it is not a second thing to read. */}
-        <section className="op2-upnext">
-          <span className="op2-upnext-label">Next</span>
-          <span className="op2-upnext-text">
-            {nextState ? nextLabel : <em>End of service</em>}
-          </span>
+        <section className="op2-section op2-section-next">
+          <div className="op2-label">Next</div>
+          <div className="op2-card">
+            {nextState ? <ConfidenceCard state={nextState} /> : <div className="op2-end">End of service</div>}
+          </div>
         </section>
 
+        {/* Where the sermon goes after a verse, on the screen the operator is
+            actually looking at rather than behind a sheet they have closed.
+            Both are ordinary `goto`s: it already means "the first slide of item
+            N", and a verse is appended INSIDE the sermon item — so the sermon
+            card is goto(live) and the next section is goto(live + 1), however
+            many verses went up in between. Neither has to count them. */}
+        {onSermon && !ended && (
+          <div className="op2-sermon-nav">
+            <button onClick={() => void jumpToSermon()}>Back to sermon</button>
+            <button onClick={() => void jumpToNextSection()}>Next section</button>
+          </div>
+        )}
         {/* Only once something is up there to take down. The room and the
             church's phones keep the passage — those people are reading it; this
             is the strip over the camera, and only the operator knows when it has
@@ -720,52 +670,6 @@ function OperatorMirror({
           </button>
         )}
       </div>
-
-      {/* Everything done more than once a service, in one column that never
-          moves — so the target does not shift as the sermon comes and goes.
-          Advancing had no button at all before this: a swipe, or an arrow key
-          on a laptop. */}
-      {!ended && (
-        <div className="op2-bar">
-          <button className="op2-bar-back" onClick={() => void run('prev')} aria-label="Previous slide">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 5l-7 7 7 7" />
-            </svg>
-          </button>
-
-          <button className="op2-bar-next" onClick={() => void run('next')}>
-            Next
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-
-          {/* The sermon's own controls, in the one slot that changes with the
-              service — a verse to put up, and the two jumps around it. */}
-          {onSermon ? (
-            <button className="op2-bar-verse" onClick={() => setVerseOpen(true)} aria-label="Put a verse on screen">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 5h9a3 3 0 0 1 3 3v11a2 2 0 0 0-2-2H4zM20 5h-1a3 3 0 0 0-3 3v11a2 2 0 0 1 2-2h2z" />
-              </svg>
-              <span>Verse</span>
-            </button>
-          ) : (
-            <span className="op2-bar-spacer" aria-hidden="true" />
-          )}
-        </div>
-      )}
-      </div>
-
-      {/* Where the sermon goes after a verse. Both are ordinary `goto`s: it
-          already means "the first slide of item N", and a verse is appended
-          INSIDE the sermon item — so the sermon card is goto(live) and the next
-          section is goto(live + 1), however many verses went up in between. */}
-      {onSermon && !ended && (
-        <div className="op2-sermon-nav">
-          <button onClick={() => void jumpToSermon()}>Back to sermon</button>
-          <button onClick={() => void jumpToNextSection()}>Next section</button>
-        </div>
-      )}
 
       {feedback && (
         <div className="op2-flash">
