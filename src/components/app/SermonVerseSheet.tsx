@@ -44,6 +44,17 @@ export function SermonVerseSheet({
   const [error, setError] = useState('')
 
   const input = useRef<HTMLInputElement>(null)
+  /**
+   * Whether the finger that is down has moved — i.e. is scrolling the book row,
+   * not picking from it.
+   *
+   * The row scrolls sideways and a touch that drags still delivers a click to
+   * whatever it started on, so flicking along the books put a book in the field
+   * — mid-sermon, one-handed, with a verse to find. The same guard the order
+   * drawer needed, for the same reason.
+   */
+  const scrolled = useRef(false)
+  const startX = useRef(0)
 
   useEffect(() => {
     if (!open) return
@@ -168,7 +179,24 @@ export function SermonVerseSheet({
         </form>
 
         {books.length > 0 && (
-          <div className="book-chips" role="listbox">
+          <div
+            className="book-chips"
+            role="listbox"
+            onPointerDown={(e) => {
+              scrolled.current = false
+              startX.current = e.clientX
+            }}
+            onPointerMove={(e) => {
+              // A few pixels is a thumb settling, not a scroll.
+              if (Math.abs(e.clientX - startX.current) > 8) scrolled.current = true
+            }}
+            onPointerCancel={() => {
+              scrolled.current = true
+            }}
+            onScroll={() => {
+              scrolled.current = true
+            }}
+          >
             {books.map((b) => (
               <button
                 key={b}
@@ -181,6 +209,7 @@ export function SermonVerseSheet({
                 // parser matches it exactly. A trailing space because a chapter
                 // always follows and this is tapped by someone in a hurry.
                 onClick={() => {
+                  if (scrolled.current) return
                   setQuery(`${teBook(b)} `)
                   setError('')
                   input.current?.focus()

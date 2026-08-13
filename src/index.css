@@ -1455,7 +1455,7 @@ html.channel-open #root {
    bottom exactly when the reference was still being typed. */
 .book-chips {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   margin-top: 10px;
   padding-bottom: 4px;
   overflow-x: auto;
@@ -1467,9 +1467,12 @@ html.channel-open #root {
 .book-chip {
   flex: none;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  /* A thumb's worth. 34px was a target you had to aim at, mid-sermon, one
+     handed, in a row that scrolls sideways under the finger. */
+  min-height: 44px;
+  padding: 0 16px;
   border: 1px solid theme('colors.line');
   border-radius: 999px;
   background: theme('colors.card');
