@@ -142,8 +142,10 @@ export function Songs(): JSX.Element {
                 </div>
               )}
               <div className="dk-songs-grid">
+                {/* Linked by slug, not id: an id link is a redirect waiting to
+                    happen and says nothing about the song. See songSlug.ts. */}
                 {sec.items.map((s) => (
-                  <Link key={s.song_id} to={`/songs/${s.song_id}`} className="dk-song">
+                  <Link key={s.song_id} to={`/songs/${s.slug}`} className="dk-song">
                     <span className="dk-song-mark">♪</span>
                     <span className="dk-song-text">
                       <span className="dk-song-name">{s.song_name}</span>
