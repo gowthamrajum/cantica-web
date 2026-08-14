@@ -9,6 +9,13 @@ import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, textOf
  * phone), this fills the card in any orientation by scaling the text to the box,
  * so an operator can always read what's live and what's next at a glance.
  */
+/** The caption's own height plus .conf-inner's 6px gap above it. A constant,
+ *  because .conf-caption is a fixed 13px and measuring it cannot be done
+ *  safely — see showCaption below. */
+const CAPTION_H = 26
+/** Below this the reference eats more than a third of the card. */
+const CAPTION_MIN_CARD = 80
+
 export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Element {
   const [, setTick] = useState(0)
   const slide = state?.slide
@@ -33,6 +40,25 @@ export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Elem
   const textRef = useRef<HTMLDivElement>(null)
   const fitKey = lines.join('\n')
 
+  /**
+   * Whether the reference fits without starving the words.
+   *
+   * The caption is laid out after the text and is never scaled, so its height
+   * comes out of the same budget. On the short NEXT card during a sermon — a
+   * 57px box holding three lines of scripture — a 20px reference is a third of
+   * the card, and keeping it left the first line cut in half by the card's
+   * edge. The reference is the supplementary part: the operator needs to
+   * recognise the slide, and the passage is on the big card the moment it goes
+   * live. So it is the first thing dropped, not the words.
+   *
+   * Decided from the CARD, against a constant — never by measuring the caption.
+   * Measuring the node whose mounting is the outcome is a loop: hiding it makes
+   * the measured cost zero, zero fits, so it mounts again. That loop is a blank
+   * operator screen, which is how it was found.
+   */
+  const [cardH, setCardH] = useState(0)
+  const showCaption = !!caption && (cardH === 0 || cardH >= CAPTION_MIN_CARD)
+
   // Fill the card with the largest text that still fits. The block is pinned to
   // the card width and lines are allowed to wrap, so on a WIDE card (desktop /
   // landscape) each line stays whole and grows big, while on a NARROW card
@@ -44,8 +70,13 @@ export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Elem
     const txt = textRef.current
     if (!box || !txt || hidden || lines.length === 0) return
     const fit = (): void => {
-      const availW = box.clientWidth * 0.92
-      const availH = box.clientHeight * 0.84
+      const h = box.clientHeight
+      // Drives showCaption above. Only ever set to a value the box really has,
+      // so it settles after one pass instead of chasing itself.
+      setCardH((prev) => (prev === h ? prev : h))
+      const availW = box.clientWidth * 0.94
+      const capH = caption && (h === 0 || h >= CAPTION_MIN_CARD) ? CAPTION_H : 0
+      const availH = h * 0.9 - capH
       if (availW <= 0 || availH <= 0) return
       txt.style.width = `${availW}px`
       let lo = 9
@@ -68,7 +99,7 @@ export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Elem
     const ro = new ResizeObserver(fit)
     ro.observe(box)
     return () => ro.disconnect()
-  }, [fitKey, hidden, lines.length])
+  }, [fitKey, hidden, lines.length, caption])
 
   return (
     <div ref={boxRef} className="conf-card">
@@ -100,7 +131,7 @@ export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Elem
               </div>
             ))}
           </div>
-          {caption && (
+          {showCaption && (
             <div className="conf-caption" style={{ color: theme?.captionColor || '#ffd27f' }}>
               {caption}
             </div>

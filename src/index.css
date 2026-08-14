@@ -1342,12 +1342,15 @@ html.channel-open #root {
 /* No clock here: the phone's own status bar already shows the time, and a
    1Hz re-render of the whole operator view to tick it was the only reason this
    component re-rendered off-network. */
-.op2-headmain { min-width: 0; }
+/* One row, not two. The service name and the section were stacked, which cost
+   ~46px of a 390px frame — and mid-sermon that is a line of scripture. The name
+   is the part that can shrink: an operator knows which service they are on. */
+.op2-headmain { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .op2-service { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Section + position, under the service name. The section title can be long
    (a song's full name) so it ellipsises; the count never does — it is the part
    worth glancing at, and a truncated "3/1…" would be worse than useless. */
-.op2-where { display: flex; align-items: baseline; gap: 7px; min-width: 0; margin-top: 1px; }
+.op2-where { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: none; }
 .op2-where-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; color: #fff; }
 .op2-where-n { flex: none; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: #38bdf8; }
 .op2-badges { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -1426,14 +1429,16 @@ html.channel-open #root {
    thing here that ADDS something to the service. */
 /* The sermon's two jumps, under the confidence cards. Full width and quiet —
    they are reached for between verses, in a dark room, without looking. */
+/* Only on screen during the sermon — which is exactly when scripture slides are
+   longest and the cards can least afford a strip. Kept tappable but tight. */
 .op2-sermon-nav {
   display: flex;
   gap: 8px;
-  padding: 0 14px 10px;
+  padding: 0 2px 6px;
 }
 .op2-sermon-nav button {
   flex: 1;
-  padding: 11px 8px;
+  padding: 8px 8px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
@@ -1542,8 +1547,8 @@ html.channel-open #root {
    coming, so Next gets the smaller share. */
 /* The live slide is what the operator reads; Next only has to be recognisable
    at a glance, so it gets the smaller share. */
-.op2-section-current { flex: 76; }
-.op2-section-next { flex: 24; }
+.op2-section-current { flex: 80; }
+.op2-section-next { flex: 20; }
 
 /* Force landscape on a portrait TOUCH device (phone/tablet) — even when the OS
    rotation lock is on: rotate the whole view 90° and swap width/height to the
@@ -1606,7 +1611,10 @@ html.channel-open #root {
 .conf-bg-media { background: #000; }
 .conf-bg-media img, .conf-bg-media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .conf-scrim { position: absolute; inset: 0; pointer-events: none; }
-.conf-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4% 5%; gap: 6px; }
+/* Tight padding: the fitter already keeps the words inside 90%×94% of the box,
+   so this only has to stop glyph ascenders touching the border. Every percent
+   here is text size on a card that is 190px tall mid-sermon. */
+.conf-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2% 3%; gap: 6px; overflow: hidden; }
 .conf-text { display: inline-block; font-weight: 700; line-height: 1.2; }
 .conf-text.upper { text-transform: uppercase; }
 .conf-text.shadow { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55); }
