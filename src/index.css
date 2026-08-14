@@ -1317,8 +1317,14 @@ html.channel-open #root {
 .stage-standby-name { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 5cqh; }
 .stage-standby-tag { font-size: 2.1cqh; color: rgba(255, 255, 255, 0.65); }
 
-/* ---- operator confidence view: CURRENT / NEXT stacked cards (upright, readable
-       on a phone — replaces the rotated 16:9 mirror the operator used to get) ---- */
+/* ---- operator confidence view: CURRENT / NEXT stacked cards, showing text the
+       right way up at a readable size — replacing the letterboxed 16:9 mirror the
+       operator used to get.
+       The FRAME still turns: on a portrait touch device the whole view is rotated
+       90° so the operator holds the phone sideways (see .op2-root's
+       `(orientation: portrait) and (pointer: coarse)` rule below). Measure this
+       screen at a portrait viewport, not a landscape one, or the rule you are
+       looking at will not be the rule that runs. ---- */
 .op2-root {
   position: fixed;
   inset: 0;
@@ -1329,15 +1335,21 @@ html.channel-open #root {
   user-select: none;
   -webkit-user-select: none;
   touch-action: pan-y;
-  padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 14px)
-    calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px);
+  padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px)
+    calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 12px);
 }
-.op2-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; }
+.op2-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; }
 /* No clock here: the phone's own status bar already shows the time, and a
    1Hz re-render of the whole operator view to tick it was the only reason this
    component re-rendered off-network. */
 .op2-headmain { min-width: 0; }
 .op2-service { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Section + position, under the service name. The section title can be long
+   (a song's full name) so it ellipsises; the count never does — it is the part
+   worth glancing at, and a truncated "3/1…" would be worse than useless. */
+.op2-where { display: flex; align-items: baseline; gap: 7px; min-width: 0; margin-top: 1px; }
+.op2-where-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; color: #fff; }
+.op2-where-n { flex: none; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: #38bdf8; }
 .op2-badges { display: flex; align-items: center; gap: 8px; flex: none; }
 .op2-viewers { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 .op2-status { padding: 4px 9px; border-radius: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; }
@@ -1520,12 +1532,18 @@ html.channel-open #root {
 /* Stacked confidence layout: Current on top (large), Next below (smaller),
    full-width — matches the desktop reference. Shown in landscape (see the
    force-landscape rule below). */
-.op2-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
-.op2-section { display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
+.op2-body { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+/* The label sits ON the card rather than above it. Two stacked labels cost ~38px
+   of a 390px-tall frame — a tenth of the screen spent naming two boxes whose
+   order never changes — and every pixel taken back here goes into the slide the
+   operator is actually reading. */
+.op2-section { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 /* 70 / 30 — the operator reads the current slide and only glances at what's
    coming, so Next gets the smaller share. */
-.op2-section-current { flex: 7; }
-.op2-section-next { flex: 3; }
+/* The live slide is what the operator reads; Next only has to be recognisable
+   at a glance, so it gets the smaller share. */
+.op2-section-current { flex: 76; }
+.op2-section-next { flex: 24; }
 
 /* Force landscape on a portrait TOUCH device (phone/tablet) — even when the OS
    rotation lock is on: rotate the whole view 90° and swap width/height to the
@@ -1557,7 +1575,22 @@ html.channel-open #root {
       calc(env(safe-area-inset-left) + 12px) calc(env(safe-area-inset-top) + 14px);
   }
 }
-.op2-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; color: rgba(255, 255, 255, 0.4); }
+/* Overlaid on the card's top-left, above the slide but out of the text's way —
+   the fitter keeps the words inside 92%×84% of the card, so the corner is free.
+   pointer-events:none so it can never eat a tap meant for the deck. */
+.op2-label {
+  position: absolute;
+  top: 7px;
+  left: 10px;
+  z-index: 2;
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.45);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
 .op2-card { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.12); background: #000; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); }
 .op2-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.4); font-size: 15px; background: radial-gradient(circle at 50% 40%, #1b2947 0%, #0f1728 100%); }
 

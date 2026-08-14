@@ -272,6 +272,8 @@ function OperatorMirror({
    * the same test the desktop importer uses to find it.
    */
   const onSermon = !!state?.order?.some((it) => it.live && /sermon|వాక్యోపదేశం/i.test(it.title ?? ''))
+  /** The section being played, for the header read-out. */
+  const here = state?.order?.find((it) => it.live)
   const [verseOpen, setVerseOpen] = useState(false)
   /** The order of service, as a drawer over the operator's controls. */
   const [orderOpen, setOrderOpen] = useState(false)
@@ -572,6 +574,20 @@ function OperatorMirror({
       <header className="op2-head">
         <div className="op2-headmain">
           <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
+          {/* Which section, and where in it — the same "3/10" the drawer shows,
+              but without having to open the drawer to see it. An operator
+              tracking how much of a song is left should not have to cover the
+              slide they are reading to find out. */}
+          {here && (
+            <p className="op2-where">
+              <span className="op2-where-title">{here.title}</span>
+              {here.count ? (
+                <span className="op2-where-n">
+                  {here.nth ? `${here.nth}/${here.count}` : here.count}
+                </span>
+              ) : null}
+            </p>
+          )}
         </div>
         <div className="op2-badges">
           <span className={`op2-status ${status.cls}`}>{status.label}</span>
