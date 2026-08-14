@@ -1537,7 +1537,17 @@ html.channel-open #root {
 /* Stacked confidence layout: Current on top (large), Next below (smaller),
    full-width — matches the desktop reference. Shown in landscape (see the
    force-landscape rule below). */
-.op2-body { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+/* A container, so the cards below can ask how wide THIS box is. A media query
+   cannot answer that here: on a portrait phone the whole view is rotated, so
+   the viewport is 430px while the frame the cards live in is 932px, and
+   `(min-width: 900px)` reads the 430 and never fires. */
+.op2-body { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; container-type: inline-size; }
+/* The two cards. Stacked when narrow, side by side once there is width — the
+   same 2:1 the presenter screen uses (.lv-body), so the phone remote, the
+   congregation's phone and the laptop all show one arrangement.
+   Side by side is not free: a card half as wide wraps a long bilingual line
+   that would otherwise stay whole, which is why it waits for the width. */
+.op2-deck { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
 /* The label sits ON the card rather than above it. Two stacked labels cost ~38px
    of a 390px-tall frame — a tenth of the screen spent naming two boxes whose
    order never changes — and every pixel taken back here goes into the slide the
@@ -1549,6 +1559,14 @@ html.channel-open #root {
    at a glance, so it gets the smaller share. */
 .op2-section-current { flex: 80; }
 .op2-section-next { flex: 20; }
+/* Side by side once the frame is wide enough, at the presenter screen's 2:1.
+   Declared after the stacked ratio above, or that would win on equal
+   specificity and the cards would turn without changing proportion. */
+@container (min-width: 900px) {
+  .op2-deck { flex-direction: row; gap: 10px; }
+  .op2-section-current { flex: 2; }
+  .op2-section-next { flex: 1; }
+}
 
 /* Force landscape on a portrait TOUCH device (phone/tablet) — even when the OS
    rotation lock is on: rotate the whole view 90° and swap width/height to the

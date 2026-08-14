@@ -33,10 +33,11 @@ export function ConfidenceDeck({
     ? { ...state, slide: state.next, next: null, blackout: false, clearText: false, showLogo: false }
     : null
 
-  // The two sections only — the caller owns .op2-body, because the operator
-  // hangs the sermon nav and the take-off-stream button in there too.
+  // Own wrapper, because the two cards turn side by side on a wide screen and
+  // the operator's sermon nav and take-off-stream button — siblings in
+  // .op2-body — must not turn with them.
   return (
-    <>
+    <div className="op2-deck">
       <section className="op2-section op2-section-current">
         <div className="op2-label">Current</div>
         <div className="op2-card">
@@ -49,6 +50,6 @@ export function ConfidenceDeck({
           {next ? <ConfidenceCard state={next} /> : <div className="op2-end">{emptyNext}</div>}
         </div>
       </section>
-    </>
+    </div>
   )
 }
