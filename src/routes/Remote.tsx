@@ -15,7 +15,7 @@ import {
 import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
 import { SermonVerseSheet } from '../components/app/SermonVerseSheet'
-import { ConfidenceCard } from '../components/ConfidenceCard'
+import { ConfidenceDeck } from '../components/ConfidenceDeck'
 import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
 import { useScreenVars } from '../lib/screenVars'
@@ -563,12 +563,6 @@ function OperatorMirror({
       ? { label: 'STANDBY', cls: 'bg-white/15 text-white/70' }
       : { label: 'OFFLINE', cls: 'bg-white/10 text-white/45' }
 
-  // Confidence render of the next slide (with the operator's blank/logo states
-  // cleared so it always previews the actual upcoming content).
-  const nextState = state?.next
-    ? { ...state, slide: state.next, next: null, blackout: false, clearText: false, showLogo: false }
-    : null
-
   return (
     <div className="op2-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="op2-head">
@@ -689,18 +683,7 @@ function OperatorMirror({
       )}
 
       <div className="op2-body">
-        <section className="op2-section op2-section-current">
-          <div className="op2-label">Current</div>
-          <div className="op2-card">
-            <ConfidenceCard state={state} />
-          </div>
-        </section>
-        <section className="op2-section op2-section-next">
-          <div className="op2-label">Next</div>
-          <div className="op2-card">
-            {nextState ? <ConfidenceCard state={nextState} /> : <div className="op2-end">End of service</div>}
-          </div>
-        </section>
+        <ConfidenceDeck state={state} />
 
         {/* Where the sermon goes after a verse, on the screen the operator is
             actually looking at rather than behind a sheet they have closed.
