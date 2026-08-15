@@ -1561,8 +1561,13 @@ html.channel-open #root {
 .op2-section-next { flex: 20; }
 /* Side by side once the frame is wide enough, at the presenter screen's 2:1.
    Declared after the stacked ratio above, or that would win on equal
-   specificity and the cards would turn without changing proportion. */
-@container (min-width: 900px) {
+   specificity and the cards would turn without changing proportion.
+
+   620px, not the presenter's 900: this frame is a phone turned sideways, and
+   its width is the phone's LONG edge — 667 on an SE, 844 on a 13, 932 on a Pro
+   Max. At 900 every phone but the largest stayed stacked, which is not what
+   "side by side like the presenter" meant. */
+@container (min-width: 620px) {
   .op2-deck { flex-direction: row; gap: 10px; }
   .op2-section-current { flex: 2; }
   .op2-section-next { flex: 1; }
