@@ -46,6 +46,7 @@ import {
 } from '../lib/serviceSlot'
 import { buildServicePdf } from '../lib/servicePdf'
 import { shareFiles } from '../lib/shareFiles'
+import { ShareFormatSheet, type ShareAs } from '../components/app/ShareFormatSheet'
 import { attachToPdf } from '../lib/attachToPdf'
 import {
   buildService,
@@ -436,10 +437,10 @@ export function Build(): JSX.Element {
   const [sharing, setSharing] = useState(false)
   /** Share any built envelope under a given name — the one being assembled, or
    *  one only being read. */
-  const shareEnvelope = async (env: ServiceEnvelope, label: string): Promise<void> => {
+  const shareEnvelope = async (env: ServiceEnvelope, label: string, as: ShareAs = 'pdf'): Promise<void> => {
     if (sharing) return
     setSharing(true)
-    setNote('Building the PDF…')
+    setNote(as === 'pdf' ? 'Building the PDF…' : 'Building the slides…')
     try {
       // The label already carries the day and the date, so it is the filename.
       const safe = label.replace(/[\\/:*?"<>|]+/g, ' ').trim()
@@ -447,6 +448,25 @@ export function Build(): JSX.Element {
       // attachment — the sheet is still just a sheet, and the thing the
       // projection machine needs travels with it instead of beside it, where
       // it used to get lost.
+      if (as === 'pptx') {
+        // No .cantica.json rides along here. A PowerPoint is for projecting
+        // somewhere Cantica is not — the PDF is the one that carries the file
+        // the projection machine imports.
+        const { buildServicePptx } = await import('../lib/servicePptx')
+        const deck = await buildServicePptx(env, (done, total) =>
+          setNote(`Building the slides… ${done} of ${total}`)
+        )
+        const file = new File([deck], `${safe}.pptx`, { type: deck.type })
+        const outcome = await shareFiles([file], label, `${label} — ${env.service.items.length} parts`)
+        setNote(
+          outcome === 'shared'
+            ? 'Shared the slides.'
+            : outcome === 'cancelled'
+              ? 'Sharing cancelled.'
+              : 'Saved the slides. Open them in PowerPoint, Keynote or Google Slides.'
+        )
+        return
+      }
       const sheet = await buildServicePdf(env, label)
       const withFile = await attachToPdf(sheet, {
         name: `${safe}.cantica.json`,
@@ -463,16 +483,27 @@ export function Build(): JSX.Element {
             : 'Saved the service sheet. The Cantica file is attached inside it — open the PDF and drag it out of the attachments panel.'
       )
     } catch (e) {
-      setNote(e instanceof Error ? `Couldn’t build the PDF: ${e.message}` : 'Couldn’t build the PDF.')
+      const what = as === 'pdf' ? 'PDF' : 'slides'
+      setNote(e instanceof Error ? `Couldn’t build the ${what}: ${e.message}` : `Couldn’t build the ${what}.`)
     } finally {
       setSharing(false)
     }
   }
 
+  /**
+   * Which file to hand over.
+   *
+   * Two different jobs wear the same button: a sheet somebody reads from a
+   * stand, and a deck somebody projects on a machine that has never heard of
+   * Cantica. They are not interchangeable, and guessing wrong costs a minute of
+   * rendering, so the choice is asked rather than assumed.
+   */
+  const [shareAsk, setShareAsk] = useState<{ env: ServiceEnvelope; label: string } | null>(null)
+
   /** The service being assembled — shareable only once it has been saved. */
   const shareService = (): void => {
     if (!committed) return
-    void shareEnvelope(envelope, name)
+    setShareAsk({ env: envelope, label: name })
   }
 
   /**
@@ -1093,7 +1124,12 @@ export function Build(): JSX.Element {
             }}
             onPreviewAll={() => setViewPreview('all')}
             onPreviewItem={(i) => setViewPreview(i)}
-            onShare={() => void shareEnvelope(viewing.envelope, `${viewing.day} Service · ${prettyDate(viewing.date)}`)}
+            onShare={() =>
+              setShareAsk({
+                env: viewing.envelope,
+                label: `${viewing.day} Service · ${prettyDate(viewing.date)}`
+              })
+            }
             onBroadcast={() => navigate(`/live/${viewing.id}`)}
             rebuilding={rebuilding}
             onRebuild={() =>
@@ -1191,7 +1227,18 @@ export function Build(): JSX.Element {
           onAddPsalm={async () => false}
         />
 
-        <SongStructureSheet
+        <ShareFormatSheet
+        open={shareAsk !== null}
+        slides={shareAsk ? countSlides(shareAsk.env) : 0}
+        onClose={() => setShareAsk(null)}
+        onPick={(as) => {
+          const ask = shareAsk
+          setShareAsk(null)
+          if (ask) void shareEnvelope(ask.env, ask.label, as)
+        }}
+      />
+
+      <SongStructureSheet
           song={addKind === 'song' ? pending : null}
           lang={lang}
           initial={null}
@@ -1676,6 +1723,17 @@ export function Build(): JSX.Element {
           // moment the user committed to it, so it's the moment to say whether
           // it is already taken.
           void checkSlot(s, true)
+        }}
+      />
+
+      <ShareFormatSheet
+        open={shareAsk !== null}
+        slides={shareAsk ? countSlides(shareAsk.env) : 0}
+        onClose={() => setShareAsk(null)}
+        onPick={(as) => {
+          const ask = shareAsk
+          setShareAsk(null)
+          if (ask) void shareEnvelope(ask.env, ask.label, as)
         }}
       />
 

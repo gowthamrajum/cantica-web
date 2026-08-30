@@ -8,6 +8,7 @@
     "prebuild": "node --experimental-strip-types scripts/make-crawl-files.mjs",
     "build": "tsc -b && vite build",
     "og": "node scripts/make-og.mjs",
+    "poster": "node scripts/make-youtube-poster.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "favicons": "node scripts/make-favicons.mjs",
@@ -19,6 +20,7 @@
   "dependencies": {
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.4.2",
+    "fflate": "^0.8.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "pdf-lib": "^1.17.1",

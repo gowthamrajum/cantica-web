@@ -1285,6 +1285,13 @@ html.channel-open #root {
 .stage-lyrics.nowrap { max-width: none; }
 .stage-lyrics.upper { text-transform: uppercase; }
 .stage-lyrics.shadow, .stage-composed.shadow { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55); }
+/* Off while capturing a slide for export (see servicePptx). Not because the
+   shadow is the bug — it is not; the slab behind exported text survives with it
+   gone — but because that export merges two captures by keeping the lighter
+   pixel, and a shadow is by definition darker than what it sits on. It would be
+   discarded by the merge anyway; switching it off says so. */
+.pptx-capture .stage-lyrics.shadow,
+.pptx-capture .stage-composed.shadow { text-shadow: none; }
 .stage-caption { margin-top: 1.6cqh; text-align: center; font-weight: 500; color: var(--accent); font-size: 2.6cqh; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7); }
 .stage-composed { position: absolute; inset: 0; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5); }
 /* nowrap (like the desktop composer + output) so a composed line — including a
