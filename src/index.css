@@ -1374,6 +1374,18 @@ html.channel-open #root {
 /* Take the last quoted passage off the OBS strip. Sits under the sermon nav,
    appears only while something is up there, and says what it does NOT do —
    the screens and phones keep the passage. */
+/* The verse either side of what is up, sharing the sermon's nav row. Narrower
+   than its neighbours — a verse number needs no room and the words beside it do
+   — and tinted, so a control that changes what is QUOTED is not mistaken for
+   one that moves the service. */
+.op2-sermon-nav .op2-vstep {
+  flex: 0 0 auto;
+  min-width: 64px;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+  color: #bae6fd;
+  font-variant-numeric: tabular-nums;
+}
 .op2-verseoff {
   display: block;
   width: 100%;

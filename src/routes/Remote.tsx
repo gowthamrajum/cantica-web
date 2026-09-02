@@ -15,6 +15,8 @@ import {
 import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
 import { SermonVerseSheet } from '../components/app/SermonVerseSheet'
+import { loadBible, type IndexedBible } from '../lib/bible'
+import { versesFor, type Reference, type VerseLang } from '../lib/reference'
 import { ConfidenceDeck } from '../components/ConfidenceDeck'
 import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
@@ -290,6 +292,52 @@ function OperatorMirror({
    */
   const [quoteOnStream, setQuoteOnStream] = useState(false)
   /**
+   * The passage last put up, so the verse either side of it is one tap away.
+   *
+   * A preacher reads on, or backs up, and reaching for the sheet to retype a
+   * reference that differs by one is exactly the wrong amount of work to be
+   * doing while they are talking. Held as the resolved reference rather than
+   * the text that produced it, so walking on from "Rom 8:28-30" means verse 31
+   * without re-parsing anything.
+   *
+   * Cleared with the quote itself: once nobody is quoting, "the verse after"
+   * has nothing to be after.
+   */
+  const [lastRef, setLastRef] = useState<{ ref: Reference; lang: VerseLang } | null>(null)
+  /** Both bibles, loaded only once a verse has actually been sent — a phone
+   *  that never quotes anything should not pay for them. */
+  const [bibles, setBibles] = useState<{ te: IndexedBible | null; en: IndexedBible | null } | null>(null)
+  useEffect(() => {
+    if (!lastRef || bibles) return
+    let alive = true
+    void Promise.all([loadBible('telugu'), loadBible('web')]).then(([te, en]) => {
+      if (alive) setBibles({ te, en })
+    })
+    return () => {
+      alive = false
+    }
+  }, [lastRef, bibles])
+
+  /**
+   * The verse before and after what is up, when there is one.
+   *
+   * Same chapter only. Running off either end of a chapter means the next
+   * reference is a different chapter — and often a different thought — which is
+   * a decision for the person reading, not for a button that says "v13".
+   */
+  const neighbours = (() => {
+    if (!lastRef?.ref.verses?.length || !bibles) return { before: null as number | null, after: null as number | null }
+    const { book, chapter, verses } = lastRef.ref
+    const all = (bibles.te?.byBook[book]?.[chapter] ?? bibles.en?.byBook[book]?.[chapter] ?? []).map((v) => v.verse)
+    if (!all.length) return { before: null, after: null }
+    const lo = Math.min(...verses)
+    const hi = Math.max(...verses)
+    return {
+      before: all.includes(lo - 1) ? lo - 1 : null,
+      after: all.includes(hi + 1) ? hi + 1 : null
+    }
+  })()
+  /**
    * Whether the finger that is down has moved — i.e. is scrolling, not tapping.
    *
    * A touch that drags still delivers a click to whatever it started on, so
@@ -307,7 +355,11 @@ function OperatorMirror({
   // Only ever offered during the sermon, so leaving it closes the sheet rather
   // than leaving a way to put a verse over the next song.
   useEffect(() => {
-    if (!onSermon) setVerseOpen(false)
+    if (onSermon) return
+    setVerseOpen(false)
+    // The verse either side of "the last quote" means nothing once the service
+    // has moved on from the sermon.
+    setLastRef(null)
   }, [onSermon])
   const [feedback, setFeedback] = useState<ControlCmd | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -386,6 +438,28 @@ function OperatorMirror({
       }
     },
     [conn.room, conn.pin, me, onBadPin]
+  )
+
+  /**
+   * Put the verse before or after what is up, without opening the sheet.
+   *
+   * Sent as its own quote rather than as a widened range: the presenter builds
+   * one slide per verse and goes live on the first of them, so re-sending
+   * 3:12-13 would put verse 12 back on the wall to get to 13. One verse, and
+   * the buttons then offer the one after that — which is how somebody reading
+   * on actually moves.
+   */
+  const quoteNeighbour = useCallback(
+    async (verse: number): Promise<void> => {
+      if (!lastRef || !bibles) return
+      const ref: Reference = { ...lastRef.ref, verses: [verse] }
+      const passage = versesFor(ref, bibles.te, bibles.en, lastRef.lang)
+      if (!passage) return
+      await run('verse', passage)
+      setQuoteOnStream(true)
+      setLastRef({ ref, lang: lastRef.lang })
+    },
+    [lastRef, bibles, run]
   )
 
   /** The sermon card itself, over any verses put up since. */
@@ -693,8 +767,24 @@ function OperatorMirror({
             many verses went up in between. Neither has to count them. */}
         {onSermon && !ended && (
           <div className="op2-sermon-nav">
+            {/* Reading on, or backing up — beside the other two ways of moving,
+                not on a row of their own. A verse is up exactly when the
+                operator most needs the slide big, and a third strip of controls
+                took a third of the card off it. Only for a verse that exists in
+                the same chapter, and the button says which one, so it can be
+                trusted without looking at the wall. */}
+            {lastRef && neighbours.before !== null && (
+              <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.before as number)}>
+                ‹ v{neighbours.before}
+              </button>
+            )}
             <button onClick={() => void jumpToSermon()}>Back to sermon</button>
             <button onClick={() => void jumpToNextSection()}>Next section</button>
+            {lastRef && neighbours.after !== null && (
+              <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.after as number)}>
+                v{neighbours.after} ›
+              </button>
+            )}
           </div>
         )}
         {/* Only once something is up there to take down. The room and the
@@ -713,6 +803,7 @@ function OperatorMirror({
             <span>The passage stays on the screens and phones</span>
           </button>
         )}
+
       </div>
 
       {feedback && (
@@ -725,9 +816,10 @@ function OperatorMirror({
       <SermonVerseSheet
         open={verseOpen}
         onClose={() => setVerseOpen(false)}
-        onSend={async (payload) => {
+        onSend={async (payload, ref, lang) => {
           await run('verse', payload)
           setQuoteOnStream(true)
+          setLastRef({ ref, lang })
         }}
       />
 

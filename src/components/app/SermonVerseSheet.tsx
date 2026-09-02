@@ -4,6 +4,7 @@ import { Segmented } from './Segmented'
 import { loadBible, teBook, type IndexedBible } from '../../lib/bible'
 import { parseReference, suggestBooks, versesFor, type VerseLang } from '../../lib/reference'
 import type { VersePayload } from '../../lib/relay'
+import type { Reference } from '../../lib/reference'
 
 /**
  * Verses during the sermon, at the speed they get quoted.
@@ -35,7 +36,15 @@ export function SermonVerseSheet({
 }: {
   open: boolean
   onClose: () => void
-  onSend: (payload: VersePayload) => void | Promise<void>
+  /**
+   * The finished passage, and the reference it came from.
+   *
+   * The reference travels alongside because the operator screen offers the
+   * verse either side of what went up, and working that out from the payload
+   * would mean parsing the label back into numbers — the reference is right
+   * here, already resolved.
+   */
+  onSend: (payload: VersePayload, ref: Reference, lang: VerseLang) => void | Promise<void>
 }): JSX.Element {
   const [te, setTe] = useState<IndexedBible | null>(null)
   const [en, setEn] = useState<IndexedBible | null>(null)
@@ -120,7 +129,7 @@ export function SermonVerseSheet({
       return
     }
     setError('')
-    await onSend(passage)
+    await onSend(passage, ref, lang)
     setQuery('')
     // Out of the way: the verse is on the screen and the operator wants to see
     // it, not the box that sent it. Back to sermon and Next section live on the
