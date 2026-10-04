@@ -153,6 +153,7 @@ export function Songs(): JSX.Element {
                           or the result looks unrelated to what was typed. */}
                       {s.snippet && <span className="dk-song-snippet">{s.snippet}</span>}
                     </span>
+                    <span className="song-id">#{s.song_id}</span>
                     <Icon name="chevron" size={16} className="dk-song-chev" />
                   </Link>
                 ))}

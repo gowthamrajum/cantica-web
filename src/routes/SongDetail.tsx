@@ -86,7 +86,7 @@ export function SongDetail(): JSX.Element {
           <h1 className="screen-title">{heading}</h1>
           {song && (
             <p className="screen-sub">
-              {song.main_stanza ? 'Pallavi · ' : ''}
+              #{song.song_id} · {song.main_stanza ? 'Pallavi · ' : ''}
               {stanzas.length} {stanzas.length === 1 ? 'stanza' : 'stanzas'}
             </p>
           )}

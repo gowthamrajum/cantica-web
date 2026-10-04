@@ -141,6 +141,7 @@ export function ServicePickerSheet({
                           looks unrelated to what was typed. */}
                       {s.snippet && <span className="list-sub block truncate">{s.snippet}</span>}
                     </span>
+                    <span className="song-id">#{s.song_id}</span>
                     <Icon name="plus" size={18} className="list-chev" />
                   </button>
                 ))}

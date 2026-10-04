@@ -1412,7 +1412,7 @@ export function Build(): JSX.Element {
                       {i + 1}. {labelOf(p)}
                     </span>
                     <span className="list-sub block">
-                      {p.type === 'song' ? 'Song' : p.type === 'media' ? 'Video or picture' : 'Responsive reading'}
+                      {p.type === 'song' ? `Song #${p.song.song_id}` : p.type === 'media' ? 'Video or picture' : 'Responsive reading'}
                       {p.type === 'song' && p.role ? ` · ${ROLE_LABEL[p.role]}` : ''}
                     </span>
                   </span>

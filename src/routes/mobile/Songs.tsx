@@ -135,6 +135,7 @@ export function Songs(): JSX.Element {
                       result looks like it has nothing to do with the search. */}
                   {s.snippet && <span className="list-sub block truncate">{s.snippet}</span>}
                 </span>
+                <span className="song-id">#{s.song_id}</span>
                 <Icon name="chevron" size={17} className="list-chev" />
               </Link>
             ))}
