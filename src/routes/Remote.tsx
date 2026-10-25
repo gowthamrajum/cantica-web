@@ -21,7 +21,7 @@ import { loadBible, teBook, type IndexedBible } from '../lib/bible'
 import { versesFor, type Reference, type VerseLang } from '../lib/reference'
 import { ConfidenceDeck } from '../components/ConfidenceDeck'
 import { ConfidenceCard } from '../components/ConfidenceCard'
-import { groupByBook, refKey, useSermonHistory } from '../lib/sermonHistory'
+import { chaptersOf, groupByBook, refKey, useSermonHistory } from '../lib/sermonHistory'
 import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
 import { useScreenVars } from '../lib/screenVars'
@@ -543,17 +543,45 @@ function OperatorMirror({
    * the buttons then offer the one after that — which is how somebody reading
    * on actually moves.
    */
+  /**
+   * The passage last put up, and where its slides are in the deck.
+   *
+   * A presenter appends one slide per verse to the END of the live item and
+   * goes live on the first, so a passage sent while that item had C slides
+   * occupies slides C, C+1, … — and `goto {item, slide}` reaches any of them.
+   * That is how Psalm 23:1-3 can be walked from this phone, which has no Next
+   * of its own (Next is the service phone's).
+   */
+  const [passage, setPassage] = useState<{ item: number; first: number; verses: number[] } | null>(null)
+
+  // Off the sermon, the passage's slides are no longer where the phone is.
+  useEffect(() => {
+    if (!onSermon) setPassage(null)
+  }, [onSermon])
+
+  /** Everything that follows a passage going up, wherever it was sent from. */
+  const sent = useCallback(
+    async (payload: VersePayload, ref: Reference, lang: VerseLang): Promise<void> => {
+      const item = state?.order?.findIndex((o) => o.live) ?? -1
+      const first = item >= 0 ? (state?.order?.[item]?.count ?? 0) : 0
+      await run('verse', payload)
+      setQuoteOnStream(true)
+      setLastRef({ ref, lang })
+      history.add(ref, lang, payload.label)
+      // Each slide is labelled "<book> <chapter>:<verse>", so the verse numbers
+      // come straight off the labels — the same numbers the presenter shows.
+      const verses = (payload.slides ?? []).map((sl) => Number(sl.label.split(':').pop()))
+      setPassage(item >= 0 && verses.every(Number.isFinite) ? { item, first, verses } : null)
+    },
+    [state, run, history]
+  )
   const sendRef = useCallback(
     async (ref: Reference, lang: VerseLang): Promise<void> => {
       if (!bibles) return
-      const passage = versesFor(ref, bibles.te, bibles.en, lang)
-      if (!passage) return
-      await run('verse', passage)
-      setQuoteOnStream(true)
-      setLastRef({ ref, lang })
-      history.add(ref, lang, passage.label)
+      const payload = versesFor(ref, bibles.te, bibles.en, lang)
+      if (payload) await sent(payload, ref, lang)
     },
-    [bibles, run, history]
+    [bibles, sent]
   )
   const quoteNeighbour = useCallback(
     async (verse: number): Promise<void> => {
@@ -562,6 +590,44 @@ function OperatorMirror({
     },
     [lastRef, sendRef]
   )
+
+  /**
+   * Which verse of the passage is on screen: the live slide's position in its
+   * item, measured from where the passage starts. Null once the presenter is
+   * somewhere else — the sermon card, the outline, the next section.
+   */
+  const liveItem = state?.order?.findIndex((o) => o.live) ?? -1
+  const liveNth = liveItem >= 0 ? state?.order?.[liveItem]?.nth : undefined
+  const passageAt =
+    passage && liveItem === passage.item && typeof liveNth === 'number'
+      ? (() => {
+          const k = liveNth - 1 - passage.first
+          return k >= 0 && k < passage.verses.length ? k : null
+        })()
+      : null
+  /** Show verse k of the passage — a jump within slides already in the deck. */
+  const showPassageVerse = useCallback(
+    (k: number): void => {
+      if (passage) void run('goto', { item: passage.item, slide: passage.first + k })
+    },
+    [passage, run]
+  )
+  /**
+   * The ‹ and › steps. Inside a passage they walk its verses; past either end
+   * they quote the next verse of the chapter, as they always did.
+   */
+  const stepBefore =
+    passage && passageAt !== null && passageAt > 0
+      ? { verse: passage.verses[passageAt - 1], go: () => showPassageVerse(passageAt - 1) }
+      : lastRef && neighbours.before !== null
+        ? { verse: neighbours.before, go: () => void quoteNeighbour(neighbours.before as number) }
+        : null
+  const stepAfter =
+    passage && passageAt !== null && passageAt < passage.verses.length - 1
+      ? { verse: passage.verses[passageAt + 1], go: () => showPassageVerse(passageAt + 1) }
+      : lastRef && neighbours.after !== null
+        ? { verse: neighbours.after, go: () => void quoteNeighbour(neighbours.after as number) }
+        : null
 
   /** Where the sermon sits in the order, so the sermon phone can go there. */
   const sermonIndex = state?.order?.findIndex((it) => /sermon|వాక్యోపదేశం/i.test(it.title ?? '')) ?? -1
@@ -750,14 +816,17 @@ function OperatorMirror({
   const status = liveShowing
     ? { label: 'LIVE', cls: 'bg-red-500 text-white' }
     : connected
-      ? { label: 'STANDBY', cls: 'bg-white/15 text-white/70' }
-      : { label: 'OFFLINE', cls: 'bg-white/10 text-white/45' }
+      ? { label: 'STANDBY', cls: isSermon ? 'bg-black/10 text-black/60' : 'bg-white/15 text-white/70' }
+      : { label: 'OFFLINE', cls: isSermon ? 'bg-black/5 text-black/40' : 'bg-white/10 text-white/45' }
 
   return (
     // The sermon phone is typed on, so it is never turned sideways for the
     // phone: the keyboard comes up along the physical bottom edge, and on a
     // turned frame that put it beside the field instead of under it.
-    <div className={`op2-root${isSermon ? ' op2-upright' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    // …and it is light: the sermon phone is read and typed on at arm's length
+    // in a lit hall, where the service phone's dark screen is for the back of a
+    // dim room watching the slides.
+    <div className={`op2-root${isSermon ? ' op2-upright op2-light' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="op2-head">
         <div className="op2-headmain">
           <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
@@ -915,29 +984,38 @@ function OperatorMirror({
                     <div className="op2-hist-bookhead">
                       <span lang="te" className="op2-hist-bookname">{teBook(g.book)}</span>
                       {teBook(g.book) !== g.book && <span className="op2-hist-bookkey">{g.book}</span>}
-                      {onSermon && (
-                        <button
-                          className="op2-hist-add"
-                          aria-label={`Another verse from ${g.book}`}
-                          onClick={() => setPrefill((p) => ({ text: `${teBook(g.book)} `, n: (p?.n ?? 0) + 1 }))}
-                        >
-                          +
-                        </button>
-                      )}
                     </div>
-                    <div className="op2-hist-refs">
-                      {g.verses.map((v) => (
-                        <button
-                          key={v.key}
-                          className={`op2-hist-ref${v.key === upKey ? ' is-up' : ''}`}
-                          disabled={!onSermon || !bibles}
-                          onClick={() => void sendRef(v.ref, v.lang)}
-                        >
-                          {v.ref.chapter}
-                          {v.ref.verses?.length ? `:${verseSpan(v.ref.verses)}` : ''}
-                        </button>
-                      ))}
-                    </div>
+                    {/* A row per chapter, so + can carry the chapter too: the
+                        next verse a preacher reaches for is usually in the
+                        chapter they are already in. */}
+                    {chaptersOf(g.verses).map(({ chapter, verses }) => (
+                      <div key={chapter} className="op2-hist-chapter">
+                        <span className="op2-hist-ch">{chapter}</span>
+                        <div className="op2-hist-refs">
+                          {verses.map((v) => (
+                            <button
+                              key={v.key}
+                              className={`op2-hist-ref${v.key === upKey ? ' is-up' : ''}`}
+                              disabled={!onSermon || !bibles}
+                              onClick={() => void sendRef(v.ref, v.lang)}
+                            >
+                              {v.ref.verses?.length ? `:${verseSpan(v.ref.verses)}` : 'all'}
+                            </button>
+                          ))}
+                          {onSermon && (
+                            <button
+                              className="op2-hist-add"
+                              aria-label={`Another verse from ${g.book} ${chapter}`}
+                              onClick={() =>
+                                setPrefill((p) => ({ text: `${teBook(g.book)} ${chapter}:`, n: (p?.n ?? 0) + 1 }))
+                              }
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </section>
                 ))}
                 {!books.length && (
@@ -954,13 +1032,26 @@ function OperatorMirror({
                     te={bibles?.te ?? null}
                     en={bibles?.en ?? null}
                     prefill={prefill}
-                    onSend={async (payload, ref, lang) => {
-                      await run('verse', payload)
-                      setQuoteOnStream(true)
-                      setLastRef({ ref, lang })
-                      history.add(ref, lang, payload.label)
-                    }}
+                    onSend={sent}
                   />
+                  {/* The verses of the passage that is up, each one a tap away.
+                      A passage goes up on its first verse; this is how the rest
+                      of it gets read from this phone. */}
+                  {passage && passage.verses.length > 1 && passageAt !== null && (
+                    <div className="op2-passage" role="group" aria-label="Verses of this passage">
+                      <span className="op2-passage-label">Verse</span>
+                      {passage.verses.map((v, k) => (
+                        <button
+                          key={`${v}-${k}`}
+                          className={k === passageAt ? 'is-up' : ''}
+                          aria-pressed={k === passageAt}
+                          onClick={() => showPassageVerse(k)}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {/* Both are ordinary `goto`s: it already means "the first slide
                       of item N", and a verse is appended INSIDE the sermon item —
                       so the sermon card is goto(live) and the next section is
@@ -968,18 +1059,18 @@ function OperatorMirror({
                   <div className="op2-sermon-nav">
                     {/* The verse either side, only when it exists in the same
                         chapter, and the button says which one. */}
-                    {lastRef && neighbours.before !== null && (
-                      <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.before as number)}>
-                        ‹ v{neighbours.before}
+                    {stepBefore && (
+                      <button className="op2-vstep" onClick={stepBefore.go}>
+                        ‹ v{stepBefore.verse}
                       </button>
                     )}
                     <button onClick={() => void jumpToSermon()}>
                       {typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'}
                     </button>
                     <button onClick={() => void jumpToNextSection()}>Next section</button>
-                    {lastRef && neighbours.after !== null && (
-                      <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.after as number)}>
-                        v{neighbours.after} ›
+                    {stepAfter && (
+                      <button className="op2-vstep" onClick={stepAfter.go}>
+                        v{stepAfter.verse} ›
                       </button>
                     )}
                   </div>

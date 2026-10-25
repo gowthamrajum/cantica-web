@@ -230,3 +230,27 @@ export function versesFor(
       : `${ref.book} ${ref.chapter}:${span}`
   return { label, lines, slides }
 }
+
+/**
+ * Why a reference reaches past its book, in the terms that fix it.
+ *
+ * "Psalms 151" or "John 3:40" are not typos the parser can catch — the book is
+ * right and the numbers are numbers. Saying how many chapters the book has, or
+ * how many verses the chapter has, answers the question the operator is about
+ * to ask, mid-sermon, without them leaving the field to find out.
+ *
+ * Null when every chapter and verse asked for exists.
+ */
+export function explainReference(ref: Reference, te: IndexedBible | null, en: IndexedBible | null): string | null {
+  const name = teBook(ref.book) !== ref.book ? `${teBook(ref.book)} (${ref.book})` : ref.book
+  const chapters = Math.max(te?.chapters[ref.book] ?? 0, en?.chapters[ref.book] ?? 0)
+  if (!chapters) return null
+  if (ref.chapter < 1 || ref.chapter > chapters)
+    return `${name} has ${chapters} chapter${chapters === 1 ? '' : 's'}.`
+  const lastVerse = (b: IndexedBible | null): number =>
+    Math.max(0, ...(b?.byBook[ref.book]?.[ref.chapter] ?? []).map((v) => v.verse))
+  const verses = Math.max(lastVerse(te), lastVerse(en))
+  if (ref.verses?.some((v) => v < 1 || v > verses))
+    return `${name} ${ref.chapter} has ${verses} verse${verses === 1 ? '' : 's'}.`
+  return null
+}

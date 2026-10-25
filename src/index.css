@@ -1633,6 +1633,74 @@ html.channel-open #root {
 .vf-books button small { font-size: 11px; font-weight: 400; color: rgba(255, 255, 255, 0.5); }
 .vf-books button:active { transform: scale(0.97); }
 
+/* History rows by chapter: the number, its passages, and + for another verse
+   from that chapter. */
+.op2-hist-chapter { display: flex; align-items: flex-start; gap: 8px; }
+.op2-hist-chapter + .op2-hist-chapter { margin-top: 6px; }
+.op2-hist-ch { flex: none; min-width: 24px; padding-top: 9px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.5); }
+.op2-hist-refs .op2-hist-add { margin-left: 0; width: 36px; height: 36px; }
+
+/* The verses of the passage on screen, for walking it from the sermon phone. */
+.op2-passage { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.op2-passage-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255, 255, 255, 0.45); margin-right: 2px; }
+.op2-passage button {
+  min-width: 40px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+.op2-passage button.is-up { border-color: #38bdf8; background: rgba(56, 189, 248, 0.18); color: #e0f2fe; }
+.op2-passage button:active { transform: scale(0.96); }
+/* An out-of-range note can be longer than one line, and it is the answer. */
+.vf-preview.is-error { white-space: normal; }
+
+/* ---- the sermon phone is light ----
+   Only the chrome: the current-slide card stays as the screen looks. */
+.op2-light { background: #f6f3ec; color: #1b2433; }
+.op2-light .op2-service { color: rgba(27, 36, 51, 0.55); }
+.op2-light .op2-where-title { color: #1b2433; }
+.op2-light .op2-where-n { color: #0369a1; }
+.op2-light .op2-role.is-sermon { background: #fbe7b5; color: #8a5a00; }
+.op2-light .op2-switch { border-color: rgba(27, 36, 51, 0.18); color: rgba(27, 36, 51, 0.75); }
+.op2-light .op2-exit { background: rgba(27, 36, 51, 0.07); color: rgba(27, 36, 51, 0.6); }
+.op2-light .op2-hist { background: #fff; border-color: #e6e0d4; }
+.op2-light .op2-hist-head,
+.op2-light .op2-hist-clear,
+.op2-light .op2-hist-bookkey,
+.op2-light .op2-hist-empty,
+.op2-light .op2-hist-ch,
+.op2-light .op2-passage-label { color: #8a8f99; }
+.op2-light .op2-hist-bookname { color: #1b2433; }
+.op2-light .op2-hist-book + .op2-hist-book { border-top-color: #eee8dc; }
+.op2-light .op2-hist-ref,
+.op2-light .op2-passage button { background: #f6f3ec; border-color: #e2dccf; color: #1b2433; }
+.op2-light .op2-hist-ref.is-up,
+.op2-light .op2-passage button.is-up { background: #e0f2fe; border-color: #38bdf8; color: #075985; }
+.op2-light .op2-hist-add { background: #fdf0cc; color: #a16207; }
+.op2-light .vf-input { background: #fff; border-color: #d9d2c3; color: #1b2433; }
+.op2-light .vf-input:focus { border-color: #d99a1b; }
+.op2-light .vf-langs { background: #ece6da; }
+.op2-light .vf-langs button { color: #6b6f78; }
+.op2-light .vf-langs button.is-on { background: #fff; color: #1b2433; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.op2-light .vf-preview { color: #6b7280; }
+.op2-light .vf-preview b { color: #1b2433; }
+.op2-light .vf-preview.is-error { color: #b45309; }
+.op2-light .vf-books button { background: #fff; border-color: #ddd5c6; color: #1b2433; }
+.op2-light .vf-books button small { color: #8a8f99; }
+.op2-light .op2-sermon-nav button { background: #fff; border-color: #e2dccf; color: #1b2433; }
+.op2-light .op2-sermon-nav .op2-vstep { background: #e0f2fe; border-color: #7dd3fc; color: #075985; }
+.op2-light .op2-verseoff { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.op2-light .op2-verseoff span { color: rgba(127, 29, 29, 0.65); }
+.op2-light .op2-sermon-off { background: #fff; color: #4b5563; }
+.op2-light .op2-sermon-off button { background: #fdf0cc; color: #a16207; }
+.op2-light .op2-card { border-color: rgba(27, 36, 51, 0.12); box-shadow: 0 6px 18px rgba(27, 36, 51, 0.18); }
+
 /* What is up, taking whatever height the controls leave. */
 .op2-sermon-now { flex: 1; min-height: 70px; }
 

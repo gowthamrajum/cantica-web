@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { teBook, type IndexedBible } from '../../lib/bible'
-import { parseReference, suggestBooks, versesFor, type Reference, type VerseLang } from '../../lib/reference'
+import { explainReference, parseReference, suggestBooks, versesFor, type Reference, type VerseLang } from '../../lib/reference'
 import type { VersePayload } from '../../lib/relay'
 
 /**
@@ -85,14 +85,17 @@ export function SermonVerseForm({
    * What is about to go on the screen, worked out as it is typed — the same
    * parse the send does, so this cannot promise one thing and put up another.
    */
-  const preview =
+  const preview: { label?: string; n?: number; note?: string } | null =
     ready && !typingBook && query.trim()
       ? (() => {
           const ref = parseReference(query, order)
           if (!ref) return null
           const passage = versesFor(ref, te, en, lang)
-          if (!passage) return null
-          return { label: passage.label, n: passage.slides?.length ?? 1 }
+          // Past the end of the book or chapter: say how far it goes, as it is
+          // typed — before Put on screen, not after.
+          const note = explainReference(ref, te, en) ?? undefined
+          if (!passage) return note ? { note } : null
+          return { label: passage.label, n: passage.slides?.length ?? 1, note }
         })()
       : null
 
@@ -111,7 +114,7 @@ export function SermonVerseForm({
     }
     const passage = versesFor(ref, te, en, lang)
     if (!passage) {
-      setError('That reference isn’t in the bible — check the chapter and verse.')
+      setError(explainReference(ref, te, en) ?? 'That reference isn’t in the bible — check the chapter and verse.')
       return
     }
     setError('')
@@ -172,11 +175,20 @@ export function SermonVerseForm({
         </div>
         {/* Holds its place whether or not it has anything to say, so nothing
             below moves while a reference is being typed. */}
-        <p className={`vf-preview${error ? ' is-error' : preview ? ' is-on' : ''}`} aria-live="polite">
+        <p
+          className={`vf-preview${error || (preview?.note && !preview.label) ? ' is-error' : preview ? ' is-on' : ''}`}
+          aria-live="polite"
+        >
           {error ||
             (preview ? (
               <>
-                <b>{preview.label}</b> · {preview.n} verse{preview.n === 1 ? '' : 's'}
+                {preview.label && (
+                  <>
+                    <b>{preview.label}</b> · {preview.n} verse{preview.n === 1 ? '' : 's'}
+                    {preview.note ? ' — ' : ''}
+                  </>
+                )}
+                {preview.note && <span className="vf-note">{preview.note}</span>}
               </>
             ) : (
               ' '

@@ -113,3 +113,14 @@ export function groupByBook(items: SentVerse[]): { book: string; verses: SentVer
     )
   return books.map(({ book, verses }) => ({ book, verses }))
 }
+
+/** One book's passages split by chapter, chapters in order — already sorted by groupByBook. */
+export function chaptersOf(verses: SentVerse[]): { chapter: number; verses: SentVerse[] }[] {
+  const out: { chapter: number; verses: SentVerse[] }[] = []
+  for (const v of verses) {
+    const last = out[out.length - 1]
+    if (last && last.chapter === v.ref.chapter) last.verses.push(v)
+    else out.push({ chapter: v.ref.chapter, verses: [v] })
+  }
+  return out
+}
