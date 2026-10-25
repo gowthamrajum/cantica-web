@@ -1,4 +1,4 @@
-import { TE_BOOKS, teBook, type IndexedBible } from './bible'
+import { TE_BOOKS, teBook, type IndexedBible, type Verse } from './bible'
 import { romanizeTelugu, romanMatches, romanPrefix } from './teluguRoman'
 import { bilingualScriptureSlides } from './scriptureSlides'
 
@@ -173,6 +173,19 @@ export function parseReference(input: string, order: string[]): Reference | null
 export type VerseLang = 'both' | 'telugu' | 'english'
 
 /**
+ * The two bibles don't always file a book under the same name — the Telugu one
+ * says "Song of Songs", the English one "Song of Solomon" — so a chapter looked
+ * up by one bible's key found nothing in the other, and that book came out in
+ * one language only.
+ */
+const BOOK_ALIASES: Record<string, string> = { 'Song of Songs': 'Song of Solomon', 'Song of Solomon': 'Song of Songs' }
+function chapterIn(b: IndexedBible | null, book: string, chapter: number): Verse[] {
+  return b?.byBook[book]?.[chapter] ?? (BOOK_ALIASES[book] ? b?.byBook[BOOK_ALIASES[book]]?.[chapter] : undefined) ?? []
+}
+const chaptersIn = (b: IndexedBible | null, book: string): number =>
+  b?.chapters[book] ?? (BOOK_ALIASES[book] ? b?.chapters[BOOK_ALIASES[book]] : undefined) ?? 0
+
+/**
  * A parsed reference → ONE SLIDE PER VERSE, as the desktop builds them.
  *
  * A passage all on one slide is unreadable from the back of a room and is not
@@ -191,7 +204,7 @@ export function versesFor(
   const want = ref.verses ? new Set(ref.verses) : null
 
   const inRange = (b: IndexedBible | null): { verse: number; text: string }[] =>
-    (b?.byBook[ref.book]?.[ref.chapter] ?? []).filter((v) => !want || want.has(v.verse))
+    chapterIn(b, ref.book, ref.chapter).filter((v) => !want || want.has(v.verse))
 
   const teV = inRange(te)
   const enV = inRange(en)
@@ -243,12 +256,12 @@ export function versesFor(
  */
 export function explainReference(ref: Reference, te: IndexedBible | null, en: IndexedBible | null): string | null {
   const name = teBook(ref.book) !== ref.book ? `${teBook(ref.book)} (${ref.book})` : ref.book
-  const chapters = Math.max(te?.chapters[ref.book] ?? 0, en?.chapters[ref.book] ?? 0)
+  const chapters = Math.max(chaptersIn(te, ref.book), chaptersIn(en, ref.book))
   if (!chapters) return null
   if (ref.chapter < 1 || ref.chapter > chapters)
     return `${name} has ${chapters} chapter${chapters === 1 ? '' : 's'}.`
   const lastVerse = (b: IndexedBible | null): number =>
-    Math.max(0, ...(b?.byBook[ref.book]?.[ref.chapter] ?? []).map((v) => v.verse))
+    Math.max(0, ...chapterIn(b, ref.book, ref.chapter).map((v) => v.verse))
   const verses = Math.max(lastVerse(te), lastVerse(en))
   if (ref.verses?.some((v) => v < 1 || v > verses))
     return `${name} ${ref.chapter} has ${verses} verse${verses === 1 ? '' : 's'}.`
