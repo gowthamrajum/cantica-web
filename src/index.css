@@ -1721,23 +1721,34 @@ html.channel-open #root {
 .op2-hist-ref:disabled { opacity: 0.45; }
 .op2-hist-ref.is-up { border-color: #38bdf8; background: #e0f2fe; color: #075985; }
 .op2-hist-live { width: 7px; height: 7px; border-radius: 999px; background: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2); }
-/* The two +'s: the book's starts a new chapter, a chapter's adds to it. */
+/* Where the next reference starts: a row of its own at the foot of the card.
+   The book (solid) starts a new chapter; each chapter (outlined) adds another
+   verse to it. */
+.op2-hist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 9px 12px;
+  border-top: 1px solid #f1ece2;
+  background: #fdfbf6;
+}
 .op2-hist-add {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  min-height: 34px;
-  padding: 0 10px;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px 0 8px;
   border-radius: 9px;
-  border: 1px dashed #e0b85a;
-  background: #fffaf0;
+  border: 1px solid #ecd9a8;
+  background: #fff;
   color: #a16207;
   font-size: 12.5px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.op2-hist-add-book { min-height: 28px; padding: 0 9px; border-style: solid; border-color: #f1d9a0; background: #fdf0cc; }
+.op2-hist-add.is-book { border-color: #f1d9a0; background: #fdf0cc; }
 .op2-hist-add:active { transform: scale(0.96); }
 .op2-hist-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 12px; text-align: center; color: #a0a4ad; }
 .op2-hist-empty p { font-size: 13px; line-height: 1.5; max-width: 22rem; }

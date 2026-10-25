@@ -43,6 +43,8 @@ export type IconName =
   | 'next'
   | 'present'
   | 'broadcast-off'
+  | 'book-add'
+  | 'chapter-add'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
 
@@ -179,6 +181,22 @@ const PATHS: Record<IconName, JSX.Element> = {
       <rect x="2.5" y="3.5" width="19" height="12.5" rx="2" />
       <path d="M12 13V7M9.2 9.6 12 6.8l2.8 2.8" />
       <path d="M8.5 20.5h7M12 16v4.5" />
+    </>
+  ),
+  // A closed book with a plus on its cover — another reference in this book.
+  'book-add': (
+    <>
+      <path d="M4 4.6A1.6 1.6 0 0 1 5.6 3H19v15.6H5.6A1.6 1.6 0 0 0 4 20.2z" />
+      <path d="M19 18.6v2.6H5.6" />
+      <path d="M11.5 7v6.5M8.25 10.25h6.5" />
+    </>
+  ),
+  // An open book's two pages, with a plus — another verse in this chapter.
+  'chapter-add': (
+    <>
+      <path d="M12 6.2C10.3 4.9 7.6 4.4 3 4.6v13.2c4.6-.2 7.3.3 9 1.6 1.7-1.3 4.4-1.8 9-1.6V4.6c-4.6-.2-7.3.3-9 1.6z" />
+      <path d="M12 6.2v13.2" />
+      <path d="M16.5 9v4.4M14.3 11.2h4.4" />
     </>
   ),
   // The broadcast mark, struck through — off the live stream.

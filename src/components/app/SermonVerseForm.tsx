@@ -30,7 +30,8 @@ export function SermonVerseForm({
   en,
   disabled,
   prefill,
-  onSend
+  onSend,
+  onLangChange
 }: {
   /** The bibles, loaded by the screen that owns this form. */
   te: IndexedBible | null
@@ -49,7 +50,9 @@ export function SermonVerseForm({
    * went up, and working that out from the payload would mean parsing the
    * label back into numbers.
    */
-  onSend: (payload: VersePayload, ref: Reference, lang: VerseLang) => void | Promise<void>
+  onSend: (payload: VersePayload, ref: Reference, lang: VerseLang) => unknown
+  /** The language was switched — the screen re-sends what is up in it. */
+  onLangChange?: (lang: VerseLang) => void
 }): JSX.Element {
   const [lang, setLang] = useState<VerseLang>('both')
   const [query, setQuery] = useState('')
@@ -174,7 +177,11 @@ export function SermonVerseForm({
               aria-checked={lang === l.id}
               lang={l.lang}
               className={lang === l.id ? 'is-on' : ''}
-              onClick={() => setLang(l.id)}
+              onClick={() => {
+                if (l.id === lang) return
+                setLang(l.id)
+                onLangChange?.(l.id)
+              }}
             >
               {l.label}
             </button>

@@ -562,7 +562,7 @@ function OperatorMirror({
 
   /** Everything that follows a passage going up, wherever it was sent from. */
   const sent = useCallback(
-    async (payload: VersePayload, ref: Reference, lang: VerseLang): Promise<void> => {
+    async (payload: VersePayload, ref: Reference, lang: VerseLang): Promise<{ item: number; first: number } | null> => {
       const item = state?.order?.findIndex((o) => o.live) ?? -1
       const first = item >= 0 ? (state?.order?.[item]?.count ?? 0) : 0
       await run('verse', payload)
@@ -572,7 +572,9 @@ function OperatorMirror({
       // Each slide is labelled "<book> <chapter>:<verse>", so the verse numbers
       // come straight off the labels — the same numbers the presenter shows.
       const verses = (payload.slides ?? []).map((sl) => Number(sl.label.split(':').pop()))
-      setPassage(item >= 0 && verses.every(Number.isFinite) ? { item, first, verses } : null)
+      const ok = item >= 0 && verses.every(Number.isFinite)
+      setPassage(ok ? { item, first, verses } : null)
+      return ok ? { item, first } : null
     },
     [state, run, history]
   )
@@ -629,6 +631,24 @@ function OperatorMirror({
       : lastRef && neighbours.after !== null
         ? { verse: neighbours.after, go: () => void quoteNeighbour(neighbours.after as number) }
         : null
+
+  /**
+   * The language switched while a verse is on screen: put the same passage up
+   * again in that language, and land on the verse that was showing — not back
+   * on its first. Switching is a correction to what is up, not only a setting
+   * for the next reference.
+   */
+  const relang = useCallback(
+    async (lang: VerseLang): Promise<void> => {
+      if (!bibles || !lastRef || lastRef.lang === lang || passageAt === null) return
+      const k = passageAt
+      const payload = versesFor(lastRef.ref, bibles.te, bibles.en, lang)
+      if (!payload) return
+      const at = await sent(payload, lastRef.ref, lang)
+      if (at && k > 0) await run('goto', { item: at.item, slide: at.first + k })
+    },
+    [bibles, lastRef, passageAt, sent, run]
+  )
 
   /** Where the sermon sits in the order, so the sermon phone can go there. */
   const sermonIndex = state?.order?.findIndex((it) => /sermon|వాక్యోపదేశం/i.test(it.title ?? '')) ?? -1
@@ -993,17 +1013,6 @@ function OperatorMirror({
                           (a new chapter), or — on each chapter row below — from
                           the book AND the chapter, which is where a preacher
                           usually stays. */}
-                      {onSermon && (
-                        <button
-                          className="op2-hist-add op2-hist-add-book"
-                          aria-label={`Type another reference in ${g.book}`}
-                          title={`${g.book} …`}
-                          onClick={() => setPrefill((p) => ({ text: `${teBook(g.book)} `, n: (p?.n ?? 0) + 1 }))}
-                        >
-                          <Icon name="plus" size={14} active />
-                          <span>Book</span>
-                        </button>
-                      )}
                     </header>
                     <div className="op2-hist-chapters">
                       {chaptersOf(g.verses).map(({ chapter, verses }) => (
@@ -1024,23 +1033,40 @@ function OperatorMirror({
                                 {v.ref.verses?.length ? verseSpan(v.ref.verses) : 'All'}
                               </button>
                             ))}
-                            {onSermon && (
-                              <button
-                                className="op2-hist-add op2-hist-add-ch"
-                                aria-label={`Another verse from ${g.book} ${chapter}`}
-                                title={`${g.book} ${chapter}:…`}
-                                onClick={() =>
-                                  setPrefill((p) => ({ text: `${teBook(g.book)} ${chapter}:`, n: (p?.n ?? 0) + 1 }))
-                                }
-                              >
-                                <Icon name="plus" size={13} active />
-                                <span>{chapter}:</span>
-                              </button>
-                            )}
                           </div>
                         </div>
                       ))}
                     </div>
+                    {/* Where the next reference starts, on a line of its own:
+                        the book (for a new chapter), or one of its chapters
+                        (for another verse in it). */}
+                    {onSermon && (
+                      <div className="op2-hist-actions">
+                        <button
+                          className="op2-hist-add is-book"
+                          aria-label={`Type another reference in ${g.book}`}
+                          title={`${g.book} …`}
+                          onClick={() => setPrefill((p) => ({ text: `${teBook(g.book)} `, n: (p?.n ?? 0) + 1 }))}
+                        >
+                          <Icon name="book-add" size={17} />
+                          <span>Book</span>
+                        </button>
+                        {chaptersOf(g.verses).map(({ chapter }) => (
+                          <button
+                            key={chapter}
+                            className="op2-hist-add is-chapter"
+                            aria-label={`Another verse from ${g.book} ${chapter}`}
+                            title={`${g.book} ${chapter}:…`}
+                            onClick={() =>
+                              setPrefill((p) => ({ text: `${teBook(g.book)} ${chapter}:`, n: (p?.n ?? 0) + 1 }))
+                            }
+                          >
+                            <Icon name="chapter-add" size={17} />
+                            <span>{chapter}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </section>
                 ))}
                 {!books.length && (
@@ -1061,6 +1087,7 @@ function OperatorMirror({
                     en={bibles?.en ?? null}
                     prefill={prefill}
                     onSend={sent}
+                    onLangChange={(l) => void relang(l)}
                   />
                   {/* The verses of the passage that is up, each one a tap away.
                       A passage goes up on its first verse; this is how the rest
