@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { RELAY_BASE, type OrderItem, type Slide, type VersePayload } from './relay'
+import { RELAY_BASE, type GotoTarget, type OrderItem, type Slide, type VersePayload } from './relay'
 
-/** What a command carries: an index for `goto`, a passage for `verse`. */
-export type RemoteArg = number | VersePayload | null
+/** What a command carries: an index (or a slide in it) for `goto`, a passage for `verse`. */
+export type RemoteArg = number | GotoTarget | VersePayload | null
 import type { ServiceEnvelope, ServiceItem, ServiceSlide } from './buildService'
 
 /**
@@ -84,13 +84,19 @@ export function flattenDeck(items: ServiceItem[]): DeckEntry[] {
  * never said. Still lyric-free: counts, not words.
  */
 export const outlineOf = (items: ServiceItem[], liveItem: number, liveNth?: number): OrderItem[] =>
-  items.map((it, i) => ({
-    title: it.title,
-    kind: it.kind,
-    live: i === liveItem,
-    count: playable(it).length,
-    ...(i === liveItem && liveNth ? { nth: liveNth } : {})
-  }))
+  items.map((it, i) => {
+    const slides = playable(it)
+    // Counted among the slides that play, so a goto to it lands where Next would.
+    const sermonOutline = slides.findIndex((s) => s.outline)
+    return {
+      title: it.title,
+      kind: it.kind,
+      live: i === liveItem,
+      count: slides.length,
+      ...(i === liveItem && liveNth ? { nth: liveNth } : {}),
+      ...(sermonOutline >= 0 ? { outline: sermonOutline } : {})
+    }
+  })
 
 /** A stored service's deck, if what came back really is one. */
 export function readEnvelope(data: unknown): ServiceEnvelope | null {
@@ -250,16 +256,19 @@ export function useRemoteCommands(
       try {
         const msg = JSON.parse((e as MessageEvent).data) as { cmd?: string; arg?: unknown }
         if (!msg?.cmd) return
-        // `goto` sends an index; `verse` sends a passage. Anything else that
-        // isn't one of those two shapes arrives as null rather than as a
-        // surprise for the handler to unpick.
+        // `goto` sends an index, or an item and a slide in it; `verse` sends a
+        // passage. Anything that isn't one of those shapes arrives as null
+        // rather than as a surprise for the handler to unpick.
         const a = msg.arg
+        const t = a as Partial<GotoTarget> | null
         const arg: RemoteArg =
           typeof a === 'number'
             ? a
-            : a && typeof a === 'object' && Array.isArray((a as VersePayload).lines)
-              ? (a as VersePayload)
-              : null
+            : t && typeof t === 'object' && typeof t.item === 'number' && typeof t.slide === 'number'
+              ? { item: t.item, slide: t.slide }
+              : a && typeof a === 'object' && Array.isArray((a as VersePayload).lines)
+                ? (a as VersePayload)
+                : null
         handler.current(msg.cmd as PresenterCmd, arg)
       } catch {
         /* a malformed frame is not worth killing the stream over */

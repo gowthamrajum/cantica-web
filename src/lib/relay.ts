@@ -52,6 +52,9 @@ export interface OrderItem {
   count?: number
   /** Which of those is on screen, 1-based. Only on the live item. */
   nth?: number
+  /** 0-based position of the item's sermon outline, when it has one — what
+   *  "Back to outline" goes to. */
+  outline?: number
 }
 export interface LiveState {
   slide?: Slide | null
@@ -111,6 +114,17 @@ export type ControlCmd =
  * exists only for a presenter too old to know about `slides`: it shows the words
  * on one slide rather than showing nothing.
  */
+/**
+ * A `goto` aimed at one slide inside an item rather than its first — how "Back
+ * to outline" lands on the outline instead of the sermon card. A presenter too
+ * old to know the shape ignores it, and such a presenter never publishes an
+ * `outline` to offer the button for in the first place.
+ */
+export interface GotoTarget {
+  item: number
+  slide: number
+}
+
 export interface VersePayload {
   label: string
   lines: string[]
@@ -214,7 +228,7 @@ export async function sendControl(
   room: string,
   pin: string,
   cmd: ControlCmd,
-  arg?: number | VersePayload,
+  arg?: number | VersePayload | GotoTarget,
   operatorId?: string
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control`, {

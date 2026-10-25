@@ -9,6 +9,7 @@ import {
   sendControl,
   type ControlCmd,
   type VersePayload,
+  type GotoTarget,
   type OperatorRole,
   type SessionSummary
 } from '../lib/relay'
@@ -418,7 +419,7 @@ function OperatorMirror({
   }, [conn.room, conn.pin, me, ended, lostSeat])
 
   const run = useCallback(
-    async (cmd: ControlCmd, arg?: number | VersePayload): Promise<void> => {
+    async (cmd: ControlCmd, arg?: number | VersePayload | GotoTarget): Promise<void> => {
       setFeedback(cmd)
       setTimeout(() => setFeedback(null), 450)
       try {
@@ -462,10 +463,18 @@ function OperatorMirror({
     [lastRef, bibles, run]
   )
 
-  /** The sermon card itself, over any verses put up since. */
+  /**
+   * The sermon's outline, when it has one — the preacher's points are where
+   * the sermon is, and the card is only its heading.
+   */
+  const sermonOutline = state?.order?.find((o) => o.live)?.outline
+  /** The outline (or, with none, the sermon card), over any verses put up since. */
   const jumpToSermon = useCallback(async (): Promise<void> => {
     const i = state?.order?.findIndex((o) => o.live) ?? -1
-    if (i >= 0) await run('goto', i)
+    if (i < 0) return
+    const outline = state?.order?.[i]?.outline
+    if (typeof outline === 'number') await run('goto', { item: i, slide: outline })
+    else await run('goto', i)
   }, [state, run])
 
   /** The section after the sermon, over the rest of them. */
@@ -778,7 +787,9 @@ function OperatorMirror({
                 ‹ v{neighbours.before}
               </button>
             )}
-            <button onClick={() => void jumpToSermon()}>Back to sermon</button>
+            <button onClick={() => void jumpToSermon()}>
+              {typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'}
+            </button>
             <button onClick={() => void jumpToNextSection()}>Next section</button>
             {lastRef && neighbours.after !== null && (
               <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.after as number)}>

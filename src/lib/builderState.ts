@@ -2,6 +2,7 @@ import { getSong } from './songs'
 import { loadBible } from './bible'
 import { usableLinks, type ServiceLink } from './links'
 import type { Pick, PsalmVerse, ServiceLang, SlideBackground, SongRole, SongStructure } from './buildService'
+import { isEmptyOutline, readOutlineValue, type Outline } from './outline'
 
 /**
  * A compact record of *how* a service was assembled, saved alongside the deck so
@@ -61,6 +62,8 @@ export interface BuilderState {
   /** Where this service can be watched or joined. Also on the envelope, but
    *  read back from here — this is the record of what was typed. */
   links?: ServiceLink[]
+  /** The sermon outline, as typed. Also in the deck, inside the sermon. */
+  outline?: Outline
 }
 
 /** Distil the live picks into something small enough to store and reload. */
@@ -68,7 +71,8 @@ export function toBuilderState(
   day: string,
   date: string,
   picks: Pick[],
-  links: ServiceLink[] = []
+  links: ServiceLink[] = [],
+  outline: Outline | null = null
 ): BuilderState {
   const usable = usableLinks(links)
   return {
@@ -76,6 +80,9 @@ export function toBuilderState(
     day,
     date,
     ...(usable.length ? { links: usable } : {}),
+    // Omitted when there is none, so a service without one stores exactly what
+    // it stored before the field existed.
+    ...(!isEmptyOutline(outline) ? { outline: outline! } : {}),
     picks: picks.map((p): SavedPick =>
       p.type === 'song'
         ? {
@@ -120,7 +127,8 @@ export function readBuilderState(serviceData: unknown): BuilderState | null {
     day: String(s.day ?? ''),
     date: String(s.date ?? ''),
     picks: s.picks,
-    links: usableLinks(Array.isArray(s.links) ? s.links : [])
+    links: usableLinks(Array.isArray(s.links) ? s.links : []),
+    outline: readOutlineValue(s.outline) ?? undefined
   }
 }
 

@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { Icon, type IconName } from './Icons'
 import { prettyDate } from '../../lib/serviceSlot'
 import { usableLinks } from '../../lib/links'
+import { SERMON, readOutline } from '../../lib/outline'
 import type { ItemKind, ServiceEnvelope, ServiceItem } from '../../lib/buildService'
 
 /** Read the order at a glance: a clip and a countdown should not both be notes. */
@@ -76,6 +77,7 @@ export function SavedServiceView({
   onResetOrder,
   onAdd,
   onRemove,
+  onOutline,
   readOnly = false,
   onPreviewAll,
   onPreviewItem,
@@ -115,6 +117,8 @@ export function SavedServiceView({
    */
   readOnly?: boolean
   onRemove?: (index: number) => void
+  /** Add or edit the outline inside the sermon card at this index. */
+  onOutline?: (index: number) => void
   onClose: () => void
 }): JSX.Element {
   const links = usableLinks(envelope.service.links)
@@ -256,6 +260,32 @@ export function SavedServiceView({
                 </button>
               )}
             </div>
+            {/* The outline goes INSIDE the sermon, so it is offered on the
+                sermon's own row rather than in the gaps between items. */}
+            {onOutline && !readOnly && SERMON.test(it.title) && (() => {
+              const o = readOutline(it.slides ?? [])
+              return (
+                <button
+                  type="button"
+                  className="list-row has-ico w-full text-left"
+                  onClick={() => onOutline(i)}
+                  disabled={saving}
+                >
+                  <span className="list-ico bg-gold-500">
+                    <Icon name={o ? 'text' : 'plus'} size={18} strokeWidth={2.1} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="list-title block">{o ? 'Edit sermon outline' : 'Add sermon outline'}</span>
+                    <span className="list-sub block truncate">
+                      {o
+                        ? `${o.title ? `${o.title} · ` : ''}${o.points.length} point${o.points.length === 1 ? '' : 's'}`
+                        : 'The preacher’s points, one slide in the Sermon'}
+                    </span>
+                  </span>
+                  <Icon name="chevron" size={17} className="list-chev" />
+                </button>
+              )
+            })()}
             {onAdd && !readOnly && <InsertHere at={i + 1} onAdd={onAdd} disabled={saving} />}
             </Fragment>
           )

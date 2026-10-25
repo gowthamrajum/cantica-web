@@ -217,7 +217,7 @@ export function Live(): JSX.Element {
         else if (cmd === 'clear') setClearText((c) => !c)
         else if (cmd === 'logo') setShowLogo((l) => !l)
         else if (cmd === 'end') setEnded(true)
-        else if (cmd === 'verse' && arg && typeof arg === 'object') {
+        else if (cmd === 'verse' && arg && typeof arg === 'object' && 'lines' in arg) {
           // Onto whatever is live — which the operator only offers during the
           // sermon, so it is the sermon. Deliberately no timer: it stays up
           // until the operator moves on, because the preacher decides how long
@@ -246,11 +246,18 @@ export function Live(): JSX.Element {
           // deck that is one slide out of date.
           verseFrom.current = deck.reduce((acc, d, i) => (d.item === at ? i + 1 : acc), 0)
           jumpToLastOf.current = at
-        } else if (cmd === 'goto' && arg !== null && typeof arg === 'number') {
+        } else if (cmd === 'goto' && typeof arg === 'number') {
           // The outline the remote sees is the ITEM list, so a goto lands on the
           // first slide of that item.
           const at = deck.findIndex((d) => d.item === arg)
           if (at >= 0) goTo(at)
+        } else if (cmd === 'goto' && arg && typeof arg === 'object' && 'slide' in arg) {
+          // A slide inside an item — "Back to outline". `nth` is 1-based and
+          // counts the same playable slides the outline index does.
+          const at = deck.findIndex((d) => d.item === arg.item && d.nth === arg.slide + 1)
+          const first = deck.findIndex((d) => d.item === arg.item)
+          if (at >= 0) goTo(at)
+          else if (first >= 0) goTo(first)
         }
       },
       [deck, cursor, goTo, goNext, goPrev]

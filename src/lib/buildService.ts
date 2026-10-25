@@ -11,6 +11,7 @@
  */
 import type { Song } from './songs'
 import { usableLinks, type ServiceLink } from './links'
+import { OUTLINE_ITEM_TITLE, isEmptyOutline, outlineSlide, type Outline } from './outline'
 
 export type ServiceLang = 'both' | 'telugu' | 'english'
 
@@ -36,6 +37,12 @@ export interface ServiceSlide {
   singleLine?: boolean
   caption?: string
   background?: SlideBackground
+  /** The sermon outline — see lib/outline. The presenter returns a finished
+   *  verse here, and the phone operator's "Back to outline" lands on it. */
+  outline?: boolean
+  /** Shown to the church's phones whatever its item says (lumen's per-slide
+   *  override). Set on the outline, which sits inside an off-air card. */
+  broadcastUsers?: boolean
 }
 
 /**
@@ -97,6 +104,12 @@ export const SLOT_COMMUNION = 'communion'
  * than landing wherever the end of the list happens to be.
  */
 export const SLOT_MEDIA = 'media'
+/**
+ * The sermon outline. Not placed beside anything: Cantica folds it INTO the
+ * Sermon card, straight after it, so it is part of the sermon and a verse
+ * quoted there comes back to it.
+ */
+export const SLOT_SERMON = 'sermon'
 
 let _uid = 0
 const uid = (): string =>
@@ -660,7 +673,8 @@ export type Pick =
 export function buildService(
   name: string,
   picks: Pick[] = [],
-  links: ServiceLink[] = []
+  links: ServiceLink[] = [],
+  outline: Outline | null = null
 ): ServiceEnvelope {
   const items: ServiceItem[] = []
   for (const p of picks) {
@@ -695,6 +709,23 @@ export function buildService(
       // A psalm is a reading, never the offering song.
       items.push(...psalmToItems(p.chapter, p.verses, p.lang ?? 'both').map((it) => ({ ...it, slot: SLOT_WORSHIP })))
     }
+  }
+  if (!isEmptyOutline(outline)) {
+    // Where the sermon falls when this deck is played as it stands (here, or
+    // on the phone broadcast): after the worship, ahead of the communion and
+    // offering songs and the clips. Cantica ignores the position and files it
+    // by its slot.
+    const after = items.findIndex(
+      (it) => it.slot === SLOT_COMMUNION || it.slot === SLOT_OFFERING || it.slot === SLOT_MEDIA
+    )
+    const sermon: ServiceItem = {
+      id: uid(),
+      title: OUTLINE_ITEM_TITLE,
+      kind: 'text',
+      slides: [outlineSlide(outline!)],
+      slot: SLOT_SERMON
+    }
+    items.splice(after < 0 ? items.length : after, 0, sermon)
   }
   const usable = usableLinks(links)
   return {

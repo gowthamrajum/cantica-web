@@ -235,7 +235,7 @@ export function SermonVerseSheet({
           <p className="verse-note is-error">{error}</p>
         ) : (
           <p className="verse-note">
-            It stays up until you move on — no timer. Back to sermon and Next section are on the operator screen.
+            It stays up until you move on — no timer. Back to sermon (or outline) and Next section are on the operator screen.
           </p>
         )}
 
