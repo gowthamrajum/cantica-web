@@ -144,20 +144,35 @@ export interface ControlStatus {
   operatorMine?: boolean
   /** who has it: the device that started the broadcast, or a phone that joined */
   operatorRole?: OperatorRole | null
+  /** Both seats at once — absent on a relay from before there were two. */
+  seats?: Record<OperatorSeat, { held: boolean; mine: boolean }>
 }
 
 /** 'presenter' is the device the broadcast was started from. */
 export type OperatorRole = 'presenter' | 'remote'
 
 /**
+ * Which job a remote does. The relay has a seat for each, so one phone can run
+ * the slides while another puts up verses — and neither can take the other's
+ * controls. A relay from before the seats treats every claim as `service`.
+ */
+export type OperatorSeat = 'service' | 'sermon'
+
+/**
  * Check whether a room is controllable, whether the given PIN is valid, and
  * whether its single operator seat is free. Pass `operatorId` to be told that
  * the seat is already yours rather than merely taken.
  */
-export async function getControlStatus(room: string, pin: string, operatorId = ''): Promise<ControlStatus> {
+export async function getControlStatus(
+  room: string,
+  pin: string,
+  operatorId = '',
+  seat?: OperatorSeat
+): Promise<ControlStatus> {
   const q = new URLSearchParams()
   if (pin) q.set('pin', pin)
   if (operatorId) q.set('operatorId', operatorId)
+  if (seat) q.set('seat', seat)
   const r = await fetch(
     `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/status${q.size ? `?${q}` : ''}`,
     { cache: 'no-store' }
@@ -177,13 +192,13 @@ export async function claimOperator(
   room: string,
   pin: string,
   operatorId: string,
-  opts: { role?: OperatorRole; force?: boolean } = {}
+  opts: { role?: OperatorRole; force?: boolean; seat?: OperatorSeat } = {}
 ): Promise<{ ok: boolean; status: number; error?: string; role?: OperatorRole; freeInMs?: number }> {
   try {
     const r = await fetch(`${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin, operatorId, role: opts.role ?? 'remote', force: !!opts.force })
+      body: JSON.stringify({ pin, operatorId, role: opts.role ?? 'remote', force: !!opts.force, seat: opts.seat ?? 'service' })
     })
     const j = (await r.json().catch(() => ({}))) as { error?: string; role?: OperatorRole; freeInMs?: number }
     return { ok: r.ok, status: r.status, error: j.error, role: j.role, freeInMs: j.freeInMs }
@@ -193,9 +208,10 @@ export async function claimOperator(
 }
 
 /** Give the seat back, so the next phone doesn't have to wait out the lease. */
-export function releaseOperator(room: string, operatorId: string): void {
+/** Give up the seat — or, with `seat`, just that one, as a phone switching jobs does. */
+export function releaseOperator(room: string, operatorId: string, seat?: OperatorSeat): void {
   const url = `${RELAY_BASE}/broadcast/${encodeURIComponent(room)}/control/release`
-  const body = JSON.stringify({ operatorId })
+  const body = JSON.stringify({ operatorId, ...(seat ? { seat } : {}) })
   // This usually runs as the page is going away, where a normal fetch is
   // cancelled — keepalive (and sendBeacon on pagehide) is what survives it.
   try {

@@ -11,11 +11,12 @@ import {
   type VersePayload,
   type GotoTarget,
   type OperatorRole,
+  type OperatorSeat,
   type SessionSummary
 } from '../lib/relay'
 import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
-import { SermonVerseSheet } from '../components/app/SermonVerseSheet'
+import { SermonVerseForm } from '../components/app/SermonVerseForm'
 import { loadBible, teBook, type IndexedBible } from '../lib/bible'
 import { versesFor, type Reference, type VerseLang } from '../lib/reference'
 import { ConfidenceDeck } from '../components/ConfidenceDeck'
@@ -41,7 +42,11 @@ function verseSpan(vs: number[]): string {
 /** Well inside the relay's 40s lease, so one dropped renewal isn't a lost seat. */
 const RENEW_MS = 12_000
 
-type Saved = { room: string; pin: string; label?: string }
+/** `seat` is which job this phone does; absent on a connection saved before there were two. */
+type Saved = { room: string; pin: string; label?: string; seat?: OperatorSeat }
+
+const SEAT_NAME: Record<OperatorSeat, string> = { service: 'Service', sermon: 'Sermon' }
+const otherSeat = (s: OperatorSeat): OperatorSeat => (s === 'sermon' ? 'service' : 'sermon')
 
 function loadSaved(): Saved | null {
   try {
@@ -62,13 +67,14 @@ export function Remote(): JSX.Element {
   useEffect(() => {
     const room = params.get('room') || ''
     const pin = params.get('pin') || ''
+    const seat: OperatorSeat = params.get('seat') === 'sermon' ? 'sermon' : 'service'
     if (room && pin) {
-      void tryConnect(room, pin).then((r) => (r.ok ? setConn({ room, pin }) : setBusy(r.error ?? null)))
+      void tryConnect(room, pin, seat).then((r) => (r.ok ? setConn({ room, pin, seat }) : setBusy(r.error ?? null)))
     } else {
       const s = loadSaved()
       // A saved session is only worth resuming if this phone can still drive it:
       // someone else may have taken the seat while this one was closed.
-      if (s) void tryConnect(s.room, s.pin).then((r) => (r.ok ? setConn(s) : setBusy(r.error ?? null)))
+      if (s) void tryConnect(s.room, s.pin, s.seat ?? 'service').then((r) => (r.ok ? setConn(s) : setBusy(r.error ?? null)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -83,8 +89,33 @@ export function Remote(): JSX.Element {
     setConn(s)
   }, [])
 
+  /**
+   * Swap jobs on this phone — for the Sunday one person does both.
+   *
+   * The new seat is taken before the old one is let go, so a refusal ("someone
+   * else is running the sermon") leaves this phone exactly where it was.
+   */
+  const switchSeat = useCallback(async (): Promise<string | null> => {
+    if (!conn) return null
+    const from = conn.seat ?? 'service'
+    const to = otherSeat(from)
+    const r = await tryConnect(conn.room, conn.pin, to)
+    if (!r.ok) return r.error ?? 'Couldn’t switch.'
+    releaseOperator(conn.room, operatorId(), from)
+    connect({ ...conn, seat: to })
+    return null
+  }, [conn, connect])
+
   return conn ? (
-    <OperatorMirror conn={conn} onDisconnect={disconnect} onBadPin={disconnect} />
+    // Keyed on the seat: switching jobs is a fresh screen with its own lease
+    // heartbeat, not the old one carrying on with a different label.
+    <OperatorMirror
+      key={conn.seat ?? 'service'}
+      conn={conn}
+      onDisconnect={disconnect}
+      onBadPin={disconnect}
+      onSwitchSeat={switchSeat}
+    />
   ) : (
     <Connect
       initialRoom={params.get('room') || ''}
@@ -102,10 +133,12 @@ const waitHint = (freeInMs?: number): string => {
 }
 
 /** Being turned away is only useful if it says who to go and ask. */
-const takenMessage = (claim: { role?: OperatorRole; freeInMs?: number }): string =>
+const takenMessage = (claim: { role?: OperatorRole; freeInMs?: number }, seat: OperatorSeat): string =>
   claim.role === 'presenter'
     ? 'The device that started this broadcast is operating it. Whoever has it can tap “Hand to a phone” on their live screen to pass the slides over.'
-    : `Another phone is already operating this service — only one can drive the slides at a time. If theirs has gone to sleep, try again in ${waitHint(claim.freeInMs)}.`
+    : seat === 'sermon'
+      ? `Another phone is already running the sermon. If theirs has gone to sleep, try again in ${waitHint(claim.freeInMs)} — or connect as Service.`
+      : `Another phone is already running the service — only one can drive the slides at a time. If theirs has gone to sleep, try again in ${waitHint(claim.freeInMs)} — or connect as Sermon.`
 
 /**
  * Validate a room + PIN, then claim the operator seat.
@@ -114,15 +147,15 @@ const takenMessage = (claim: { role?: OperatorRole; freeInMs?: number }): string
  * about to be refused should learn it here, not by pressing Next during a song
  * and finding nothing moves.
  */
-async function tryConnect(room: string, pin: string): Promise<{ ok: boolean; error?: string }> {
+async function tryConnect(room: string, pin: string, seat: OperatorSeat): Promise<{ ok: boolean; error?: string }> {
   try {
-    const st = await getControlStatus(room, pin, operatorId())
+    const st = await getControlStatus(room, pin, operatorId(), seat)
     if (!st.online)
       return { ok: false, error: 'No presenter is connected to this service yet. Start broadcasting first.' }
     if (!st.pinOk) return { ok: false, error: 'That PIN didn’t match.' }
-    const claim = await claimOperator(room, pin, operatorId(), { role: 'remote' })
+    const claim = await claimOperator(room, pin, operatorId(), { role: 'remote', seat })
     if (claim.status === 409 && claim.error === 'operator-taken')
-      return { ok: false, error: takenMessage(claim) }
+      return { ok: false, error: takenMessage(claim, seat) }
     if (!claim.ok) return { ok: false, error: 'Could not reach the service. Check your connection.' }
     return { ok: true }
   } catch {
@@ -147,6 +180,8 @@ function Connect({
   const [room, setRoom] = useState(initialRoom)
   const [label, setLabel] = useState<string | undefined>(undefined)
   const [pin, setPin] = useState(initialPin)
+  /** Which job this phone is joining to do. */
+  const [seat, setSeat] = useState<OperatorSeat>('service')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(initialError)
 
@@ -169,8 +204,8 @@ function Connect({
     }
     setBusy(true)
     setError(null)
-    const r = await tryConnect(room, pin)
-    if (r.ok) onConnect({ room, pin, label })
+    const r = await tryConnect(room, pin, seat)
+    if (r.ok) onConnect({ room, pin, label, seat })
     else setError(r.error ?? 'Could not connect.')
     setBusy(false)
   }
@@ -184,7 +219,7 @@ function Connect({
             {/* The page had no h1 at all — this line was its title in every
                 sense except the one a screen reader can use. */}
             <h1 className="font-serif text-lg font-semibold">Operator</h1>
-            <div className="text-[13px] text-white/55">Move the live slides from your phone — one phone at a time</div>
+            <div className="text-[13px] text-white/55">Run the slides or the sermon from your phone — one phone for each</div>
           </div>
         </div>
 
@@ -223,6 +258,35 @@ function Connect({
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
             <div className="mb-1 text-[13px] text-white/50">Connecting to</div>
             <div className="mb-4 font-serif text-xl font-semibold">{prettyServiceName(label)}</div>
+
+            {/* Two jobs, two phones: one runs the slides, one puts up verses
+                during the sermon. Each sees only its own controls. */}
+            <div className="mb-1.5 text-[13px] font-semibold text-white/60">I’m running</div>
+            <div className="mb-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Job">
+              {(
+                [
+                  ['service', 'Service', 'Slides, songs & order'],
+                  ['sermon', 'Sermon', 'Verses during the sermon']
+                ] as const
+              ).map(([id, name, hint]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={seat === id}
+                  onClick={() => {
+                    setSeat(id)
+                    setError(null)
+                  }}
+                  className={`rounded-xl border px-3 py-3 text-left transition active:scale-[0.99] ${
+                    seat === id ? 'border-amber-400 bg-amber-400/10' : 'border-white/15 bg-[#0b1120]'
+                  }`}
+                >
+                  <span className="block font-semibold">{name}</span>
+                  <span className="block text-xs text-white/50">{hint}</span>
+                </button>
+              ))}
+            </div>
 
             <label className="mb-1.5 block text-[13px] font-semibold text-white/60">Control PIN</label>
             <input
@@ -270,11 +334,14 @@ const SWIPE_MIN = 45 // px; below this a gesture is a tap, not a swipe
 function OperatorMirror({
   conn,
   onDisconnect,
-  onBadPin
+  onBadPin,
+  onSwitchSeat
 }: {
   conn: Saved
   onDisconnect: () => void
   onBadPin: () => void
+  /** Swap this phone to the other job; resolves to why not, or null once done. */
+  onSwitchSeat: () => Promise<string | null>
 }): JSX.Element {
   const navigate = useNavigate()
   // Operators see the unsuppressed deck (every slide), unlike audience/OBS viewers.
@@ -291,18 +358,20 @@ function OperatorMirror({
   const onSermon = !!state?.order?.some((it) => it.live && /sermon|వాక్యోపదేశం/i.test(it.title ?? ''))
   /** The section being played, for the header read-out. */
   const here = state?.order?.find((it) => it.live)
-  const [verseOpen, setVerseOpen] = useState(false)
-  /** What the verse sheet opens with — a book, when opened from the history. */
-  const [verseStart, setVerseStart] = useState('')
+  /** A book to start the reference field with, from + in the history. */
+  const [prefill, setPrefill] = useState<{ text: string; n: number } | undefined>(undefined)
   /**
-   * Service or sermon — two jobs, two screens.
+   * Service or sermon — two jobs, two phones.
    *
    * Running the service is the slides and Next. Running the sermon is quoting
-   * scripture: what to put up, what already went up, what to go back to. They
-   * shared one screen, and the sermon's controls took room from the slide on
-   * every other part of the service while the verse history had nowhere to go.
+   * scripture: what to put up, what already went up, what to go back to. Each
+   * phone holds its own seat on the relay and shows only its own job, so the
+   * person quoting verses can't move the slides out from under the person
+   * running them.
    */
-  const [tab, setTab] = useState<'service' | 'sermon'>('service')
+  const seat: OperatorSeat = conn.seat ?? 'service'
+  const isSermon = seat === 'sermon'
+  const [switching, setSwitching] = useState(false)
   /** Every passage sent today, so going back to one is a tap, not a retype. */
   const history = useSermonHistory(conn.room)
   /** The order of service, as a drawer over the operator's controls. */
@@ -336,7 +405,7 @@ function OperatorMirror({
    *  that never quotes anything should not pay for them. */
   const [bibles, setBibles] = useState<{ te: IndexedBible | null; en: IndexedBible | null } | null>(null)
   useEffect(() => {
-    if ((!lastRef && tab !== 'sermon') || bibles) return
+    if ((!lastRef && !isSermon) || bibles) return
     let alive = true
     void Promise.all([loadBible('telugu'), loadBible('web')]).then(([te, en]) => {
       if (alive) setBibles({ te, en })
@@ -344,7 +413,7 @@ function OperatorMirror({
     return () => {
       alive = false
     }
-  }, [lastRef, bibles, tab])
+  }, [lastRef, bibles, isSermon])
 
   /**
    * The verse before and after what is up, when there is one.
@@ -380,11 +449,8 @@ function OperatorMirror({
    */
   const scrolled = useRef(false)
   const touchStartY = useRef(0)
-  // Only ever offered during the sermon, so leaving it closes the sheet rather
-  // than leaving a way to put a verse over the next song.
   useEffect(() => {
     if (onSermon) return
-    setVerseOpen(false)
     // The verse either side of "the last quote" means nothing once the service
     // has moved on from the sermon.
     setLastRef(null)
@@ -428,7 +494,7 @@ function OperatorMirror({
     if (ended || lostSeat) return
     let alive = true
     const renew = async (): Promise<void> => {
-      const r = await claimOperator(conn.room, conn.pin, me, { role: 'remote' })
+      const r = await claimOperator(conn.room, conn.pin, me, { role: 'remote', seat })
       if (!alive) return
       if (r.status === 409 && r.error === 'operator-taken') setLostSeat(true)
     }
@@ -443,7 +509,7 @@ function OperatorMirror({
       clearInterval(id)
       window.removeEventListener('pagehide', onHide)
     }
-  }, [conn.room, conn.pin, me, ended, lostSeat])
+  }, [conn.room, conn.pin, me, seat, ended, lostSeat])
 
   const run = useCallback(
     async (cmd: ControlCmd, arg?: number | VersePayload | GotoTarget): Promise<void> => {
@@ -497,7 +563,7 @@ function OperatorMirror({
     [lastRef, sendRef]
   )
 
-  /** Where the sermon sits in the order, so the Sermon tab can go there. */
+  /** Where the sermon sits in the order, so the sermon phone can go there. */
   const sermonIndex = state?.order?.findIndex((it) => /sermon|వాక్యోపదేశం/i.test(it.title ?? '')) ?? -1
   const books = groupByBook(history.items)
   /** The passage up now — the history row to mark. */
@@ -596,7 +662,7 @@ function OperatorMirror({
    * Asked of the ELEMENT rather than of the open/closed state, so an overlay
    * added later is covered without anyone remembering to come back here.
    */
-  const OVERLAY = '.op2-drawer-wrap, .op2-ask, .sheet, .sheet-backdrop, .book-chips, .op2-hist'
+  const OVERLAY = '.op2-drawer-wrap, .op2-ask, .sheet, .sheet-backdrop, .vf-books, .op2-hist'
 
   /**
    * Off the deck and onto the viewer.
@@ -624,8 +690,9 @@ function OperatorMirror({
   }, [lostSeat, ended, toViewer])
 
   const onTouchStart = (e: TouchEvent): void => {
-    // A swipe must not move slides from under the confirmation.
-    if (confirmEnd || ending || ended || lostSeat) return
+    // A swipe must not move slides from under the confirmation — and the
+    // sermon phone doesn't move slides at all; that is the service phone's job.
+    if (isSermon || confirmEnd || ending || ended || lostSeat) return
     const target = e.target as Element | null
     if (target?.closest?.(OVERLAY)) return
     const t = e.touches[0]
@@ -648,7 +715,7 @@ function OperatorMirror({
   useEffect(() => {
     // …but not while something is open over it. Arrow keys scroll the drawer,
     // and scrolling it should not also walk the service.
-    if (confirmEnd || ending || ended || lostSeat || orderOpen || verseOpen) return
+    if (isSermon || confirmEnd || ending || ended || lostSeat || orderOpen) return
     const onKey = (e: KeyboardEvent): void => {
       // Not while something is being typed. Space is both "next slide" and the
       // commonest character in a reference, so without this, typing "John 3:16"
@@ -666,7 +733,7 @@ function OperatorMirror({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [run, confirmEnd, ending, ended, lostSeat, orderOpen, verseOpen])
+  }, [run, isSermon, confirmEnd, ending, ended, lostSeat, orderOpen])
 
   useEffect(() => {
     if (!flash) return
@@ -687,7 +754,10 @@ function OperatorMirror({
       : { label: 'OFFLINE', cls: 'bg-white/10 text-white/45' }
 
   return (
-    <div className="op2-root" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    // The sermon phone is typed on, so it is never turned sideways for the
+    // phone: the keyboard comes up along the physical bottom edge, and on a
+    // turned frame that put it beside the field instead of under it.
+    <div className={`op2-root${isSermon ? ' op2-upright' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <header className="op2-head">
         <div className="op2-headmain">
           <h1 className="op2-service">{prettyServiceName(state?.name || conn.label) || 'Live service'}</h1>
@@ -710,30 +780,42 @@ function OperatorMirror({
           <span className={`op2-status ${status.cls}`}>{status.label}</span>
           {/* Ending is the operator's, not just the presenter's: they are the one
               who knows the service is over. */}
-          {/* Service or sermon. The dot says the sermon is on now — the moment
-              the operator will want that tab — without switching for them: a
-              screen that changes by itself mid-service is one they can't trust. */}
-          <div className="op2-tabs" role="tablist" aria-label="Operate">
-            <button role="tab" aria-selected={tab === 'service'} className={tab === 'service' ? 'is-on' : ''} onClick={() => setTab('service')}>
-              Service
-            </button>
-            <button role="tab" aria-selected={tab === 'sermon'} className={tab === 'sermon' ? 'is-on' : ''} onClick={() => setTab('sermon')}>
-              Sermon
-              {onSermon && <span className="op2-tab-dot" aria-label="on now" />}
-            </button>
-          </div>
-          {/* The whole service, one tap away. An operator who has to reach a
-              different section has been walking there with Next until now — past
-              every slide in between, all of them going out on the screen on the
-              way. */}
-          <button onClick={() => setOrderOpen(true)} className="op2-order-btn" title="Order of service">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
+          {/* Which job this phone is doing, and the way to the other one. The
+              dot on the service phone says the sermon has started — the moment
+              a verse might be wanted — without changing anything by itself. */}
+          <span className={`op2-role${isSermon ? ' is-sermon' : ''}`}>{SEAT_NAME[seat]}</span>
+          <button
+            className="op2-switch"
+            disabled={switching}
+            onClick={async () => {
+              setSwitching(true)
+              const why = await onSwitchSeat()
+              setSwitching(false)
+              if (why) setFlash(why)
+            }}
+            title={`Switch this phone to ${SEAT_NAME[otherSeat(seat)]}`}
+          >
+            {switching ? '…' : `→ ${SEAT_NAME[otherSeat(seat)]}`}
+            {!isSermon && onSermon && <span className="op2-tab-dot" aria-label="the sermon is on" />}
           </button>
-          <button onClick={() => setConfirmEnd(true)} className="op2-stop">
-            End
-          </button>
+          {!isSermon && (
+            <>
+              {/* The whole service, one tap away. An operator who has to reach a
+                  different section has been walking there with Next until now —
+                  past every slide in between, all of them going out on the
+                  screen on the way. */}
+              <button onClick={() => setOrderOpen(true)} className="op2-order-btn" title="Order of service">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              </button>
+              {/* Ending is the operator's, not just the presenter's: they are
+                  the one who knows the service is over. */}
+              <button onClick={() => setConfirmEnd(true)} className="op2-stop">
+                End
+              </button>
+            </>
+          )}
           <button onClick={exit} aria-label="Exit operator" className="op2-exit">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -811,7 +893,7 @@ function OperatorMirror({
       )}
 
       <div className="op2-body">
-        {tab === 'service' ? (
+        {!isSermon ? (
           <ConfidenceDeck state={state} />
         ) : (
           <div className="op2-sermon">
@@ -837,10 +919,7 @@ function OperatorMirror({
                         <button
                           className="op2-hist-add"
                           aria-label={`Another verse from ${g.book}`}
-                          onClick={() => {
-                            setVerseStart(`${teBook(g.book)} `)
-                            setVerseOpen(true)
-                          }}
+                          onClick={() => setPrefill((p) => ({ text: `${teBook(g.book)} `, n: (p?.n ?? 0) + 1 }))}
                         >
                           +
                         </button>
@@ -871,16 +950,17 @@ function OperatorMirror({
             <div className="op2-sermon-main">
               {onSermon ? (
                 <>
-                  <button
-                    className="op2-verse-big"
-                    onClick={() => {
-                      setVerseStart('')
-                      setVerseOpen(true)
+                  <SermonVerseForm
+                    te={bibles?.te ?? null}
+                    en={bibles?.en ?? null}
+                    prefill={prefill}
+                    onSend={async (payload, ref, lang) => {
+                      await run('verse', payload)
+                      setQuoteOnStream(true)
+                      setLastRef({ ref, lang })
+                      history.add(ref, lang, payload.label)
                     }}
-                  >
-                    <span>Put a verse on screen</span>
-                    <small>Type a reference — John 3:16, Rom 8:28-30</small>
-                  </button>
+                  />
                   {/* Both are ordinary `goto`s: it already means "the first slide
                       of item N", and a verse is appended INSIDE the sermon item —
                       so the sermon card is goto(live) and the next section is
@@ -896,16 +976,7 @@ function OperatorMirror({
                     <button onClick={() => void jumpToSermon()}>
                       {typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'}
                     </button>
-                    <button
-                      onClick={() => {
-                        void jumpToNextSection()
-                        // The sermon is over once this is pressed; the slides
-                        // are what the operator needs to see next.
-                        setTab('service')
-                      }}
-                    >
-                      Next section
-                    </button>
+                    <button onClick={() => void jumpToNextSection()}>Next section</button>
                     {lastRef && neighbours.after !== null && (
                       <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.after as number)}>
                         v{neighbours.after} ›
@@ -956,27 +1027,15 @@ function OperatorMirror({
       )}
       {flash && <div className="op2-toast">{flash}</div>}
 
-      <SermonVerseSheet
-        open={verseOpen}
-        initialQuery={verseStart}
-        onClose={() => setVerseOpen(false)}
-        onSend={async (payload, ref, lang) => {
-          await run('verse', payload)
-          setQuoteOnStream(true)
-          setLastRef({ ref, lang })
-          history.add(ref, lang, payload.label)
-        }}
-      />
-
       {/* The seat went elsewhere: stop pretending this phone still drives the
           service, and get off the deck rather than leave a dead remote in
           somebody's hand. */}
       {lostSeat && !ended && (
         <div className="op2-ask" role="dialog" aria-label="Another phone is operating">
-          <p className="op2-ask-title">Someone else is driving now</p>
+          <p className="op2-ask-title">{isSermon ? 'Someone else is running the sermon now' : 'Someone else is driving now'}</p>
           <p className="op2-ask-body">
-            One device operates a service at a time. Either this one was asleep or out of signal long enough to give
-            the seat up, or somebody with the master PIN took it.
+            One phone runs the {isSermon ? 'sermon' : 'slides'} at a time. Either this one was asleep or out of signal
+            long enough to give the seat up, or somebody with the master PIN took it.
           </p>
           <p className="op2-ask-body">
             You’re being moved to the viewer, so you can still follow the service.
