@@ -17,6 +17,7 @@ import {
 import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
 import { SermonVerseForm } from '../components/app/SermonVerseForm'
+import { Icon } from '../components/app/Icons'
 import { loadBible, teBook, type IndexedBible } from '../lib/bible'
 import { versesFor, type Reference, type VerseLang } from '../lib/reference'
 import { ConfidenceDeck } from '../components/ConfidenceDeck'
@@ -971,7 +972,9 @@ function OperatorMirror({
                 is most of what a preacher who stays in one book needs. */}
             <aside className="op2-hist" aria-label="Verses sent today">
               <div className="op2-hist-head">
-                <span>Verses today</span>
+                <Icon name="bible" size={16} />
+                <span className="op2-hist-title">Verses today</span>
+                {history.items.length > 0 && <span className="op2-hist-count">{history.items.length}</span>}
                 {books.length > 0 && (
                   <button onClick={history.clear} className="op2-hist-clear">
                     Clear
@@ -981,45 +984,70 @@ function OperatorMirror({
               <div className="op2-hist-list">
                 {books.map((g) => (
                   <section key={g.book} className="op2-hist-book">
-                    <div className="op2-hist-bookhead">
-                      <span lang="te" className="op2-hist-bookname">{teBook(g.book)}</span>
-                      {teBook(g.book) !== g.book && <span className="op2-hist-bookkey">{g.book}</span>}
-                    </div>
-                    {/* A row per chapter, so + can carry the chapter too: the
-                        next verse a preacher reaches for is usually in the
-                        chapter they are already in. */}
-                    {chaptersOf(g.verses).map(({ chapter, verses }) => (
-                      <div key={chapter} className="op2-hist-chapter">
-                        <span className="op2-hist-ch">{chapter}</span>
-                        <div className="op2-hist-refs">
-                          {verses.map((v) => (
-                            <button
-                              key={v.key}
-                              className={`op2-hist-ref${v.key === upKey ? ' is-up' : ''}`}
-                              disabled={!onSermon || !bibles}
-                              onClick={() => void sendRef(v.ref, v.lang)}
-                            >
-                              {v.ref.verses?.length ? `:${verseSpan(v.ref.verses)}` : 'all'}
-                            </button>
-                          ))}
-                          {onSermon && (
-                            <button
-                              className="op2-hist-add"
-                              aria-label={`Another verse from ${g.book} ${chapter}`}
-                              onClick={() =>
-                                setPrefill((p) => ({ text: `${teBook(g.book)} ${chapter}:`, n: (p?.n ?? 0) + 1 }))
-                              }
-                            >
-                              +
-                            </button>
-                          )}
-                        </div>
+                    <header className="op2-hist-bookhead">
+                      <div className="op2-hist-bookname-wrap">
+                        <span lang="te" className="op2-hist-bookname">{teBook(g.book)}</span>
+                        {teBook(g.book) !== g.book && <span className="op2-hist-bookkey">{g.book}</span>}
                       </div>
-                    ))}
+                      {/* Two ways to start the next reference: from the book
+                          (a new chapter), or — on each chapter row below — from
+                          the book AND the chapter, which is where a preacher
+                          usually stays. */}
+                      {onSermon && (
+                        <button
+                          className="op2-hist-add op2-hist-add-book"
+                          aria-label={`Type another reference in ${g.book}`}
+                          title={`${g.book} …`}
+                          onClick={() => setPrefill((p) => ({ text: `${teBook(g.book)} `, n: (p?.n ?? 0) + 1 }))}
+                        >
+                          <Icon name="plus" size={14} active />
+                          <span>Book</span>
+                        </button>
+                      )}
+                    </header>
+                    <div className="op2-hist-chapters">
+                      {chaptersOf(g.verses).map(({ chapter, verses }) => (
+                        <div key={chapter} className="op2-hist-chapter">
+                          <span className="op2-hist-ch" aria-label={`Chapter ${chapter}`}>
+                            {chapter}
+                          </span>
+                          <div className="op2-hist-refs">
+                            {verses.map((v) => (
+                              <button
+                                key={v.key}
+                                className={`op2-hist-ref${v.key === upKey ? ' is-up' : ''}`}
+                                disabled={!onSermon || !bibles}
+                                aria-label={`Put ${v.label} on screen`}
+                                onClick={() => void sendRef(v.ref, v.lang)}
+                              >
+                                {v.key === upKey && <span className="op2-hist-live" aria-hidden="true" />}
+                                {v.ref.verses?.length ? verseSpan(v.ref.verses) : 'All'}
+                              </button>
+                            ))}
+                            {onSermon && (
+                              <button
+                                className="op2-hist-add op2-hist-add-ch"
+                                aria-label={`Another verse from ${g.book} ${chapter}`}
+                                title={`${g.book} ${chapter}:…`}
+                                onClick={() =>
+                                  setPrefill((p) => ({ text: `${teBook(g.book)} ${chapter}:`, n: (p?.n ?? 0) + 1 }))
+                                }
+                              >
+                                <Icon name="plus" size={13} active />
+                                <span>{chapter}:</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </section>
                 ))}
                 {!books.length && (
-                  <p className="op2-hist-empty">Verses you put on screen are kept here, by book, for the rest of today.</p>
+                  <div className="op2-hist-empty">
+                    <Icon name="bible" size={28} />
+                    <p>Verses you put on screen are kept here, by book and chapter, for the rest of today.</p>
+                  </div>
                 )}
               </div>
             </aside>
@@ -1064,10 +1092,26 @@ function OperatorMirror({
                         ‹ v{stepBefore.verse}
                       </button>
                     )}
-                    <button onClick={() => void jumpToSermon()}>
-                      {typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'}
+                    {/* Icons, not words: these two are reached for between
+                        verses without reading, and the labels took half the
+                        row. The name is still there for a screen reader and
+                        on a long press. */}
+                    {(() => {
+                      const home = typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'
+                      return (
+                        <button className="op2-navicon" onClick={() => void jumpToSermon()} aria-label={home} title={home}>
+                          <Icon name="home" size={22} />
+                        </button>
+                      )
+                    })()}
+                    <button
+                      className="op2-navicon"
+                      onClick={() => void jumpToNextSection()}
+                      aria-label="Next section"
+                      title="Next section"
+                    >
+                      <Icon name="next" size={22} />
                     </button>
-                    <button onClick={() => void jumpToNextSection()}>Next section</button>
                     {stepAfter && (
                       <button className="op2-vstep" onClick={stepAfter.go}>
                         v{stepAfter.verse} ›
@@ -1085,6 +1129,7 @@ function OperatorMirror({
                         setQuoteOnStream(false)
                       }}
                     >
+                      <Icon name="broadcast-off" size={18} />
                       Remove from live stream
                       <span>The passage stays on the screens and phones</span>
                     </button>

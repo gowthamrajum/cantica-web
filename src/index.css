@@ -1504,71 +1504,15 @@ html.channel-open #root {
 }
 
 .op2-sermon { display: flex; flex: 1; min-height: 0; gap: 10px; }
-.op2-hist {
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 36%;
-  min-width: 0;
-  min-height: 0;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-}
-.op2-hist-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.45);
-}
-.op2-hist-clear { font-size: 11.5px; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, 0.45); padding: 2px 4px; }
-/* Its own scroller, and excluded from the deck's swipe (see OVERLAY in
-   Remote.tsx): scrolling this list is a swipe up, and a swipe up is Next. */
-.op2-hist-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 10px; }
-.op2-hist-book + .op2-hist-book { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
-.op2-hist-bookhead { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
-.op2-hist-bookname { font-size: 14px; font-weight: 700; color: #fff; }
-.op2-hist-bookkey { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: rgba(255, 255, 255, 0.45); }
-.op2-hist-add {
-  margin-left: auto;
-  flex: none;
-  width: 30px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(245, 195, 96, 0.16);
-  color: #f5c360;
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1;
-}
-.op2-hist-refs { display: flex; flex-wrap: wrap; gap: 6px; }
-.op2-hist-ref {
-  min-height: 36px;
-  min-width: 48px;
-  padding: 0 10px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 13.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.op2-hist-ref:active { transform: scale(0.97); }
-.op2-hist-ref:disabled { opacity: 0.45; }
-/* The passage on screen right now. */
-.op2-hist-ref.is-up { border-color: rgba(56, 189, 248, 0.6); background: rgba(56, 189, 248, 0.18); color: #e0f2fe; }
-.op2-hist-empty { padding: 14px 4px; font-size: 13px; line-height: 1.5; color: rgba(255, 255, 255, 0.45); }
 
 .op2-sermon-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; gap: 8px; }
 .op2-sermon-main .op2-sermon-nav { padding: 0; }
 /* One line each here, not two: on the sermon screen these share the height
    with the current slide, and the slide is what shows the verse landed. */
-.op2-sermon-main .op2-verseoff { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-top: 0; padding: 8px 12px; }
+.op2-sermon-main .op2-verseoff { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 0; padding: 8px 12px; }
+.op2-sermon-main .op2-verseoff svg { flex: none; }
+/* Home and Next as icons: square-ish, the same height as the verse steps. */
+.op2-sermon-nav .op2-navicon { display: inline-flex; align-items: center; justify-content: center; }
 .op2-sermon-main .op2-verseoff span { margin-top: 0; }
 .op2-sermon-off {
   display: flex;
@@ -1603,7 +1547,7 @@ html.channel-open #root {
 }
 .vf-input:focus { border-color: #f5c360; }
 .vf-input:disabled { opacity: 0.5; }
-.vf-go { flex: none; padding: 0 16px; border-radius: 12px; background: #f5c360; color: #1a1204; font-size: 14.5px; font-weight: 800; }
+.vf-go { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 58px; border-radius: 12px; background: #f5c360; color: #1a1204; font-size: 14.5px; font-weight: 800; box-shadow: 0 2px 6px rgba(161, 98, 7, 0.25); }
 .vf-go:disabled { opacity: 0.45; }
 .vf-go:active { transform: scale(0.97); }
 .vf-meta { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -1635,10 +1579,6 @@ html.channel-open #root {
 
 /* History rows by chapter: the number, its passages, and + for another verse
    from that chapter. */
-.op2-hist-chapter { display: flex; align-items: flex-start; gap: 8px; }
-.op2-hist-chapter + .op2-hist-chapter { margin-top: 6px; }
-.op2-hist-ch { flex: none; min-width: 24px; padding-top: 9px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.5); }
-.op2-hist-refs .op2-hist-add { margin-left: 0; width: 36px; height: 36px; }
 
 /* The verses of the passage on screen, for walking it from the sermon phone. */
 .op2-passage { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -1669,20 +1609,9 @@ html.channel-open #root {
 .op2-light .op2-role.is-sermon { background: #fbe7b5; color: #8a5a00; }
 .op2-light .op2-switch { border-color: rgba(27, 36, 51, 0.18); color: rgba(27, 36, 51, 0.75); }
 .op2-light .op2-exit { background: rgba(27, 36, 51, 0.07); color: rgba(27, 36, 51, 0.6); }
-.op2-light .op2-hist { background: #fff; border-color: #e6e0d4; }
-.op2-light .op2-hist-head,
-.op2-light .op2-hist-clear,
-.op2-light .op2-hist-bookkey,
-.op2-light .op2-hist-empty,
-.op2-light .op2-hist-ch,
 .op2-light .op2-passage-label { color: #8a8f99; }
-.op2-light .op2-hist-bookname { color: #1b2433; }
-.op2-light .op2-hist-book + .op2-hist-book { border-top-color: #eee8dc; }
-.op2-light .op2-hist-ref,
 .op2-light .op2-passage button { background: #f6f3ec; border-color: #e2dccf; color: #1b2433; }
-.op2-light .op2-hist-ref.is-up,
 .op2-light .op2-passage button.is-up { background: #e0f2fe; border-color: #38bdf8; color: #075985; }
-.op2-light .op2-hist-add { background: #fdf0cc; color: #a16207; }
 .op2-light .vf-input { background: #fff; border-color: #d9d2c3; color: #1b2433; }
 .op2-light .vf-input:focus { border-color: #d99a1b; }
 .op2-light .vf-langs { background: #ece6da; }
@@ -1700,6 +1629,118 @@ html.channel-open #root {
 .op2-light .op2-sermon-off { background: #fff; color: #4b5563; }
 .op2-light .op2-sermon-off button { background: #fdf0cc; color: #a16207; }
 .op2-light .op2-card { border-color: rgba(27, 36, 51, 0.12); box-shadow: 0 6px 18px rgba(27, 36, 51, 0.18); }
+
+/* ---- Verses today ----
+   A card per book, a row per chapter: the chapter's number as a badge, its
+   passages as chips, and + to type another verse in that chapter. The book's
+   own + starts a new chapter. The passage on screen is marked with a dot. */
+.op2-hist {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 38%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 16px;
+  border: 1px solid #e6e0d4;
+  background: #fbf9f4;
+}
+.op2-hist-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px 8px;
+  color: #8a6a2b;
+}
+.op2-hist-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em; color: #6b6f78; }
+.op2-hist-count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ece6da;
+  color: #4b5563;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.op2-hist-clear { margin-left: auto; padding: 3px 8px; border-radius: 7px; font-size: 12px; font-weight: 600; color: #8a8f99; }
+.op2-hist-clear:active { background: #ece6da; }
+/* Its own scroller, and excluded from the deck's swipe (see OVERLAY in
+   Remote.tsx): scrolling this list is a swipe up, and a swipe up is Next. */
+.op2-hist-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+.op2-hist-book {
+  /* Full height always: the list scrolls rather than squeezing cards. */
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid #ebe5d9;
+  border-left: 3px solid #f5c360;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(27, 36, 51, 0.05);
+  overflow: hidden;
+}
+.op2-hist-bookhead { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px 12px; }
+.op2-hist-bookname-wrap { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1; }
+.op2-hist-bookname { font-size: 15px; font-weight: 700; color: #1b2433; white-space: nowrap; }
+.op2-hist-bookkey { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: #8a8f99; }
+.op2-hist-chapters { display: flex; flex-direction: column; padding: 0 10px 8px 12px; }
+.op2-hist-chapter { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; }
+.op2-hist-chapter + .op2-hist-chapter { border-top: 1px dashed #eee8dc; }
+.op2-hist-ch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 34px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #1b2433;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.op2-hist-refs { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.op2-hist-ref {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  min-width: 42px;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: 1px solid #e2dccf;
+  background: #f6f3ec;
+  color: #1b2433;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.op2-hist-ref:active { transform: scale(0.97); }
+.op2-hist-ref:disabled { opacity: 0.45; }
+.op2-hist-ref.is-up { border-color: #38bdf8; background: #e0f2fe; color: #075985; }
+.op2-hist-live { width: 7px; height: 7px; border-radius: 999px; background: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2); }
+/* The two +'s: the book's starts a new chapter, a chapter's adds to it. */
+.op2-hist-add {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px dashed #e0b85a;
+  background: #fffaf0;
+  color: #a16207;
+  font-size: 12.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.op2-hist-add-book { min-height: 28px; padding: 0 9px; border-style: solid; border-color: #f1d9a0; background: #fdf0cc; }
+.op2-hist-add:active { transform: scale(0.96); }
+.op2-hist-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 12px; text-align: center; color: #a0a4ad; }
+.op2-hist-empty p { font-size: 13px; line-height: 1.5; max-width: 22rem; }
 
 /* What is up, taking whatever height the controls leave. */
 .op2-sermon-now { flex: 1; min-height: 70px; }

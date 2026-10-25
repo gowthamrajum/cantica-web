@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { teBook, type IndexedBible } from '../../lib/bible'
+import { Icon } from './Icons'
 import { explainReference, parseReference, suggestBooks, versesFor, type Reference, type VerseLang } from '../../lib/reference'
 import type { VersePayload } from '../../lib/relay'
 
@@ -152,8 +153,14 @@ export function SermonVerseForm({
           }}
           disabled={!ready}
         />
-        <button className="vf-go" type="submit" disabled={!ready || !query.trim()}>
-          {te || en ? 'Put on screen' : 'Loading…'}
+        <button
+          className="vf-go"
+          type="submit"
+          disabled={!ready || !query.trim()}
+          aria-label={te || en ? 'Put on screen' : 'Loading the bible'}
+          title="Put on screen"
+        >
+          {te || en ? <Icon name="present" size={24} active /> : '…'}
         </button>
       </form>
 

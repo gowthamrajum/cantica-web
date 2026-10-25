@@ -40,6 +40,9 @@ export type IconName =
   | 'grip'
   | 'copy'
   | 'bell'
+  | 'next'
+  | 'present'
+  | 'broadcast-off'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
 
@@ -163,6 +166,30 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  // Skip forward: on to the next section of the service.
+  next: (
+    <>
+      <path d="M5.5 5.8 15 12l-9.5 6.2z" />
+      <path d="M18.5 5.5v13" />
+    </>
+  ),
+  // A screen with something going up onto it — Put on screen.
+  present: (
+    <>
+      <rect x="2.5" y="3.5" width="19" height="12.5" rx="2" />
+      <path d="M12 13V7M9.2 9.6 12 6.8l2.8 2.8" />
+      <path d="M8.5 20.5h7M12 16v4.5" />
+    </>
+  ),
+  // The broadcast mark, struck through — off the live stream.
+  'broadcast-off': (
+    <>
+      <circle cx="12" cy="12" r="2.1" />
+      <path d="M8.3 15.7a5.2 5.2 0 0 1 0-7.4M15.7 8.3a5.2 5.2 0 0 1 0 7.4" />
+      <path d="M5.3 18.7a9.5 9.5 0 0 1 0-13.4M18.7 5.3a9.5 9.5 0 0 1 0 13.4" />
+      <path d="M3.5 3.5l17 17" />
+    </>
+  ),
   minus: <path d="M5 12h14" />,
   info: (
     <>
