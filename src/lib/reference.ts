@@ -186,6 +186,19 @@ const chaptersIn = (b: IndexedBible | null, book: string): number =>
   b?.chapters[book] ?? (BOOK_ALIASES[book] ? b?.chapters[BOOK_ALIASES[book]] : undefined) ?? 0
 
 /**
+ * The book's name as the reference on a slide shows it — in the language the
+ * verse is shown in, and in both when both are: "కీర్తనల గ్రంథము · Psalms".
+ * The congregation reads the Telugu; the English is there for whoever doesn't,
+ * and a reference in only one of them left half the room without it.
+ */
+function bookName(book: string, lang: VerseLang): string {
+  const te = teBook(book)
+  if (lang === 'telugu') return te
+  if (lang === 'english' || te === book) return book
+  return `${te} · ${book}`
+}
+
+/**
  * A parsed reference → ONE SLIDE PER VERSE, as the desktop builds them.
  *
  * A passage all on one slide is unreadable from the back of a room and is not
@@ -232,15 +245,12 @@ export function versesFor(
     lang,
     (n) => teByVerse.get(n) ?? '',
     (n) => enByVerse.get(n) ?? '',
-    (n) => `${lang === 'telugu' ? teBook(ref.book) : ref.book} ${ref.chapter}:${n}`
+    (n) => `${bookName(ref.book, lang)} ${ref.chapter}:${n}`
   )
   if (!slides.length) return null
   const lines = slides.flatMap((sl) => sl.lines)
 
-  const label =
-    lang === 'telugu'
-      ? `${teBook(ref.book)} ${ref.chapter}:${span}`
-      : `${ref.book} ${ref.chapter}:${span}`
+  const label = `${bookName(ref.book, lang)} ${ref.chapter}:${span}`
   return { label, lines, slides }
 }
 
