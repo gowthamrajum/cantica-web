@@ -1477,6 +1477,133 @@ html.channel-open #root {
 }
 .op2-sermon-nav button:active { transform: scale(0.985); }
 
+/* ---- Service | Sermon: the switch in the header, and the sermon screen ----
+   The sermon screen is two columns inside the (usually rotated) landscape
+   frame: what was quoted today on the left, what to do next on the right. */
+.op2-tabs { display: inline-flex; padding: 2px; border-radius: 9px; background: rgba(255, 255, 255, 0.08); }
+.op2-tabs button {
+  position: relative;
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+.op2-tabs button.is-on { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.op2-tab-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f5c360;
+}
+
+.op2-sermon { display: flex; flex: 1; min-height: 0; gap: 10px; }
+.op2-hist {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 36%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.op2-hist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.45);
+}
+.op2-hist-clear { font-size: 11.5px; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, 0.45); padding: 2px 4px; }
+/* Its own scroller, and excluded from the deck's swipe (see OVERLAY in
+   Remote.tsx): scrolling this list is a swipe up, and a swipe up is Next. */
+.op2-hist-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 10px; }
+.op2-hist-book + .op2-hist-book { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.op2-hist-bookhead { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.op2-hist-bookname { font-size: 14px; font-weight: 700; color: #fff; }
+.op2-hist-bookkey { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: rgba(255, 255, 255, 0.45); }
+.op2-hist-add {
+  margin-left: auto;
+  flex: none;
+  width: 30px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(245, 195, 96, 0.16);
+  color: #f5c360;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+.op2-hist-refs { display: flex; flex-wrap: wrap; gap: 6px; }
+.op2-hist-ref {
+  min-height: 36px;
+  min-width: 48px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.op2-hist-ref:active { transform: scale(0.97); }
+.op2-hist-ref:disabled { opacity: 0.45; }
+/* The passage on screen right now. */
+.op2-hist-ref.is-up { border-color: rgba(56, 189, 248, 0.6); background: rgba(56, 189, 248, 0.18); color: #e0f2fe; }
+.op2-hist-empty { padding: 14px 4px; font-size: 13px; line-height: 1.5; color: rgba(255, 255, 255, 0.45); }
+
+.op2-sermon-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; gap: 8px; }
+.op2-sermon-main .op2-sermon-nav { padding: 0; }
+/* One line each here, not two: on the sermon screen these share the height
+   with the current slide, and the slide is what shows the verse landed. */
+.op2-sermon-main .op2-verseoff { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-top: 0; padding: 8px 12px; }
+.op2-sermon-main .op2-verseoff span { margin-top: 0; }
+.op2-verse-big {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 195, 96, 0.4);
+  background: rgba(245, 195, 96, 0.14);
+  color: #f5c360;
+  text-align: left;
+}
+.op2-verse-big span { flex: none; font-size: 15px; font-weight: 700; }
+.op2-verse-big small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.op2-verse-big:active { transform: scale(0.99); }
+.op2-sermon-off {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.65);
+}
+.op2-sermon-off button { flex: none; padding: 7px 12px; border-radius: 9px; background: rgba(245, 195, 96, 0.18); color: #f5c360; font-weight: 700; font-size: 13px; }
+/* What is up, taking whatever height the controls leave. */
+.op2-sermon-now { flex: 1; min-height: 70px; }
+
+/* A narrow window (a desktop browser, not a phone — the phone frame is always
+   landscape): controls first, the history under them. */
+@container (max-width: 559px) {
+  .op2-sermon { flex-direction: column; }
+  .op2-hist { flex: 0 0 auto; max-height: 42%; order: 2; }
+}
+
 /* The book list under the reference field: the Telugu name is the name, and
    the English key sits under it for anyone who reads that faster. */
 /* ---------- putting a verse on the screen, from a phone ----------

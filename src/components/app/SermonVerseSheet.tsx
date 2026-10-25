@@ -32,10 +32,17 @@ const LANGS: { id: VerseLang; label: string; lang?: string }[] = [
 export function SermonVerseSheet({
   open,
   onClose,
-  onSend
+  onSend,
+  initialQuery = ''
 }: {
   open: boolean
   onClose: () => void
+  /**
+   * What the field starts with — a book name and a space, when the operator
+   * opened this from that book in the history. The chapter is what they type
+   * next, so that is where the cursor lands.
+   */
+  initialQuery?: string
   /**
    * The finished passage, and the reference it came from.
    *
@@ -67,11 +74,16 @@ export function SermonVerseSheet({
 
   useEffect(() => {
     if (!open) return
+    setQuery(initialQuery)
+    setError('')
     void Promise.all([loadBible('telugu'), loadBible('web')]).then(([t, e]) => {
       setTe(t)
       setEn(e)
     })
     setTimeout(() => input.current?.focus(), 50)
+    // initialQuery is read as the sheet opens, not tracked — it must not wipe
+    // a reference that is half typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const order = te?.order ?? en?.order ?? []
@@ -235,7 +247,7 @@ export function SermonVerseSheet({
           <p className="verse-note is-error">{error}</p>
         ) : (
           <p className="verse-note">
-            It stays up until you move on — no timer. Back to sermon (or outline) and Next section are on the operator screen.
+            It stays up until you move on — no timer. Every verse you send is kept on the left of the Sermon tab, ready to put up again.
           </p>
         )}
 

@@ -16,14 +16,28 @@ import {
 import { operatorId } from '../lib/operatorId'
 import { useLiveState } from '../lib/useLiveState'
 import { SermonVerseSheet } from '../components/app/SermonVerseSheet'
-import { loadBible, type IndexedBible } from '../lib/bible'
+import { loadBible, teBook, type IndexedBible } from '../lib/bible'
 import { versesFor, type Reference, type VerseLang } from '../lib/reference'
 import { ConfidenceDeck } from '../components/ConfidenceDeck'
+import { ConfidenceCard } from '../components/ConfidenceCard'
+import { groupByBook, refKey, useSermonHistory } from '../lib/sermonHistory'
 import { LogoBadge } from '../components/Logo'
 import { prettyServiceName } from '../lib/format'
 import { useScreenVars } from '../lib/screenVars'
 
 const STORE_KEY = 'tcc-remote'
+
+/** [28,29,30,32] -> "28-30,32": the reference as a person would say it. */
+function verseSpan(vs: number[]): string {
+  const out: string[] = []
+  for (let i = 0; i < vs.length; i++) {
+    let j = i
+    while (j + 1 < vs.length && vs[j + 1] === vs[j] + 1) j++
+    out.push(j > i ? `${vs[i]}-${vs[j]}` : `${vs[i]}`)
+    i = j
+  }
+  return out.join(',')
+}
 /** Well inside the relay's 40s lease, so one dropped renewal isn't a lost seat. */
 const RENEW_MS = 12_000
 
@@ -278,6 +292,19 @@ function OperatorMirror({
   /** The section being played, for the header read-out. */
   const here = state?.order?.find((it) => it.live)
   const [verseOpen, setVerseOpen] = useState(false)
+  /** What the verse sheet opens with — a book, when opened from the history. */
+  const [verseStart, setVerseStart] = useState('')
+  /**
+   * Service or sermon — two jobs, two screens.
+   *
+   * Running the service is the slides and Next. Running the sermon is quoting
+   * scripture: what to put up, what already went up, what to go back to. They
+   * shared one screen, and the sermon's controls took room from the slide on
+   * every other part of the service while the verse history had nowhere to go.
+   */
+  const [tab, setTab] = useState<'service' | 'sermon'>('service')
+  /** Every passage sent today, so going back to one is a tap, not a retype. */
+  const history = useSermonHistory(conn.room)
   /** The order of service, as a drawer over the operator's controls. */
   const [orderOpen, setOrderOpen] = useState(false)
   /**
@@ -309,7 +336,7 @@ function OperatorMirror({
    *  that never quotes anything should not pay for them. */
   const [bibles, setBibles] = useState<{ te: IndexedBible | null; en: IndexedBible | null } | null>(null)
   useEffect(() => {
-    if (!lastRef || bibles) return
+    if ((!lastRef && tab !== 'sermon') || bibles) return
     let alive = true
     void Promise.all([loadBible('telugu'), loadBible('web')]).then(([te, en]) => {
       if (alive) setBibles({ te, en })
@@ -317,7 +344,7 @@ function OperatorMirror({
     return () => {
       alive = false
     }
-  }, [lastRef, bibles])
+  }, [lastRef, bibles, tab])
 
   /**
    * The verse before and after what is up, when there is one.
@@ -450,18 +477,31 @@ function OperatorMirror({
    * the buttons then offer the one after that — which is how somebody reading
    * on actually moves.
    */
-  const quoteNeighbour = useCallback(
-    async (verse: number): Promise<void> => {
-      if (!lastRef || !bibles) return
-      const ref: Reference = { ...lastRef.ref, verses: [verse] }
-      const passage = versesFor(ref, bibles.te, bibles.en, lastRef.lang)
+  const sendRef = useCallback(
+    async (ref: Reference, lang: VerseLang): Promise<void> => {
+      if (!bibles) return
+      const passage = versesFor(ref, bibles.te, bibles.en, lang)
       if (!passage) return
       await run('verse', passage)
       setQuoteOnStream(true)
-      setLastRef({ ref, lang: lastRef.lang })
+      setLastRef({ ref, lang })
+      history.add(ref, lang, passage.label)
     },
-    [lastRef, bibles, run]
+    [bibles, run, history]
   )
+  const quoteNeighbour = useCallback(
+    async (verse: number): Promise<void> => {
+      if (!lastRef) return
+      await sendRef({ ...lastRef.ref, verses: [verse] }, lastRef.lang)
+    },
+    [lastRef, sendRef]
+  )
+
+  /** Where the sermon sits in the order, so the Sermon tab can go there. */
+  const sermonIndex = state?.order?.findIndex((it) => /sermon|వాక్యోపదేశం/i.test(it.title ?? '')) ?? -1
+  const books = groupByBook(history.items)
+  /** The passage up now — the history row to mark. */
+  const upKey = quoteOnStream && lastRef ? refKey(lastRef.ref) : null
 
   /**
    * The sermon's outline, when it has one — the preacher's points are where
@@ -556,7 +596,7 @@ function OperatorMirror({
    * Asked of the ELEMENT rather than of the open/closed state, so an overlay
    * added later is covered without anyone remembering to come back here.
    */
-  const OVERLAY = '.op2-drawer-wrap, .op2-ask, .sheet, .sheet-backdrop, .book-chips'
+  const OVERLAY = '.op2-drawer-wrap, .op2-ask, .sheet, .sheet-backdrop, .book-chips, .op2-hist'
 
   /**
    * Off the deck and onto the viewer.
@@ -670,13 +710,18 @@ function OperatorMirror({
           <span className={`op2-status ${status.cls}`}>{status.label}</span>
           {/* Ending is the operator's, not just the presenter's: they are the one
               who knows the service is over. */}
-          {/* Only during the sermon. Everywhere else there is nothing for a
-              verse to be appended to that would make sense of it. */}
-          {onSermon && !ended && (
-            <button onClick={() => setVerseOpen(true)} className="op2-verse" title="Put a verse on screen">
-              Verse
+          {/* Service or sermon. The dot says the sermon is on now — the moment
+              the operator will want that tab — without switching for them: a
+              screen that changes by itself mid-service is one they can't trust. */}
+          <div className="op2-tabs" role="tablist" aria-label="Operate">
+            <button role="tab" aria-selected={tab === 'service'} className={tab === 'service' ? 'is-on' : ''} onClick={() => setTab('service')}>
+              Service
             </button>
-          )}
+            <button role="tab" aria-selected={tab === 'sermon'} className={tab === 'sermon' ? 'is-on' : ''} onClick={() => setTab('sermon')}>
+              Sermon
+              {onSermon && <span className="op2-tab-dot" aria-label="on now" />}
+            </button>
+          </div>
           {/* The whole service, one tap away. An operator who has to reach a
               different section has been walking there with Next until now — past
               every slide in between, all of them going out on the screen on the
@@ -766,55 +811,142 @@ function OperatorMirror({
       )}
 
       <div className="op2-body">
-        <ConfidenceDeck state={state} />
+        {tab === 'service' ? (
+          <ConfidenceDeck state={state} />
+        ) : (
+          <div className="op2-sermon">
+            {/* Left: everything quoted today, by book. Tapping a passage puts it
+                back up; + on a book opens the sheet with that book typed, which
+                is most of what a preacher who stays in one book needs. */}
+            <aside className="op2-hist" aria-label="Verses sent today">
+              <div className="op2-hist-head">
+                <span>Verses today</span>
+                {books.length > 0 && (
+                  <button onClick={history.clear} className="op2-hist-clear">
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="op2-hist-list">
+                {books.map((g) => (
+                  <section key={g.book} className="op2-hist-book">
+                    <div className="op2-hist-bookhead">
+                      <span lang="te" className="op2-hist-bookname">{teBook(g.book)}</span>
+                      {teBook(g.book) !== g.book && <span className="op2-hist-bookkey">{g.book}</span>}
+                      {onSermon && (
+                        <button
+                          className="op2-hist-add"
+                          aria-label={`Another verse from ${g.book}`}
+                          onClick={() => {
+                            setVerseStart(`${teBook(g.book)} `)
+                            setVerseOpen(true)
+                          }}
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                    <div className="op2-hist-refs">
+                      {g.verses.map((v) => (
+                        <button
+                          key={v.key}
+                          className={`op2-hist-ref${v.key === upKey ? ' is-up' : ''}`}
+                          disabled={!onSermon || !bibles}
+                          onClick={() => void sendRef(v.ref, v.lang)}
+                        >
+                          {v.ref.chapter}
+                          {v.ref.verses?.length ? `:${verseSpan(v.ref.verses)}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+                {!books.length && (
+                  <p className="op2-hist-empty">Verses you put on screen are kept here, by book, for the rest of today.</p>
+                )}
+              </div>
+            </aside>
 
-        {/* Where the sermon goes after a verse, on the screen the operator is
-            actually looking at rather than behind a sheet they have closed.
-            Both are ordinary `goto`s: it already means "the first slide of item
-            N", and a verse is appended INSIDE the sermon item — so the sermon
-            card is goto(live) and the next section is goto(live + 1), however
-            many verses went up in between. Neither has to count them. */}
-        {onSermon && !ended && (
-          <div className="op2-sermon-nav">
-            {/* Reading on, or backing up — beside the other two ways of moving,
-                not on a row of their own. A verse is up exactly when the
-                operator most needs the slide big, and a third strip of controls
-                took a third of the card off it. Only for a verse that exists in
-                the same chapter, and the button says which one, so it can be
-                trusted without looking at the wall. */}
-            {lastRef && neighbours.before !== null && (
-              <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.before as number)}>
-                ‹ v{neighbours.before}
-              </button>
-            )}
-            <button onClick={() => void jumpToSermon()}>
-              {typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'}
-            </button>
-            <button onClick={() => void jumpToNextSection()}>Next section</button>
-            {lastRef && neighbours.after !== null && (
-              <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.after as number)}>
-                v{neighbours.after} ›
-              </button>
-            )}
+            {/* Right: what goes up next, how the sermon moves, and what is up. */}
+            <div className="op2-sermon-main">
+              {onSermon ? (
+                <>
+                  <button
+                    className="op2-verse-big"
+                    onClick={() => {
+                      setVerseStart('')
+                      setVerseOpen(true)
+                    }}
+                  >
+                    <span>Put a verse on screen</span>
+                    <small>Type a reference — John 3:16, Rom 8:28-30</small>
+                  </button>
+                  {/* Both are ordinary `goto`s: it already means "the first slide
+                      of item N", and a verse is appended INSIDE the sermon item —
+                      so the sermon card is goto(live) and the next section is
+                      goto(live + 1), however many verses went up in between. */}
+                  <div className="op2-sermon-nav">
+                    {/* The verse either side, only when it exists in the same
+                        chapter, and the button says which one. */}
+                    {lastRef && neighbours.before !== null && (
+                      <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.before as number)}>
+                        ‹ v{neighbours.before}
+                      </button>
+                    )}
+                    <button onClick={() => void jumpToSermon()}>
+                      {typeof sermonOutline === 'number' ? 'Back to outline' : 'Back to sermon'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        void jumpToNextSection()
+                        // The sermon is over once this is pressed; the slides
+                        // are what the operator needs to see next.
+                        setTab('service')
+                      }}
+                    >
+                      Next section
+                    </button>
+                    {lastRef && neighbours.after !== null && (
+                      <button className="op2-vstep" onClick={() => void quoteNeighbour(neighbours.after as number)}>
+                        v{neighbours.after} ›
+                      </button>
+                    )}
+                  </div>
+                  {/* Only once something is up there to take down. The room and
+                      the church's phones keep the passage — this is the strip
+                      over the camera. */}
+                  {quoteOnStream && !ended && (
+                    <button
+                      className="op2-verseoff"
+                      onClick={() => {
+                        void run('verseoff')
+                        setQuoteOnStream(false)
+                      }}
+                    >
+                      Remove from live stream
+                      <span>The passage stays on the screens and phones</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                // Verses only go up during the sermon — anywhere else they would
+                // land in the middle of a song. Say so, and offer the way there.
+                <div className="op2-sermon-off">
+                  <p>The sermon isn’t on screen yet.</p>
+                  {sermonIndex >= 0 && (
+                    <button onClick={() => void run('goto', sermonIndex)}>Go to the sermon</button>
+                  )}
+                </div>
+              )}
+              <section className="op2-section op2-sermon-now">
+                <div className="op2-label">Current</div>
+                <div className="op2-card">
+                  <ConfidenceCard state={state} />
+                </div>
+              </section>
+            </div>
           </div>
         )}
-        {/* Only once something is up there to take down. The room and the
-            church's phones keep the passage — those people are reading it; this
-            is the strip over the camera, and only the operator knows when it has
-            stopped being what the preacher is on. */}
-        {quoteOnStream && !ended && (
-          <button
-            className="op2-verseoff"
-            onClick={() => {
-              void run('verseoff')
-              setQuoteOnStream(false)
-            }}
-          >
-            Remove from live stream
-            <span>The passage stays on the screens and phones</span>
-          </button>
-        )}
-
       </div>
 
       {feedback && (
@@ -826,11 +958,13 @@ function OperatorMirror({
 
       <SermonVerseSheet
         open={verseOpen}
+        initialQuery={verseStart}
         onClose={() => setVerseOpen(false)}
         onSend={async (payload, ref, lang) => {
           await run('verse', payload)
           setQuoteOnStream(true)
           setLastRef({ ref, lang })
+          history.add(ref, lang, payload.label)
         }}
       />
 
