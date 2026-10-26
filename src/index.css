@@ -1513,6 +1513,9 @@ html.channel-open #root {
 .op2-sermon-main .op2-verseoff svg { flex: none; }
 /* Home and Next as icons: square-ish, the same height as the verse steps. */
 .op2-sermon-nav .op2-navicon { display: inline-flex; align-items: center; justify-content: center; }
+/* Off the live stream: red, so it is never mistaken for a way of moving on. */
+.op2-sermon-nav .op2-streamoff { flex: 0 0 auto; min-width: 60px; }
+.op2-light .op2-sermon-nav .op2-streamoff { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
 .op2-sermon-main .op2-verseoff span { margin-top: 0; }
 .op2-sermon-off {
   display: flex;

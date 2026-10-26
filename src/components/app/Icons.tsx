@@ -45,6 +45,7 @@ export type IconName =
   | 'broadcast-off'
   | 'book-add'
   | 'chapter-add'
+  | 'no-entry'
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number; active?: boolean }
 
@@ -197,6 +198,13 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M12 6.2C10.3 4.9 7.6 4.4 3 4.6v13.2c4.6-.2 7.3.3 9 1.6 1.7-1.3 4.4-1.8 9-1.6V4.6c-4.6-.2-7.3.3-9 1.6z" />
       <path d="M12 6.2v13.2" />
       <path d="M16.5 9v4.4M14.3 11.2h4.4" />
+    </>
+  ),
+  // A no-entry sign — take it off the live stream.
+  'no-entry': (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M7.5 12h9" strokeWidth="3" />
     </>
   ),
   // The broadcast mark, struck through — off the live stream.

@@ -1139,28 +1139,28 @@ function OperatorMirror({
                     >
                       <Icon name="next" size={22} />
                     </button>
+                    {/* Off the live stream, beside Next: only once a passage is
+                        up there to take down. The room and the church's phones
+                        keep it — this is the strip over the camera. */}
+                    {quoteOnStream && !ended && (
+                      <button
+                        className="op2-navicon op2-streamoff"
+                        aria-label="Remove from live stream — the passage stays on the screens and phones"
+                        title="Remove from live stream"
+                        onClick={() => {
+                          void run('verseoff')
+                          setQuoteOnStream(false)
+                        }}
+                      >
+                        <Icon name="no-entry" size={24} />
+                      </button>
+                    )}
                     {stepAfter && (
                       <button className="op2-vstep" onClick={stepAfter.go}>
                         v{stepAfter.verse} ›
                       </button>
                     )}
                   </div>
-                  {/* Only once something is up there to take down. The room and
-                      the church's phones keep the passage — this is the strip
-                      over the camera. */}
-                  {quoteOnStream && !ended && (
-                    <button
-                      className="op2-verseoff"
-                      onClick={() => {
-                        void run('verseoff')
-                        setQuoteOnStream(false)
-                      }}
-                    >
-                      <Icon name="broadcast-off" size={18} />
-                      Remove from live stream
-                      <span>The passage stays on the screens and phones</span>
-                    </button>
-                  )}
                 </>
               ) : (
                 // Verses only go up during the sermon — anywhere else they would
