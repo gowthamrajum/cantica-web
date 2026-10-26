@@ -68,6 +68,7 @@ User-agent: *
 Allow: /
 
 Disallow: /build
+Disallow: /sermon
 Disallow: /remote
 Disallow: /notify
 Disallow: /c/

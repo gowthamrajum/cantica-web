@@ -14,7 +14,14 @@ import { builderPinRequired, builderUnlocked, unlockBuilder } from '../../lib/ac
  * Unlocked for the session, not remembered: a shared phone in the sound booth
  * should not still be open next week.
  */
-export function BuilderGate({ children }: { children: JSX.Element }): JSX.Element {
+export function BuilderGate({
+  children,
+  title = 'Service Builder'
+}: {
+  children: JSX.Element
+  /** Which builder this door is in front of — the Sermon Builder shares the PIN. */
+  title?: string
+}): JSX.Element {
   const [required, setRequired] = useState<boolean | null>(null)
   const [open, setOpen] = useState(builderUnlocked())
   const [pin, setPin] = useState('')
@@ -39,7 +46,7 @@ export function BuilderGate({ children }: { children: JSX.Element }): JSX.Elemen
   // builder first would flash the very screen the gate exists to withhold.
   if (required === null) {
     return (
-      <Screen title="Service Builder" back={{ to: '/more', label: 'More' }}>
+      <Screen title={title} back={{ to: '/more', label: 'More' }}>
         <div className="flex items-center justify-center gap-2.5 py-20 text-[15px] text-ink-muted">
           <span className="spinner" /> Just a moment…
         </div>
@@ -50,7 +57,7 @@ export function BuilderGate({ children }: { children: JSX.Element }): JSX.Elemen
 
   return (
     <Screen
-      title="Service Builder"
+      title={title}
       back={{ to: '/more', label: 'More' }}
       subtitle="For whoever puts Sunday's order together."
     >
@@ -65,7 +72,7 @@ export function BuilderGate({ children }: { children: JSX.Element }): JSX.Elemen
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 12))}
             onKeyDown={(e) => e.key === 'Enter' && pin && void submit()}
-            aria-label="Service Builder PIN"
+            aria-label={`${title} PIN`}
           />
           <button className="btn-app btn-app-primary btn-block mt-3" onClick={() => void submit()} disabled={!pin || busy}>
             {busy ? 'Checking…' : 'Continue'}

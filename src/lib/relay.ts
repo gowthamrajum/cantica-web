@@ -271,6 +271,8 @@ export interface ServiceSummary {
   updatedDateTime: string
   /** characters of stored deck — only present on the list endpoint */
   serviceDataLength?: number
+  /** an outline was set in the Sermon Builder — list endpoint only */
+  hasSermon?: boolean
 }
 
 export interface ServiceConflict {
@@ -381,6 +383,46 @@ export async function createService(
 }
 
 /** Replace an existing service's deck (and optionally move its slot). */
+// ---- the sermon outline (Sermon Builder) ----
+// Kept apart from the deck on the relay and written on its own, so the preacher
+// writing the outline and whoever builds the service never overwrite each
+// other. The relay puts it into the deck whenever the service is read, so the
+// presenter finds it inside the Sermon exactly where it always did.
+export interface SermonOutline {
+  title: string
+  points: string[]
+}
+
+/** The service's outline, or null when it has none; undefined if unreachable. */
+export async function getSermon(id: number): Promise<SermonOutline | null | undefined> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/services/${id}/sermon`, { cache: 'no-store' })
+    if (!r.ok) return undefined
+    const j = (await r.json()) as { sermon?: SermonOutline | null }
+    return j.sermon ?? null
+  } catch {
+    return undefined
+  }
+}
+
+/** Set the outline, or take it out with null. Touches nothing else on the service. */
+export async function saveSermon(
+  id: number,
+  outline: SermonOutline | null
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/services/${id}/sermon`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outline })
+    })
+    if (!r.ok) return { ok: false, message: await readError(r) }
+    return { ok: true }
+  } catch {
+    return { ok: false, message: 'Could not reach the service store. Check your connection.' }
+  }
+}
+
 export async function updateService(
   id: number,
   serviceData: unknown,

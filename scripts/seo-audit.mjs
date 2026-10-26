@@ -70,6 +70,7 @@ const PUBLIC = [
  */
 const PRIVATE = [
   { path: '/build', name: 'Service Builder' },
+  { path: '/sermon', name: 'Sermon Builder' },
   { path: '/remote', name: 'Operator remote' },
   { path: '/notify', name: 'Send a notification' }
 ]

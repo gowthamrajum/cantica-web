@@ -41,7 +41,7 @@ export function SermonOutlineFields({
         }}
       />
       <textarea
-        className="search-field w-full"
+        className="search-field min-h-[10.5rem] w-full"
         rows={6}
         placeholder={'Points, one per line\n1. He knows His sheep\n2. He leads His sheep\n3. He lays down His life'}
         value={body}

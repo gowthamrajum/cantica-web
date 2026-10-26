@@ -34,8 +34,7 @@ import { MediaUrlFields } from '../components/app/MediaUrlFields'
 import { MediaUploadFields } from '../components/app/MediaUploadFields'
 import { mediaConfig, type MediaConfig } from '../lib/mediaUpload'
 import { fromBuilderState, isFromPresenter, readBuilderState, toBuilderState } from '../lib/builderState'
-import { outlineInDeck, readOutline, withOutline, type Outline } from '../lib/outline'
-import { SermonOutlineFields } from '../components/app/SermonOutlineFields'
+import { readOutline } from '../lib/outline'
 import {
   DAYS,
   dayOf,
@@ -170,9 +169,6 @@ export function Build(): JSX.Element {
    * layouts, the QR code. Everything else about the deck is left alone.
    */
   const [viewItems, setViewItems] = useState<ServiceItem[]>([])
-  /** The sermon whose outline is being edited in the read-only view, and the draft. */
-  const [viewOutlineAt, setViewOutlineAt] = useState<number | null>(null)
-  const [viewOutline, setViewOutline] = useState<Outline | null>(null)
   const [viewSaving, setViewSaving] = useState(false)
   /**
    * Where something new goes, once the operator has tapped a gap.
@@ -200,7 +196,6 @@ export function Build(): JSX.Element {
     picks: Pick[]
     dropped: { title: string; reason: string }[]
     links: ServiceLink[]
-    outline: Outline | null
   } | null>(null)
   const [rebuilding, setRebuilding] = useState(false)
 
@@ -208,15 +203,6 @@ export function Build(): JSX.Element {
   const [picks, setPicks] = useState<Pick[]>([])
   /** Where this service can be watched or joined — saved with the deck. */
   const [links, setLinks] = useState<ServiceLink[]>([])
-  /** The sermon outline — it travels inside the Sermon, not as a part of its own. */
-  const [outline, setOutline] = useState<Outline | null>(null)
-  /** Bumped when the outline is replaced from outside (a service reopened), so
-   *  the editor starts again from it rather than from what was being typed. */
-  const [outlineKey, setOutlineKey] = useState(0)
-  const restoreOutline = (o: Outline | null): void => {
-    setOutline(o)
-    setOutlineKey((k) => k + 1)
-  }
   const [source, setSource] = useState<PickSource>('songs')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [preview, setPreview] = useState<number | 'all' | null>(null)
@@ -410,13 +396,15 @@ export function Build(): JSX.Element {
   const setLangAt = (i: number, l: ServiceLang): void =>
     setPicks((p) => p.map((x, j) => (j === i && x.type !== 'media' ? { ...x, lang: l } : x)))
 
-  const envelope = useMemo(() => buildService(name, picks, links, outline), [name, picks, links, outline])
+  // No sermon outline here: it is written in the Sermon Builder and kept apart
+  // on the relay, which puts it into the deck whenever the service is read.
+  const envelope = useMemo(() => buildService(name, picks, links), [name, picks, links])
   // What gets stored: the deck Cantica reads, plus a record of how it was
   // assembled so this builder can reopen it. The exported FILE stays the plain
   // envelope — Cantica has no use for the sidecar.
   const builderState = useMemo(
-    () => toBuilderState(slot.day, slot.date, picks, links, outline),
-    [slot.day, slot.date, picks, links, outline]
+    () => toBuilderState(slot.day, slot.date, picks, links),
+    [slot.day, slot.date, picks, links]
   )
   const payload = useMemo(() => ({ ...envelope, builder: builderState }), [envelope, builderState])
 
@@ -612,14 +600,12 @@ export function Build(): JSX.Element {
       }
       const { picks: restored, skipped } = await fromBuilderState(state)
       const restoredLinks = state.links ?? []
-      const restoredOutline = state.outline ?? null
       setPicks(restored)
       setLinks(restoredLinks)
-      restoreOutline(restoredOutline)
       // The baseline is what the RESTORED picks produce, not the stored
       // sidecar: a psalm's range is re-derived from its verses, so the two can
       // differ harmlessly and would otherwise read as an unsaved change.
-      setSavedKey(JSON.stringify(toBuilderState(slot.day, slot.date, restored, restoredLinks, restoredOutline)))
+      setSavedKey(JSON.stringify(toBuilderState(slot.day, slot.date, restored, restoredLinks)))
       setSavedId(exists.id)
       setEditing(true)
       setExists(null)
@@ -702,11 +688,9 @@ export function Build(): JSX.Element {
         checkToken.current++
         setViewing(null)
         setSlot(next)
-        const restoredOutline = state.outline ?? null
         setPicks(restored)
         setLinks(restoredLinks)
-        restoreOutline(restoredOutline)
-        setSavedKey(JSON.stringify(toBuilderState(next.day, next.date, restored, restoredLinks, restoredOutline)))
+        setSavedKey(JSON.stringify(toBuilderState(next.day, next.date, restored, restoredLinks)))
         setSavedId(s.id)
         setEditing(true)
         setExists(null)
@@ -786,9 +770,7 @@ export function Build(): JSX.Element {
         dropped,
         // A deck may carry links even when it carries no picks; they survive
         // verbatim, being the one part of it this builder can hold unchanged.
-        links: usableLinks(env.service.links),
-        // So does the sermon outline: it is words, not an arrangement.
-        outline: outlineInDeck(env.service.items ?? [])
+        links: usableLinks(env.service.links)
       })
     } finally {
       setRebuilding(false)
@@ -914,7 +896,6 @@ export function Build(): JSX.Element {
     setSlot(next)
     setPicks(rebuild.picks)
     setLinks(rebuild.links)
-    restoreOutline(rebuild.outline)
     setSavedId(rebuild.id)
     setEditing(true)
     // Deliberately NOT marking this as saved: what is on screen is a rebuild,
@@ -1140,11 +1121,8 @@ export function Build(): JSX.Element {
               setAddKind(null)
               setNote('')
             }}
-            onOutline={(i) => {
-              setViewOutline(readOutline(viewItems[i]?.slides ?? []))
-              setViewOutlineAt(i)
-              setNote('')
-            }}
+            // The outline is the Sermon Builder's now — one place to write it.
+            onOutline={() => navigate(`/sermon?service=${viewing.id}`)}
             onRemove={(i) => {
               const gone = viewItems[i]?.title ?? 'that item'
               setViewItems((list) => list.filter((_, j) => j !== i))
@@ -1205,44 +1183,6 @@ export function Build(): JSX.Element {
             setAddKind(null)
           }}
         />
-
-        <Sheet
-          open={viewOutlineAt !== null}
-          title="Sermon outline"
-          onClose={() => setViewOutlineAt(null)}
-        >
-          {viewOutlineAt !== null && (
-            <SermonOutlineFields key={viewOutlineAt} initial={viewOutline} onChange={setViewOutline} />
-          )}
-          <div className="mt-3 space-y-2 px-[var(--gutter)] pb-1">
-            <button
-              className="btn-app btn-app-primary btn-block"
-              onClick={() => {
-                const at = viewOutlineAt
-                const had = at !== null && !!readOutline(viewItems[at]?.slides ?? [])
-                if (at !== null) {
-                  setViewItems((list) =>
-                    list.map((it, j) => (j === at ? { ...it, slides: withOutline(it.slides ?? [], viewOutline) } : it))
-                  )
-                }
-                setViewOutlineAt(null)
-                setNote(
-                  viewOutline
-                    ? 'Outline set in the Sermon. Save the new order to keep it.'
-                    : had
-                      ? 'Outline taken out of the Sermon. Save the new order to keep it.'
-                      : ''
-                )
-              }}
-            >
-              {viewOutline
-                ? 'Done'
-                : viewOutlineAt !== null && readOutline(viewItems[viewOutlineAt]?.slides ?? [])
-                  ? 'Remove the outline'
-                  : 'Cancel'}
-            </button>
-          </div>
-        </Sheet>
 
         <Sheet
           open={addKind === 'url'}
@@ -1444,16 +1384,24 @@ export function Build(): JSX.Element {
         <ServiceLinksEditor links={links} onChange={setLinks} />
       </Collapsible>
 
-      {/* Part of the Sermon, not a part of the service: Cantica files it inside
-          the Sermon card, straight after it. Closed by default, like Links. */}
-      <Collapsible
-        title="Sermon outline"
-        open={disc.isOpen('outline')}
-        onToggle={() => disc.toggle('outline')}
-        summary={outline ? `${outline.points.length} point${outline.points.length === 1 ? '' : 's'}` : 'none'}
-      >
-        <SermonOutlineFields key={outlineKey} initial={outline} onChange={setOutline} />
-      </Collapsible>
+      {/* The sermon outline has a builder of its own: the preacher writes it
+          there, apart from the service, so the two never overwrite each other. */}
+      <Section>
+        <button
+          type="button"
+          onClick={() => navigate(savedId !== null ? `/sermon?service=${savedId}` : '/sermon')}
+          className="app-card pressable flex w-[calc(100%_-_2*var(--gutter))] items-center gap-3 p-4 text-left"
+        >
+          <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-gold-100 text-gold-700">
+            <Icon name="bible" size={19} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="list-title block">Sermon outline</span>
+            <span className="list-sub block">Written in the Sermon Builder — opens this service there</span>
+          </span>
+          <Icon name="chevron" size={17} className="list-chev" />
+        </button>
+      </Section>
 
 
       <Section>

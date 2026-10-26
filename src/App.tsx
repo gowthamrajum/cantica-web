@@ -10,6 +10,7 @@ import { More } from './routes/More'
 import { Services } from './routes/Services'
 import { Give } from './routes/Give'
 import { Build } from './routes/Build'
+import { SermonBuild } from './routes/SermonBuild'
 import { BuilderGate } from './components/app/BuilderGate'
 import { Install } from './routes/Install'
 import { Notifications } from './routes/Notifications'
@@ -52,6 +53,14 @@ export default function App(): JSX.Element {
             element={
               <BuilderGate>
                 <Build />
+              </BuilderGate>
+            }
+          />
+          <Route
+            path="/sermon"
+            element={
+              <BuilderGate title="Sermon Builder">
+                <SermonBuild />
               </BuilderGate>
             }
           />

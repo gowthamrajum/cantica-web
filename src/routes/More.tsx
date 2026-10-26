@@ -40,6 +40,13 @@ export function More(): JSX.Element {
           to="/build"
         />
         <ListRow
+          icon="bible"
+          tint="gold"
+          title="Sermon Builder"
+          subtitle="Write the sermon outline for a service"
+          to="/sermon"
+        />
+        <ListRow
           icon="remote"
           tint="gold"
           title="Operator remote"

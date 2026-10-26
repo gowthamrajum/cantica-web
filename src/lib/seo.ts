@@ -168,6 +168,11 @@ export const ROUTE_SEO: Record<string, SeoMeta> = {
     description: "Pick Sunday's songs and readings for Cantica.",
     noindex: true
   },
+  '/sermon': {
+    title: 'Sermon Builder',
+    description: "Write the sermon's outline and attach it to a service.",
+    noindex: true
+  },
   '/remote': {
     title: 'Operator remote',
     description: 'Drive the live slides from a phone.',

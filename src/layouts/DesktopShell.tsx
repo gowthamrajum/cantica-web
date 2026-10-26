@@ -40,6 +40,7 @@ const MORE: { label: string; sub: string; icon: IconName; to?: string; href?: st
 
 const TEAM: { label: string; sub: string; icon: IconName; to: string }[] = [
   { label: 'Service Builder', sub: "Pick Sunday's songs and readings", icon: 'sparkle', to: '/build' },
+  { label: 'Sermon Builder', sub: 'Write the sermon outline', icon: 'bible', to: '/sermon' },
   { label: 'Operator remote', sub: 'Drive the live slides', icon: 'remote', to: '/remote' },
   { label: 'Send a notification', sub: 'Tell the church something', icon: 'bell', to: '/notify' }
 ]
@@ -163,7 +164,7 @@ function MoreMenu(): JSX.Element {
     }
   }, [open])
 
-  const owned = ['/visit', '/give', '/notifications', '/install', '/build', '/remote', '/notify']
+  const owned = ['/visit', '/give', '/notifications', '/install', '/build', '/sermon', '/remote', '/notify']
   const active = owned.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   return (
