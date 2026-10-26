@@ -173,6 +173,11 @@ export const ROUTE_SEO: Record<string, SeoMeta> = {
     description: "Write the sermon's outline and attach it to a service.",
     noindex: true
   },
+  '/admin/backgrounds': {
+    title: 'Background Library',
+    description: 'Motion backgrounds for every Cantica presenter. Admins only.',
+    noindex: true
+  },
   '/remote': {
     title: 'Operator remote',
     description: 'Drive the live slides from a phone.',

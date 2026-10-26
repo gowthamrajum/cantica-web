@@ -11,6 +11,7 @@ import { Services } from './routes/Services'
 import { Give } from './routes/Give'
 import { Build } from './routes/Build'
 import { SermonBuild } from './routes/SermonBuild'
+import { BackgroundLibrary } from './routes/BackgroundLibrary'
 import { BuilderGate } from './components/app/BuilderGate'
 import { Install } from './routes/Install'
 import { Notifications } from './routes/Notifications'
@@ -64,6 +65,7 @@ export default function App(): JSX.Element {
               </BuilderGate>
             }
           />
+          <Route path="/admin/backgrounds" element={<BackgroundLibrary />} />
           <Route path="/install" element={<Install />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/notify" element={<Notify />} />

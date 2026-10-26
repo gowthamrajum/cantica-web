@@ -383,6 +383,75 @@ export async function createService(
 }
 
 /** Replace an existing service's deck (and optionally move its slot). */
+// ---- the shared background library (admins only change it) ----
+// Motion backgrounds every Cantica presenter can use. Uploaded here, by an
+// admin, straight to the media store (uploadMedia), then registered on the
+// relay; the presenters only ever read the list.
+export interface LibraryBackground {
+  id: number
+  name: string
+  url: string
+  kind: 'video' | 'image'
+  bytes: number
+  createdAt: string
+}
+
+export async function listBackgrounds(): Promise<LibraryBackground[] | null> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/media/backgrounds`, { cache: 'no-store' })
+    if (!r.ok) return null
+    const j = (await r.json()) as { backgrounds?: LibraryBackground[] }
+    return j.backgrounds ?? []
+  } catch {
+    return null
+  }
+}
+
+/** Whether this is the admin PIN — asked before the admin controls appear. */
+export async function checkAdminPin(pin: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/media/admin/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    })
+    if (r.ok) return { ok: true }
+    return { ok: false, message: await readError(r) }
+  } catch {
+    return { ok: false, message: 'Could not reach the relay. Check your connection.' }
+  }
+}
+
+export async function addBackground(
+  pin: string,
+  bg: { name: string; url: string; kind: 'video' | 'image'; bytes: number }
+): Promise<{ ok: true; background: LibraryBackground } | { ok: false; message: string }> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/media/backgrounds`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...bg, pin })
+    })
+    if (!r.ok) return { ok: false, message: await readError(r) }
+    return { ok: true, background: (await r.json()) as LibraryBackground }
+  } catch {
+    return { ok: false, message: 'Could not reach the relay. Check your connection.' }
+  }
+}
+
+export async function removeBackground(pin: string, id: number): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/media/backgrounds/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Pin ${pin}` }
+    })
+    if (!r.ok) return { ok: false, message: await readError(r) }
+    return { ok: true }
+  } catch {
+    return { ok: false, message: 'Could not reach the relay. Check your connection.' }
+  }
+}
+
 // ---- the sermon outline (Sermon Builder) ----
 // Kept apart from the deck on the relay and written on its own, so the preacher
 // writing the outline and whoever builds the service never overwrite each

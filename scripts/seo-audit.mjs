@@ -71,6 +71,7 @@ const PUBLIC = [
 const PRIVATE = [
   { path: '/build', name: 'Service Builder' },
   { path: '/sermon', name: 'Sermon Builder' },
+  { path: '/admin/backgrounds', name: 'Background Library' },
   { path: '/remote', name: 'Operator remote' },
   { path: '/notify', name: 'Send a notification' }
 ]

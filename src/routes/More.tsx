@@ -47,6 +47,13 @@ export function More(): JSX.Element {
           to="/sermon"
         />
         <ListRow
+          icon="watch"
+          tint="navy"
+          title="Background Library"
+          subtitle="Motion backgrounds for Cantica — admins"
+          to="/admin/backgrounds"
+        />
+        <ListRow
           icon="remote"
           tint="gold"
           title="Operator remote"

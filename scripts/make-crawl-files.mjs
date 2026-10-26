@@ -69,6 +69,7 @@ Allow: /
 
 Disallow: /build
 Disallow: /sermon
+Disallow: /admin/
 Disallow: /remote
 Disallow: /notify
 Disallow: /c/

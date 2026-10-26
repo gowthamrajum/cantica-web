@@ -23,6 +23,7 @@ const LIBRARY = [
 const TEAM = [
   { to: '/build', label: 'Service Builder' },
   { to: '/sermon', label: 'Sermon Builder' },
+  { to: '/admin/backgrounds', label: 'Background Library' },
   { to: '/remote', label: 'Operator remote' },
   { to: '/notify', label: 'Send a notification' }
 ]
