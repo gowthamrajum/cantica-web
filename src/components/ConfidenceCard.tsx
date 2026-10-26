@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { LiveState } from '../lib/relay'
+import { textEffectClass } from '../lib/textEffect'
 import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, textOf } from '../lib/stage'
 
 /**
@@ -122,7 +123,7 @@ export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Elem
         <div className="conf-inner">
           <div
             ref={textRef}
-            className={`conf-text${theme?.uppercase ? ' upper' : ''}${theme?.shadow !== false ? ' shadow' : ''}`}
+            className={`conf-text${theme?.uppercase ? ' upper' : ''}${textEffectClass(theme)}`}
             style={{ color: theme?.textColor || '#fff', textAlign: (theme?.textAlign as CSSProperties['textAlign']) || 'center' }}
           >
             {lines.map((t, i) => (
@@ -132,7 +133,10 @@ export function ConfidenceCard({ state }: { state: LiveState | null }): JSX.Elem
             ))}
           </div>
           {showCaption && (
-            <div className="conf-caption" style={{ color: theme?.captionColor || '#ffd27f' }}>
+            <div
+              className={`conf-caption${theme?.outline !== false ? ' outline' : ''}`}
+              style={{ color: theme?.captionColor || '#ffd27f' }}
+            >
               {caption}
             </div>
           )}

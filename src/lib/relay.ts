@@ -41,6 +41,8 @@ export interface Theme {
   textAlign?: string
   uppercase?: boolean
   shadow?: boolean
+  /** thin solid black outline around the text, replacing the shadow; absent = on */
+  outline?: boolean
   fontScale?: number
 }
 export interface OrderItem {

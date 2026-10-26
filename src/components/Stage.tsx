@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { Link } from 'react-router-dom'
 import type { LiveState } from '../lib/relay'
 import { fmtClock, fmtCountdown, formatLyric, isTimer, resolveBackground, sizeFor, textOf } from '../lib/stage'
+import { outlineOn, textEffectClass } from '../lib/textEffect'
 import { Logo } from './Logo'
 
 /** Full-frame audience mirror of the live service — the React port of the desktop
@@ -110,7 +111,7 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
       ) : hidden ? (
         <div className="stage-bg" style={{ background: blackout ? '#000' : 'transparent' }} />
       ) : composed ? (
-        <div className="stage-composed">
+        <div className={`stage-composed${textEffectClass(theme)}`}>
           {composed.map((l, i) => (
             <div
               key={i}
@@ -131,14 +132,14 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
         <div className={`stage-content${qrOn ? ' has-qr' : ''}`}>
           <div className="stage-text-wrap">
             {timer && (
-              <div className="stage-lyrics shadow" style={{ fontSize: sizeFor(1, scale * 1.6) }}>
+              <div className={`stage-lyrics${textEffectClass(theme) || ' shadow'}`} style={{ fontSize: sizeFor(1, scale * 1.6) }}>
                 <span className="line">{slide?.kind === 'clock' ? fmtClock() : fmtCountdown(slide?.countdownTo)}</span>
               </div>
             )}
             {showLines && (
               <div
                 ref={lyricRef}
-                className={`stage-lyrics${slide?.singleLine ? ' nowrap' : ''}${theme?.uppercase ? ' upper' : ''}${theme?.shadow !== false ? ' shadow' : ''}`}
+                className={`stage-lyrics${slide?.singleLine ? ' nowrap' : ''}${theme?.uppercase ? ' upper' : ''}${textEffectClass(theme)}`}
                 style={{ textAlign: (theme?.textAlign as CSSProperties['textAlign']) || 'center' }}
               >
                 {lines.map((t, i) => (
@@ -146,7 +147,9 @@ export function Stage({ state, standbyName = 'Telugu Community Church' }: { stat
                 ))}
               </div>
             )}
-            {(caption || (timer && slide?.message)) && <div className="stage-caption">{caption || slide?.message}</div>}
+            {(caption || (timer && slide?.message)) && (
+              <div className={`stage-caption${outlineOn(theme) ? ' outline' : ''}`}>{caption || slide?.message}</div>
+            )}
           </div>
           {/* A QR is useless on the device displaying it — on a phone this is a
               tap, straight to the giving page. */}

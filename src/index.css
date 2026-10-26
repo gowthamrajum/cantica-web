@@ -1295,6 +1295,10 @@ html.channel-open #root {
 .stage-lyrics.nowrap { max-width: none; }
 .stage-lyrics.upper { text-transform: uppercase; }
 .stage-lyrics.shadow, .stage-composed.shadow { text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55); }
+/* The presenter's Outline (on by default): a thin solid black ring around the
+   text, sized in em — see lib/textEffect. Replaces the shadow, never adds to it. */
+.stage-lyrics.outline, .stage-composed.outline, .conf-text.outline { text-shadow: 0.04em 0em 0 #000, 0.037em 0.015em 0 #000, 0.028em 0.028em 0 #000, 0.015em 0.037em 0 #000, 0em 0.04em 0 #000, -0.015em 0.037em 0 #000, -0.028em 0.028em 0 #000, -0.037em 0.015em 0 #000, -0.04em 0em 0 #000, -0.037em -0.015em 0 #000, -0.028em -0.028em 0 #000, -0.015em -0.037em 0 #000, 0em -0.04em 0 #000, 0.015em -0.037em 0 #000, 0.028em -0.028em 0 #000, 0.037em -0.015em 0 #000, 0.022em 0em 0 #000, 0.016em 0.016em 0 #000, 0em 0.022em 0 #000, -0.016em 0.016em 0 #000, -0.022em 0em 0 #000, -0.016em -0.016em 0 #000, 0em -0.022em 0 #000, 0.016em -0.016em 0 #000; }
+.stage-caption.outline, .conf-caption.outline { text-shadow: 0.06em 0em 0 #000, 0.055em 0.023em 0 #000, 0.042em 0.042em 0 #000, 0.023em 0.055em 0 #000, 0em 0.06em 0 #000, -0.023em 0.055em 0 #000, -0.042em 0.042em 0 #000, -0.055em 0.023em 0 #000, -0.06em 0em 0 #000, -0.055em -0.023em 0 #000, -0.042em -0.042em 0 #000, -0.023em -0.055em 0 #000, 0em -0.06em 0 #000, 0.023em -0.055em 0 #000, 0.042em -0.042em 0 #000, 0.055em -0.023em 0 #000, 0.033em 0em 0 #000, 0.023em 0.023em 0 #000, 0em 0.033em 0 #000, -0.023em 0.023em 0 #000, -0.033em 0em 0 #000, -0.023em -0.023em 0 #000, 0em -0.033em 0 #000, 0.023em -0.023em 0 #000; }
 /* Off while capturing a slide for export (see servicePptx). Not because the
    shadow is the bug — it is not; the slab behind exported text survives with it
    gone — but because that export merges two captures by keeping the lighter
