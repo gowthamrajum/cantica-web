@@ -396,6 +396,8 @@ export interface LibraryBackground {
   kind: 'video' | 'image'
   bytes: number
   createdAt: string
+  /** lower-case, for search — absent on a relay from before tags */
+  tags?: string[]
 }
 
 export async function listBackgrounds(): Promise<LibraryBackground[] | null> {
@@ -426,13 +428,32 @@ export async function checkAdminPin(pin: string): Promise<{ ok: true } | { ok: f
 
 export async function addBackground(
   pin: string,
-  bg: { name: string; url: string; kind: 'video' | 'image'; bytes: number }
+  bg: { name: string; url: string; kind: 'video' | 'image'; bytes: number; tags?: string[] }
 ): Promise<{ ok: true; background: LibraryBackground } | { ok: false; message: string }> {
   try {
     const r = await fetch(`${RELAY_BASE}/media/backgrounds`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...bg, pin })
+    })
+    if (!r.ok) return { ok: false, message: await readError(r) }
+    return { ok: true, background: (await r.json()) as LibraryBackground }
+  } catch {
+    return { ok: false, message: 'Could not reach the relay. Check your connection.' }
+  }
+}
+
+/** Rename a background or change its tags (admins). */
+export async function updateBackground(
+  pin: string,
+  id: number,
+  change: { name?: string; tags?: string[] }
+): Promise<{ ok: true; background: LibraryBackground } | { ok: false; message: string }> {
+  try {
+    const r = await fetch(`${RELAY_BASE}/media/backgrounds/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Pin ${pin}` },
+      body: JSON.stringify(change)
     })
     if (!r.ok) return { ok: false, message: await readError(r) }
     return { ok: true, background: (await r.json()) as LibraryBackground }
